@@ -1,0 +1,121 @@
+/* resets */
+html, body, nav, ul, div {
+    margin:0;
+    border-width: 0;
+    padding: 0;
+}
+button {
+    font: unset;
+}
+
+
+:root {
+    font-family: sans-serif;
+    font-size: 16px;
+
+    /* light mode */
+    /*--panel-border-color: #333;*/
+    /*--panel-background: #ccc;*/
+    /*--primary-control-background: #e0e0e0;*/
+    /*--primary-control-background-hover: #fff;*/
+    /*--primary-control-border-color: #555;*/
+
+
+
+    /* dark mode */
+    --panel-background: #002b36;
+    --panel-border-color: #555;
+
+    --primary-control-text: #657b83;
+    --primary-control-background: #073642;
+    --primary-control-background-hover: #000;
+    --primary-control-border-color: #555;
+    --selected-color: #002b36;
+    --selected-background: #2aa198;
+
+
+}
+
+body, .panel {
+    background-color: var(--panel-background);
+}
+label, button, input, textarea {
+    color: var(--primary-control-text);
+}
+button {
+    border-radius: 0;
+    background-color: var(--primary-control-background);
+    &:hover {
+        background-color: var(--primary-control-background-hover);
+    }
+    border: 1px solid var(--primary-control-border-color);
+    padding: 0.25rem 0.5rem;
+}
+input {
+    border-radius: 0;
+    background-color: var(--primary-control-background);
+    border: 1px solid var(--primary-control-border-color);
+    &:focus {
+        background-color: var(--primary-control-background-hover);
+    }
+}
+
+.menubar {
+    display: flex;
+    flex-direction: row;
+    ul li {
+        display: none;
+    }
+    border: 1px solid black;
+}
+
+.toolbar, .statusbar {
+    display: flex;
+    flex-direction: row;
+    border: 1px solid var(--panel-border-color);
+}
+.spacer {
+    flex: 1;
+}
+.scroll-container {
+    overflow: scroll;
+}
+
+
+.main-layout {
+    display: grid;
+    grid-template-columns: 200px 1fr 200px;
+    .full-span {
+        grid-column: 1 / span 3;
+    }
+    .left {
+        border: 1px solid var(--panel-border-color);
+        grid-column: 1 / span 1;
+    }
+    .center {
+        border: 1px solid var(--panel-border-color);
+        grid-column: 2 / span 1;
+        min-height: 80vh;
+    }
+    .right {
+        border: 1px solid var(--panel-border-color);
+        grid-column: 3 / span 1;
+    }
+}
+
+
+.tree-view {
+    color: var(--primary-control-text);
+    .tree-item {
+        border: 1px solid transparent;
+        padding: 0.25rem 0.5rem;
+        &.selected {
+            background-color: var(--selected-background);
+            color: var(--selected-color);
+            border: 1px solid var(--primary-control-border-color);
+        }
+        &:hover {
+            border: 1px solid var(--primary-control-border-color);
+        }
+    }
+}

@@ -176,6 +176,7 @@ export interface OvalShape extends Shape {
 //
 export interface DrawDocument {
   version: number
+  title: string
   shapes: Shape[];
 }
 
