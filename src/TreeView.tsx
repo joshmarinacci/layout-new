@@ -18,14 +18,14 @@ function TreeItem(props: {
     onSelect: (value: (((prevState: Shape) => Shape) | Shape)) => void
 }) {
     const {item, selected, onSelect} = props
-    return <li key={item.id}
+    return <div key={item.id}
                className={cls({
                    'tree-item':true,
                    selected: item === selected
                })}
                onClick={()=>{
                    onSelect(item)
-               }}>{item.name}</li>
+               }}>{item.name}</div>
 }
 
 export default function TreeView(props: {
@@ -36,14 +36,15 @@ export default function TreeView(props: {
     const doc = props.document
     return <ul className={'tree-view'}>
         <li>
-            <label>Doc {doc.title}</label>
+            <div className={'tree-item'}>
+                Doc: {doc.title}
+            </div>
             <ul>
-                {doc.shapes.map((shape,n)=>{
-                    return <TreeItem key={shape.id}
-                                     item={shape}
-                                     selected={props.selected}
-                                     onSelect={props.onSelect}/>
-                })}
+                {doc.shapes.map((shape,n)=>
+                    <TreeItem key={shape.id}
+                              item={shape}
+                              selected={props.selected}
+                              onSelect={props.onSelect}/>)}
             </ul>
         </li>
         <li>

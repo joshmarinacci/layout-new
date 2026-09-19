@@ -1,10 +1,17 @@
 // @ts-ignore
 import React, {useState} from "react";
-import type {CircleShape, DrawDocument, RectangleShape, Shape} from "./types";
+import type {
+    Bounds,
+    CircleShape,
+    DrawDocument,
+    RectangleShape,
+    Shape
+} from "./types";
 import TreeView from "./TreeView";
 import "./app.css"
 import PropSheet from "./PropSheet";
 import VisualEditor from "./VisualEditor";
+import {appendShape, makeRect} from "./reducer";
 
 function make_example_doc():DrawDocument {
     const rect: RectangleShape = {
@@ -73,10 +80,18 @@ function make_example_doc():DrawDocument {
     }
 }
 
-const DOC = make_example_doc()
+const DOCx = make_example_doc()
+
+function updateDocTitle(doc: DrawDocument, title: string):DrawDocument {
+    return {
+        ...doc,
+        title
+    }
+}
 
 function App() {
     const [selected, setSelected] = useState<Shape|null>()
+    const [doc, setDoc] = useState<DrawDocument>(DOCx)
     return <div className={'main-layout'}>
         <nav className={'menubar full-span'}>
             <ul>
@@ -99,16 +114,26 @@ function App() {
             </ul>
         </nav>
         <div className={'toolbar full-span'}>
-            <input type={'text'} value={DOC.version}/>
-            <button>New Rect</button>
+            <input type={'text'} value={doc.title} onChange={(e) => {
+                setDoc(updateDocTitle(doc, e.target.value))
+            }}/>
+            <button onClick={() => {
+                const bounds:Bounds = {
+                    x: 50,
+                    y: 250,
+                    width: 50,
+                    height: 50
+                }
+                setDoc(appendShape(doc,makeRect("rect2",bounds)))
+            }}>New Rect</button>
             <button disabled={true}>Undo</button>
             <button disabled={true}>Redo</button>
         </div>
         <div className={'left scroll-container'}>
-            <TreeView document={DOC} selected={selected} onSelect={setSelected}/>
+            <TreeView document={doc} selected={selected} onSelect={setSelected}/>
         </div>
         <div className={'center scroll-container'}>
-            <VisualEditor document={DOC} selected={selected} setSelected={setSelected}/>
+            <VisualEditor document={doc} selected={selected} setSelected={setSelected}/>
         </div>
         <div className={'right scroll-container'}>
             <PropSheet selected={selected}/>

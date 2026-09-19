@@ -1,39 +1,14 @@
 import {describe, expect, it} from 'vitest'
 import type {DrawDocument, RectangleShape} from "../src/types";
-
-function gen_id(rect1: string) {
-    return rect1+"_"+Math.floor(Math.random()*1_000_000)
-}
+import {
+    appendShape,
+    makeRect,
+    updateDocShape,
+    updateRectName
+} from "../src/reducer";
 
 function makeRectDocument():DrawDocument {
-    const rect:RectangleShape = {
-        id: gen_id("rect"),
-        type:'rectangle',
-        name: 'rect',
-        components: {
-            rect: {
-                bounds: {
-                    x: 0,
-                    y: 0,
-                    width: 100,
-                    height: 100,
-                }
-            },
-            fill: {
-                fill: {
-                    kind: "solid",
-                    color: "red"
-                }
-            },
-            stroke: {
-                width: 1,
-                color: "black"
-            },
-            cornerRadius: {
-                radius: 10
-            }
-        }
-    }
+    const rect = makeRect('rect1',{x:200,y:50,width:100, height:100});
     return {
         version: 0,
         title:'document',
@@ -41,8 +16,36 @@ function makeRectDocument():DrawDocument {
     }
 }
 
+function makeEmptyDoc():DrawDocument {
+    return {
+        title:"some doc",
+        shapes: [],
+        version: 0,
+    }
+}
+
 describe("make document",() => {
-    const doc = makeRectDocument()
-    expect(doc.version).toBe(0)
-    expect(doc.shapes.length).toBe(1)
+    it("can update a rectangle", () => {
+        const doc = makeRectDocument()
+        expect(doc.version).toBe(0)
+        expect(doc.shapes.length).toBe(1)
+        expect(doc.shapes[0].type).toBe('rectangle')
+        let rect = doc.shapes[0] as RectangleShape
+        expect(rect.name).toBe('rect1')
+        // set the name
+        rect = updateRectName(rect, 'rect2')
+        expect(rect.name).toBe('rect2')
+
+        let doc2 = updateDocShape(doc, updateRectName(rect, 'rect3'))
+        expect(doc2.shapes[0].type).toBe('rectangle')
+        let rect3 = doc2.shapes[0] as RectangleShape
+        expect(rect3.name).toBe('rect3')
+    })
+    it("can add a rectangle", () => {
+        const doc = makeEmptyDoc()
+        expect(doc.shapes.length).toBe(0)
+        let doc2 = appendShape(doc, makeRect("rect1",{x:0, y:0, width:50, height:50}))
+        expect(doc.shapes.length).toBe(0)
+        expect(doc2.shapes.length).toBe(1)
+    })
 })
