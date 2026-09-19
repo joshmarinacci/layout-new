@@ -1,4 +1,10 @@
-import type {CircleShape, DrawDocument, RectangleShape, Shape} from "./types";
+import type {
+    Bounds,
+    CircleShape,
+    DrawDocument,
+    RectangleShape,
+    Shape
+} from "./types";
 import {useEffect, useRef} from "react";
 
 type ShapeRenderer<T extends Shape> = (ctx:CanvasRenderingContext2D,shape:T) => void
@@ -26,19 +32,45 @@ const circleRenderer:ShapeRenderer<CircleShape> = (ctx, shape) => {
     ctx.stroke()
 }
 
-function drawScene(current: HTMLCanvasElement, document: DrawDocument, selected: Shape) {
+
+function calculateSelectionBounds(shape: Shape):Bounds {
+    if(shape.type === 'rectangle') {
+        return (shape as RectangleShape).components.rect.bounds
+    }
+    if(shape.type === 'circle') {
+        let circ = (shape as CircleShape).components.circle
+        return {
+            x: circ.center.x - circ.radius,
+            y: circ.center.y - circ.radius,
+            width: circ.radius*2,
+            height: circ.radius*2
+        }
+    }
+    throw new Error(`unknown shape type ${shape.type}`)
+}
+
+function drawScene(current: HTMLCanvasElement, document: DrawDocument, selected?: Shape) {
     let ctx = current.getContext('2d') as CanvasRenderingContext2D
     ctx.fillStyle = '#333'
     ctx.fillRect(0,0,current.width, current.height)
     document.shapes.forEach(shape => {
         if(shape.type === 'rectangle') rectRenderer(ctx, shape as RectangleShape)
         if(shape.type === 'circle') circleRenderer(ctx, shape as CircleShape)
+        if(shape === selected) {
+            const b = calculateSelectionBounds(shape)
+            ctx.strokeStyle = 'yellow'
+            ctx.lineWidth = 3
+            ctx.beginPath()
+            ctx.rect(b.x,b.y,b.width,b.height)
+            ctx.closePath()
+            ctx.stroke()
+        }
     })
 }
 
 export default function VisualEditor(props: {
     document: DrawDocument,
-    selected: Shape,
+    selected?: Shape,
     setSelected: (value: (((prevState: Shape) => Shape) | Shape)) => void
 }) {
     const ref = useRef<HTMLCanvasElement>(null)
