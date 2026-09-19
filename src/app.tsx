@@ -4,6 +4,7 @@ import type {CircleShape, DrawDocument, RectangleShape, Shape} from "./types";
 import TreeView from "./TreeView";
 import "./app.css"
 import PropSheet from "./PropSheet";
+import VisualEditor from "./VisualEditor";
 
 function make_example_doc():DrawDocument {
     const rect: RectangleShape = {
@@ -29,7 +30,7 @@ function make_example_doc():DrawDocument {
             },
             stroke: {
                 kind: "stroke-component",
-                width: 1,
+                width: 4,
                 color: "black"
             },
             cornerRadius: {
@@ -61,7 +62,7 @@ function make_example_doc():DrawDocument {
             stroke: {
                 kind: 'stroke-component',
                 color: 'black',
-                width: 1
+                width: 4
             }
         }
     }
@@ -107,7 +108,7 @@ function App() {
             <TreeView document={DOC} selected={selected} onSelect={setSelected}/>
         </div>
         <div className={'center scroll-container'}>
-            <div>the editing canvas</div>
+            <VisualEditor document={DOC} selected={selected} setSelected={setSelected}/>
         </div>
         <div className={'right scroll-container'}>
             <PropSheet selected={selected}/>
