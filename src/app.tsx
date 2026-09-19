@@ -136,7 +136,7 @@ function App() {
             <VisualEditor document={doc} selected={selected} setSelected={setSelected}/>
         </div>
         <div className={'right scroll-container'}>
-            <PropSheet selected={selected}/>
+            <PropSheet document={doc} selected={selected} onDocChange={setDoc}/>
         </div>
         <div className={'statusbar full-span'}>
             <button>toggle left</button>

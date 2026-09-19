@@ -1,9 +1,15 @@
 import type {
-    Bounds, CircleLikeComponent, FillComponent,
+    Bounds, CircleLikeComponent, DrawDocument, FillComponent,
     ResizableBoundsComponent, RoundedCornerComponent,
     Shape,
     ShapeComponent, StrokeComponent
 } from "./types";
+import {
+    updateDocShape,
+    updateFillComp,
+    updateShapeComp,
+    updateStrokeComp
+} from "./reducer";
 
 function NumberInput(props: {
     title: string,
@@ -27,9 +33,15 @@ function resizableBoundsComponent(comp: ResizableBoundsComponent) {
     </li>
 }
 
-function fillComponent(comp: FillComponent) {
+export type OnDocChange = (value: (((prevState: DrawDocument) => DrawDocument) | DrawDocument)) => void;
+function fillComponent(doc: DrawDocument, shape: Shape, comp: FillComponent, onDocChange: OnDocChange) {
     return <div className={'prop-sheet-panel'}>
-        <input type={'color'} value={comp.fill.color}/>
+        <input type={'color'} value={comp.fill.color} onChange={(e)=>{
+            let new_comp = updateFillComp(comp,e.target.value)
+            let new_shape = updateShapeComp(shape,'fill',new_comp)
+            let new_doc = updateDocShape(doc,new_shape)
+            onDocChange(new_doc)
+        }}/>
     </div>
 }
 
@@ -39,9 +51,13 @@ function roundedCornerComponent(comp: RoundedCornerComponent) {
     </div>
 }
 
-function strokeComponent(comp: StrokeComponent) {
+function strokeComponent(doc: DrawDocument, shape: Shape, comp: StrokeComponent, onDocChange: OnDocChange) {
     return <div className={'prop-sheet-panel'}>
-        <input type={'color'} value={comp.color}/>
+        <input type={'color'} value={comp.color} onChange={e => {
+            let new_comp = updateStrokeComp(comp,e.target.value)
+            let new_shape = updateShapeComp(shape,'stroke',new_comp)
+            onDocChange(updateDocShape(doc,new_shape))
+        }}/>
         <NumberInput title={'width'} target={comp} field={'width'} unit={'px'}/>
     </div>
 }
@@ -52,12 +68,12 @@ function circleLikeComponent(comp: CircleLikeComponent) {
     </div>
 }
 
-function componentProps(component: ShapeComponent) {
+function componentProps(doc: DrawDocument, shape: Shape, component: ShapeComponent, onDocChange: OnDocChange) {
     switch (component.kind) {
         case 'resizable-bounds-component': return resizableBoundsComponent(component as ResizableBoundsComponent);
-        case 'fill-component': return fillComponent(component as FillComponent)
+        case 'fill-component': return fillComponent(doc, shape, component as FillComponent, onDocChange)
         case 'rounded-corner-component': return roundedCornerComponent(component as RoundedCornerComponent)
-        case 'stroke-component': return strokeComponent(component as StrokeComponent)
+        case 'stroke-component': return strokeComponent(doc, shape, component as StrokeComponent, onDocChange)
         case 'circle-like-component': return circleLikeComponent(component as CircleLikeComponent)
         default: {
             return <li>unknown component</li>
@@ -65,7 +81,11 @@ function componentProps(component: ShapeComponent) {
     }
 }
 
-export default function PropSheet(props: { selected?: Shape }) {
+export default function PropSheet(props: {
+    selected?: Shape,
+    document?: DrawDocument,
+    onDocChange?: (value: (((prevState: DrawDocument) => DrawDocument) | DrawDocument)) => void
+}) {
     if(!props.selected) {
         return <div className={'prop-sheet'}>nothing selected</div>
     } else {
@@ -73,7 +93,7 @@ export default function PropSheet(props: { selected?: Shape }) {
         const comps = Object.keys(shape.components).map(key => {
             return <details>
                 <summary>{key}</summary>
-                {componentProps(shape.components[key])}
+                {componentProps(props.document, shape,shape.components[key], props.onDocChange)}
             </details>
         })
         return <ul className={'prop-sheet'}>

@@ -1,4 +1,10 @@
-import type {Bounds, DrawDocument, RectangleShape} from "./types";
+import type {
+    Bounds,
+    DrawDocument,
+    FillComponent,
+    RectangleShape,
+    Shape, ShapeComponent, StrokeComponent
+} from "./types";
 
 function gen_id(rect1: string) {
     return rect1+"_"+Math.floor(Math.random()*1_000_000)
@@ -41,13 +47,31 @@ export function updateRectName(rect: RectangleShape, name: string): RectangleSha
     }
 }
 
-export function updateDocShape(doc: DrawDocument, rect: RectangleShape): DrawDocument {
+
+export function updateRectFill(rect: RectangleShape, color: string):RectangleShape {
+    return {
+        ...rect,
+        components: {
+            ...rect.components,
+            fill: {
+                ...rect.components.fill,
+                fill: {
+                    kind: "solid",
+                    color: color
+                }
+            }
+        }
+    }
+
+}
+
+export function updateDocShape(doc: DrawDocument, shape: Shape): DrawDocument {
     let new_shapes = doc.shapes.slice()
-    let index = new_shapes.findIndex(shape => shape.id === rect.id)
+    let index = new_shapes.findIndex(shape => shape.id === shape.id)
     if (index < 0) {
         throw new Error("shape not found in the list")
     }
-    new_shapes[index] = rect
+    new_shapes[index] = shape
     return {
         ...doc,
         shapes: new_shapes,
@@ -58,5 +82,34 @@ export function appendShape(doc: DrawDocument, rectangleShape: RectangleShape): 
     return {
         ...doc,
         shapes: [...doc.shapes, rectangleShape]
+    }
+}
+
+export function updateFillComp(comp: FillComponent, color: string): FillComponent {
+    return {
+        ...comp,
+        fill: {
+            kind: 'solid',
+            color: color,
+        }
+    }
+}
+export function updateStrokeComp(comp: StrokeComponent, color: string):StrokeComponent {
+    return {
+        ...comp,
+        color: color
+    }
+}
+
+export function updateShapeComp(shape: Shape, name: string, comp: ShapeComponent): Shape {
+    let comps = {
+        ...shape.components
+    }
+    comps[name] = comp
+    return {
+        type: shape.type,
+        name: shape.name,
+        id: shape.id,
+        components: comps
     }
 }

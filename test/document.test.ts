@@ -4,7 +4,9 @@ import {
     appendShape,
     makeRect,
     updateDocShape,
-    updateRectName
+    updateFillComp,
+    updateRectName,
+    updateShapeComp, updateStrokeComp
 } from "../src/reducer";
 
 function makeRectDocument():DrawDocument {
@@ -47,5 +49,23 @@ describe("make document",() => {
         let doc2 = appendShape(doc, makeRect("rect1",{x:0, y:0, width:50, height:50}))
         expect(doc.shapes.length).toBe(0)
         expect(doc2.shapes.length).toBe(1)
+    })
+    it("can edit a rectangle fill", () => {
+        const doc = makeRectDocument()
+        let rect1 = doc.shapes[0] as RectangleShape
+        expect(rect1.components.fill.fill.color).toBe('red')
+        let rect2 = updateShapeComp(rect1,'fill',updateFillComp(rect1.components.fill,'blue'))
+        let doc2 = updateDocShape(doc, rect2)
+        let rect3 = doc2.shapes[0] as RectangleShape
+        expect(rect3.components.fill.fill.color).toBe('blue')
+    })
+    it("can change a rect stroke color",() => {
+        const doc = makeRectDocument()
+        let rect1 = doc.shapes[0] as RectangleShape
+        expect(rect1.components.stroke.color).toBe("black")
+        let stroke2 = updateStrokeComp(rect1.components.stroke,'white')
+        expect(stroke2.color).toBe("white")
+        let rect2 = updateShapeComp(rect1,'stroke',stroke2) as RectangleShape
+        expect(rect2.components.stroke.color).toBe('white')
     })
 })
