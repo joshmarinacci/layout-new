@@ -1,108 +1,112 @@
-
 export type Tool = "select" | "rectangle" | "pan";
 export type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
 /* ========= primitives ========== */
 export interface Point {
-  x: number;
-  y: number;
+    x: number;
+    y: number;
 }
 
 export interface Bounds {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
 }
 
 export interface SolidFill {
-  kind: "solid";
-  color: string;
+    kind: "solid";
+    color: string;
 }
 
 export type Fill = SolidFill
 
 export interface ColorAsset {
-  id: string;
-  kind: "color";
-  name: string;
-  value: string;
+    id: string;
+    kind: "color";
+    name: string;
+    value: string;
 }
 
 export interface GradientStop {
-  id: string;
-  offset: number;
-  color: string;
+    id: string;
+    offset: number;
+    color: string;
 }
 
 export interface GradientAsset {
-  id: string;
-  kind: "gradient";
-  name: string;
-  type: "linear";
-  angle: number;
-  stops: GradientStop[];
+    id: string;
+    kind: "gradient";
+    name: string;
+    type: "linear";
+    angle: number;
+    stops: GradientStop[];
 }
 
 
 export interface ImageAsset {
-  id: string;
-  kind: "image";
-  name: string;
-  mimeType: string;
-  dataUrl: string;
-  width: number;
-  height: number;
+    id: string;
+    kind: "image";
+    name: string;
+    mimeType: string;
+    dataUrl: string;
+    width: number;
+    height: number;
 }
 
 
 /* ========== components ========= */
 
 export interface ShapeComponent extends Record<string, unknown> {
-
+    kind: string
 }
 
-export interface ResizableBoundsComponent extends ShapeComponent  {
-  bounds: Bounds;
+export interface ResizableBoundsComponent extends ShapeComponent {
+    kind: 'resizable-bounds-component'
+    bounds: Bounds;
 }
 
 export interface FillComponent extends ShapeComponent {
+    kind: 'fill-component'
     fill: Fill;
 }
 
 export interface RoundedCornerComponent extends ShapeComponent {
-  radius: number;
+    kind: 'rounded-corner-component'
+    radius: number;
 }
 
 export interface StrokeComponent extends ShapeComponent {
-  color: string;
-  width: number;
-  // position: "inside" | "center" | "outside"
+    kind: 'stroke-component'
+    color: string;
+    width: number;
+    // position: "inside" | "center" | "outside"
 }
 
-export interface CircleLikeComponent extends ShapeComponent  {
-  center: Point;
-  radius: number;
+export interface CircleLikeComponent extends ShapeComponent {
+    kind: 'circle-like-component'
+    center: Point;
+    radius: number;
 }
 
 /* =============== shapes ============ */
 
 export interface Shape {
-  id: string;
-  name: string;
-  type: string;
-  // parentId?: string | null;
-  components: Record<string, unknown>;
+    id: string;
+    name: string;
+    type: string;
+    // parentId?: string | null;
+    components: Record<string, ShapeComponent>;
 }
 
 export interface RectangleShape extends Shape {
-  type: "rectangle";
-  components: {
-    rect: ResizableBoundsComponent;
-    fill: FillComponent;
-    stroke: StrokeComponent;
-    cornerRadius: RoundedCornerComponent;
-  };
+    type: "rectangle";
+    components: {
+        rect: ResizableBoundsComponent;
+        fill: FillComponent;
+        stroke: StrokeComponent;
+        cornerRadius: RoundedCornerComponent;
+    };
 }
 
 // export interface GroupShape extends Shape {
@@ -122,21 +126,21 @@ export interface RectangleShape extends Shape {
 // }
 
 export interface CircleShape extends Shape {
-  type: "circle";
-  components: {
-    circle: CircleLikeComponent;
-    fill: FillComponent;
-    stroke: StrokeComponent;
-  };
+    type: "circle";
+    components: {
+        circle: CircleLikeComponent;
+        fill: FillComponent;
+        stroke: StrokeComponent;
+    };
 }
 
 export interface OvalShape extends Shape {
-  type: "oval";
-  components: {
-    oval: ResizableBoundsComponent;
-    fill: FillComponent;
-    stroke: StrokeComponent;
-  };
+    type: "oval";
+    components: {
+        oval: ResizableBoundsComponent;
+        fill: FillComponent;
+        stroke: StrokeComponent;
+    };
 }
 
 // export interface PolygonShape extends Shape {
@@ -175,9 +179,9 @@ export interface OvalShape extends Shape {
 // }
 //
 export interface DrawDocument {
-  version: number
-  title: string
-  shapes: Shape[];
+    version: number
+    title: string
+    shapes: Shape[];
 }
 
 // export interface SnapGuide {
@@ -223,41 +227,41 @@ export type PowerupActionLocation =
     | "canvas-shape-context";
 
 export interface PowerupAction {
-  name: string;
-  title: string;
-  description: string;
-  tags: string[];
-  icon: ActionIconName;
-  locations: PowerupActionLocation[];
-  // isVisible?: (state: AppState) => boolean;
-  // isEnabled?: (state: AppState) => boolean;
-  // run: (appState: AppStateStore) => void;
+    name: string;
+    title: string;
+    description: string;
+    tags: string[];
+    icon: ActionIconName;
+    locations: PowerupActionLocation[];
+    // isVisible?: (state: AppState) => boolean;
+    // isEnabled?: (state: AppState) => boolean;
+    // run: (appState: AppStateStore) => void;
 }
 
 export interface ExporterAction extends PowerupAction {
-  kind: "exporter";
-  fileExtension: string;
-  mimeType: string;
+    kind: "exporter";
+    fileExtension: string;
+    mimeType: string;
 }
 
 export interface SingleComponentEditorArgs {
-  shape: Shape;
-  document: DrawDocument
-  updateShape: (updater: (shape: Shape) => Shape) => void;
+    shape: Shape;
+    document: DrawDocument
+    updateShape: (updater: (shape: Shape) => Shape) => void;
 }
 
 export interface MultiComponentEditorArgs {
-  shapes: Shape[];
-  document: DrawDocument;
-  bounds: Bounds | null;
-  updateShapes: (updater: (shape: Shape) => Shape) => void;
+    shapes: Shape[];
+    document: DrawDocument;
+    bounds: Bounds | null;
+    updateShapes: (updater: (shape: Shape) => Shape) => void;
 }
 
 export interface PowerupComponentDefinition {
-  key: string;
-  title: string;
-  // renderSingle: (args: SingleComponentEditorArgs) => ReactNode;
-  // renderMulti?: (args: MultiComponentEditorArgs) => ReactNode;
+    key: string;
+    title: string;
+    // renderSingle: (args: SingleComponentEditorArgs) => ReactNode;
+    // renderMulti?: (args: MultiComponentEditorArgs) => ReactNode;
 }
 
 // export interface PowerupShapeDefinition {
@@ -278,10 +282,10 @@ export interface PowerupComponentDefinition {
 // }
 
 export interface Powerup {
-  id: string;
-  name: string;
-  description: string;
-  type: string;
-  // shapes: PowerupShapeDefinition[];
-  actions: PowerupAction[];
+    id: string;
+    name: string;
+    description: string;
+    type: string;
+    // shapes: PowerupShapeDefinition[];
+    actions: PowerupAction[];
 }

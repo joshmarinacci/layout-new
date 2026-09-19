@@ -119,3 +119,27 @@ input {
         }
     }
 }
+
+.prop-sheet {
+    details {
+        summary {
+            color: var(--primary-control-text);
+            background-color: var(--primary-control-background);
+            padding: 0.25rem 0.5rem;
+            &:hover {
+                background-color: var(--primary-control-background-hover);
+            }
+        }
+        .prop-sheet-panel {
+            /*border: 1px solid red;*/
+            padding: 0.5rem;
+        }
+    }
+}
+
+.number-input {
+    border: 0px solid var(--primary-control-border-color);
+    display: flex;
+    flex-direction: row;
+    gap: 0.5rem;
+}

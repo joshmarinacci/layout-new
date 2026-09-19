@@ -3,6 +3,7 @@ import React, {useState} from "react";
 import type {CircleShape, DrawDocument, RectangleShape, Shape} from "./types";
 import TreeView from "./TreeView";
 import "./app.css"
+import PropSheet from "./PropSheet";
 
 function make_example_doc():DrawDocument {
     const rect: RectangleShape = {
@@ -11,6 +12,7 @@ function make_example_doc():DrawDocument {
         name: 'rect',
         components: {
             rect: {
+                kind: "resizable-bounds-component",
                 bounds: {
                     x: 0,
                     y: 0,
@@ -19,16 +21,19 @@ function make_example_doc():DrawDocument {
                 }
             },
             fill: {
+                kind: 'fill-component',
                 fill: {
                     kind: "solid",
                     color: "red"
                 }
             },
             stroke: {
+                kind: "stroke-component",
                 width: 1,
                 color: "black"
             },
             cornerRadius: {
+                kind: 'rounded-corner-component',
                 radius: 10
             }
         }
@@ -39,12 +44,14 @@ function make_example_doc():DrawDocument {
         name:'circle',
         components: {
             fill: {
+                kind: 'fill-component',
                 fill: {
                     kind: 'solid',
                     color:'blue',
                 }
             },
             circle: {
+                kind: 'circle-like-component',
                 radius: 30,
                 center: {
                     x: 200,
@@ -52,6 +59,7 @@ function make_example_doc():DrawDocument {
                 }
             },
             stroke: {
+                kind: 'stroke-component',
                 color: 'black',
                 width: 1
             }
@@ -102,7 +110,7 @@ function App() {
             <div>the editing canvas</div>
         </div>
         <div className={'right scroll-container'}>
-            <div>a propsheet here</div>
+            <PropSheet selected={selected}/>
         </div>
         <div className={'statusbar full-span'}>
             <button>toggle left</button>
