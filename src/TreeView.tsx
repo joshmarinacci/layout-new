@@ -1,6 +1,4 @@
-// @ts-ignore
-import React from "react";
-import type {DrawDocument, RectangleShape, Shape} from "./types";
+import type {DrawDocument, Shape} from "./types";
 
 function cls(props:Record<string,boolean>) {
     let classname = ""
@@ -14,14 +12,14 @@ function cls(props:Record<string,boolean>) {
 
 function TreeItem(props: {
     item: Shape,
-    selected?: Shape,
-    onSelect: (value: (((prevState: Shape) => Shape) | Shape)) => void
+    selected: Shape | undefined,
+    onSelect: (value: Shape) => void
 }) {
     const {item, selected, onSelect} = props
     return <div key={item.id}
                className={cls({
                    'tree-item':true,
-                   selected: item === selected
+                   selected: item.id === selected?.id
                })}
                onClick={()=>{
                    onSelect(item)
@@ -30,8 +28,8 @@ function TreeItem(props: {
 
 export default function TreeView(props: {
     document: DrawDocument,
-    selected?: Shape,
-    onSelect: (value: (((prevState: Shape) => Shape) | Shape)) => void
+    selected: Shape | undefined,
+    onSelect: (value: Shape) => void
 }) {
     const doc = props.document
     return <ul className={'tree-view'}>

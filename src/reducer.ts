@@ -7,7 +7,7 @@ import type {
 } from "./types";
 
 function gen_id(rect1: string) {
-    return rect1+"_"+Math.floor(Math.random()*1_000_000)
+    return rect1+"_"+crypto.randomUUID()
 }
 
 export function makeRect(name: string, bounds: Bounds): RectangleShape {
@@ -67,7 +67,7 @@ export function updateRectFill(rect: RectangleShape, color: string):RectangleSha
 
 export function updateDocShape(doc: DrawDocument, shape: Shape): DrawDocument {
     let new_shapes = doc.shapes.slice()
-    let index = new_shapes.findIndex(shape => shape.id === shape.id)
+    let index = new_shapes.findIndex(candidate => candidate.id === shape.id)
     if (index < 0) {
         throw new Error("shape not found in the list")
     }
@@ -101,15 +101,6 @@ export function updateStrokeComp(comp: StrokeComponent, color: string):StrokeCom
     }
 }
 
-export function updateShapeComp(shape: Shape, name: string, comp: ShapeComponent): Shape {
-    let comps = {
-        ...shape.components
-    }
-    comps[name] = comp
-    return {
-        type: shape.type,
-        name: shape.name,
-        id: shape.id,
-        components: comps
-    }
+export function updateShapeComp<S extends Shape, K extends keyof S['components']>(shape: S, name: K, comp: S['components'][K]): S {
+    return {...shape, components: {...shape.components, [name]: comp}};
 }

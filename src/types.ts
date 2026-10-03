@@ -1,5 +1,3 @@
-export type Tool = "select" | "rectangle" | "pan";
-export type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
 
 /* ========= primitives ========== */
 export interface Point {
@@ -43,7 +41,6 @@ export interface GradientAsset {
     stops: GradientStop[];
 }
 
-
 export interface ImageAsset {
     id: string;
     kind: "image";
@@ -54,36 +51,32 @@ export interface ImageAsset {
     height: number;
 }
 
-
 /* ========== components ========= */
 
-export interface ShapeComponent extends Record<string, unknown> {
-    kind: string
-}
+export type ShapeComponent = ResizableBoundsComponent | FillComponent | RoundedCornerComponent | StrokeComponent | CircleLikeComponent;
 
-export interface ResizableBoundsComponent extends ShapeComponent {
+export interface ResizableBoundsComponent {
     kind: 'resizable-bounds-component'
     bounds: Bounds;
 }
 
-export interface FillComponent extends ShapeComponent {
+export interface FillComponent {
     kind: 'fill-component'
     fill: Fill;
 }
 
-export interface RoundedCornerComponent extends ShapeComponent {
+export interface RoundedCornerComponent {
     kind: 'rounded-corner-component'
     radius: number;
 }
 
-export interface StrokeComponent extends ShapeComponent {
+export interface StrokeComponent {
     kind: 'stroke-component'
     color: string;
     width: number;
-    // position: "inside" | "center" | "outside"
 }
 
-export interface CircleLikeComponent extends ShapeComponent {
+export interface CircleLikeComponent {
     kind: 'circle-like-component'
     center: Point;
     radius: number;
@@ -91,15 +84,13 @@ export interface CircleLikeComponent extends ShapeComponent {
 
 /* =============== shapes ============ */
 
-export interface Shape {
+interface BaseShape {
     id: string;
     name: string;
-    type: string;
-    // parentId?: string | null;
-    components: Record<string, ShapeComponent>;
+
 }
 
-export interface RectangleShape extends Shape {
+export interface RectangleShape extends BaseShape {
     type: "rectangle";
     components: {
         rect: ResizableBoundsComponent;
@@ -109,23 +100,7 @@ export interface RectangleShape extends Shape {
     };
 }
 
-// export interface GroupShape extends Shape {
-//   type: "group";
-//   components: {
-//     group: Record<string, never>;
-//   };
-// }
-//
-// export interface TextShape extends Shape {
-//   type: "text";
-//   components: {
-//     rect: ResizableBoundsComponent;
-//     fill: FillComponent;
-//     text: TextComponent;
-//   };
-// }
-
-export interface CircleShape extends Shape {
+export interface CircleShape extends BaseShape {
     type: "circle";
     components: {
         circle: CircleLikeComponent;
@@ -134,7 +109,7 @@ export interface CircleShape extends Shape {
     };
 }
 
-export interface OvalShape extends Shape {
+export interface OvalShape extends BaseShape {
     type: "oval";
     components: {
         oval: ResizableBoundsComponent;
@@ -143,149 +118,14 @@ export interface OvalShape extends Shape {
     };
 }
 
-// export interface PolygonShape extends Shape {
-//   type: "polygon";
-//   components: {
-//     polygon: PolygonComponent;
-//     fill: FillComponent;
-//     stroke: StrokeComponent;
-//   };
-// }
-//
-// export interface StarShape extends Shape {
-//   type: "star";
-//   components: {
-//     star: StarComponent;
-//     fill: FillComponent;
-//     stroke: StrokeComponent;
-//   };
-// }
-//
-// export interface ImageShape extends Shape {
-//   type: "image";
-//   components: {
-//     rect: Bounds;
-//     image: ImageComponent;
-//   };
-// }
-
 /* ========== document ======== */
 
-// export interface AssetCollections {
-//   colors: Record<string, ColorAsset>;
-//   gradients: Record<string, GradientAsset>;
-//   hatched: Record<string, HatchedAsset>;
-//   images: Record<string, ImageAsset>;
-// }
-//
-export interface DrawDocument {
-    version: number
+export type Shape = RectangleShape | CircleShape | OvalShape;
+
+export interface Document {
+    version: 0
     title: string
     shapes: Shape[];
 }
 
-// export interface SnapGuide {
-//   axis: "x" | "y";
-//   position: number;
-// }
-
-// export interface Viewport {
-//   panX: number;
-//   panY: number;
-//   zoom: number;
-// }
-//
-// export const MIN_SHAPE_SIZE = 8;
-// export const MIN_TYPED_SHAPE_SIZE = 0;
-
-/* ======= Actions =========== */
-
-export type ActionIconName =
-    | "file-plus-2"
-    | "folder-open"
-    | "circle-plus"
-    | "image-plus"
-    | "scissors"
-    | "trash-2"
-    | "copy"
-    | "clipboard-paste"
-    | "files"
-    | "undo-2"
-    | "redo-2"
-    | "search"
-    | "zoom-in"
-    | "zoom-out"
-    | "maximize-2"
-    | "save";
-export type PowerupActionLocation =
-    | "menu-file"
-    | "menu-edit"
-    | "menu-shapes"
-    | "menu-view"
-    | "tree-layer-context"
-    | "tree-shape-context"
-    | "canvas-shape-context";
-
-export interface PowerupAction {
-    name: string;
-    title: string;
-    description: string;
-    tags: string[];
-    icon: ActionIconName;
-    locations: PowerupActionLocation[];
-    // isVisible?: (state: AppState) => boolean;
-    // isEnabled?: (state: AppState) => boolean;
-    // run: (appState: AppStateStore) => void;
-}
-
-export interface ExporterAction extends PowerupAction {
-    kind: "exporter";
-    fileExtension: string;
-    mimeType: string;
-}
-
-export interface SingleComponentEditorArgs {
-    shape: Shape;
-    document: DrawDocument
-    updateShape: (updater: (shape: Shape) => Shape) => void;
-}
-
-export interface MultiComponentEditorArgs {
-    shapes: Shape[];
-    document: DrawDocument;
-    bounds: Bounds | null;
-    updateShapes: (updater: (shape: Shape) => Shape) => void;
-}
-
-export interface PowerupComponentDefinition {
-    key: string;
-    title: string;
-    // renderSingle: (args: SingleComponentEditorArgs) => ReactNode;
-    // renderMulti?: (args: MultiComponentEditorArgs) => ReactNode;
-}
-
-// export interface PowerupShapeDefinition {
-//   type: string;
-//   components: PowerupComponentDefinition[];
-//   drawShape: (context: CanvasRenderingContext2D, shape: Shape, options: DrawShapeOptions) => void;
-//   getBounds: (shape: Shape, document: DocumentV1) => Bounds | null;
-//   hitTest: (point: Point, shape: Shape, document: DocumentV1) => boolean;
-//   sanitizeShape?: (shape: Shape) => Shape;
-//   resizeShape?: (shape: Shape, handle: string, point: Point) => Shape;
-//   translateShape?: (shape: Shape, delta: Point) => Shape;
-//   getSelectionHandles?: (shape: Shape) => SelectionHandle[];
-//   describeShape?: (shape: Shape) => string;
-//   normalizeSerializedShape?: (item: Record<string, unknown>) => Shape | null;
-//   serializeShape?: (shape: Shape) => Record<string, unknown>;
-//   createShapeAt?: (start: Point, current: Point) => Shape;
-//   createDefaultShape?: (state: AppState) => Shape;
-// }
-
-export interface Powerup {
-    id: string;
-    name: string;
-    description: string;
-    type: string;
-    // shapes: PowerupShapeDefinition[];
-    actions: PowerupAction[];
-}
+export type DrawDocument = Document;

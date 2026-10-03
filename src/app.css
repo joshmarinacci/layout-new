@@ -63,9 +63,7 @@ input {
 .menubar {
     display: flex;
     flex-direction: row;
-    ul li {
-        display: none;
-    }
+    ul { display: flex; list-style: none; }
     border: 1px solid black;
 }
 
@@ -84,7 +82,7 @@ input {
 
 .main-layout {
     display: grid;
-    grid-template-columns: 200px 1fr 200px;
+    grid-template-columns: 200px minmax(320px, 1fr) 220px;
     .full-span {
         grid-column: 1 / span 3;
     }
@@ -143,3 +141,7 @@ input {
     flex-direction: row;
     gap: 0.5rem;
 }
+.prop-sheet { color: var(--primary-control-text); overflow-wrap: anywhere; }
+.number-input input { min-width: 0; width: 100%; }
+.number-input .title { min-width: 3rem; }
+button:disabled { opacity: 0.5; }

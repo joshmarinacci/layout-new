@@ -1,113 +1,46 @@
-import type {
-    Bounds, CircleLikeComponent, DrawDocument, FillComponent,
-    ResizableBoundsComponent, RoundedCornerComponent,
-    Shape,
-    ShapeComponent, StrokeComponent
-} from "./types";
-import {
-    updateDocShape,
-    updateFillComp,
-    updateShapeComp,
-    updateStrokeComp
-} from "./reducer";
+import type {Draft} from 'immer';
+import type {Shape, ShapeComponent} from './types';
+import type {EditorStore} from './EditorStore';
+import {useEditorStore} from './useEditorStore';
 
-function NumberInput(props: {
-    title: string,
-    target: object,
-    field: string,
-    unit: string
+function Field({store, title, value, type = 'number', nonnegative = false, update}: {
+    store: EditorStore; title: string; value: number | string; type?: 'number' | 'color'; nonnegative?: boolean;
+    update: (value: string) => void;
 }) {
-    return <div className={'number-input'}>
-        <label className={'title'}>{props.title}</label>
-        <input type={'number'} value={props.target[props.field]}/>
-        <label className={'unit'}>{props.unit}</label>
-    </div>
+    return <label className="number-input"><span className="title">{title}</span><input aria-label={title} type={type} value={value}
+        min={nonnegative ? 0 : undefined} step="any"
+        onFocus={() => store.beginTransaction(title)}
+        onBlur={() => { if (store.getSnapshot().transactionActive) store.commitTransaction(); }}
+        onKeyDown={event => {
+            if (event.key === 'Escape') { store.cancelTransaction(); event.currentTarget.blur(); }
+            if (event.key === 'Enter') event.currentTarget.blur();
+        }}
+        onChange={event => {
+            if (type === 'number' && (event.target.value === '' || !Number.isFinite(event.target.valueAsNumber) || (nonnegative && event.target.valueAsNumber < 0))) return;
+            update(event.target.value);
+        }}/></label>;
 }
-
-function resizableBoundsComponent(comp: ResizableBoundsComponent) {
-    return <li className={'prop-sheet-panel'}>
-        <NumberInput title={'x'} target={comp.bounds} field={'x'} unit={'px'}/>
-        <NumberInput title={'y'} target={comp.bounds} field={'y'} unit={'px'}/>
-        <NumberInput title={'width'} target={comp.bounds} field={'width'} unit={'px'}/>
-        <NumberInput title={'height'} target={comp.bounds} field={'height'} unit={'px'}/>
-    </li>
+function componentFor(shape: Draft<Shape>, key: string): Draft<ShapeComponent> {
+    const entry = Object.entries(shape.components).find(([name]) => name === key);
+    if (!entry) throw new Error('Unknown component');
+    return entry[1];
 }
-
-export type OnDocChange = (value: (((prevState: DrawDocument) => DrawDocument) | DrawDocument)) => void;
-function fillComponent(doc: DrawDocument, shape: Shape, comp: FillComponent, onDocChange: OnDocChange) {
-    return <div className={'prop-sheet-panel'}>
-        <input type={'color'} value={comp.fill.color} onChange={(e)=>{
-            let new_comp = updateFillComp(comp,e.target.value)
-            let new_shape = updateShapeComp(shape,'fill',new_comp)
-            let new_doc = updateDocShape(doc,new_shape)
-            onDocChange(new_doc)
-        }}/>
-    </div>
-}
-
-function roundedCornerComponent(comp: RoundedCornerComponent) {
-    return <div className={'prop-sheet-panel'}>
-        <NumberInput title={'radius'} target={comp} field={'radius'} unit={'px'}/>
-    </div>
-}
-
-function strokeComponent(doc: DrawDocument, shape: Shape, comp: StrokeComponent, onDocChange: OnDocChange) {
-    return <div className={'prop-sheet-panel'}>
-        <input type={'color'} value={comp.color} onChange={e => {
-            let new_comp = updateStrokeComp(comp,e.target.value)
-            let new_shape = updateShapeComp(shape,'stroke',new_comp)
-            onDocChange(updateDocShape(doc,new_shape))
-        }}/>
-        <NumberInput title={'width'} target={comp} field={'width'} unit={'px'}/>
-    </div>
-}
-
-function circleLikeComponent(comp: CircleLikeComponent) {
-    return <div className={'prop-sheet-panel'}>
-        <NumberInput title={'radius'} target={comp} field={'radius'} unit={'px'}/>
-    </div>
-}
-
-function componentProps(doc: DrawDocument, shape: Shape, component: ShapeComponent, onDocChange: OnDocChange) {
-    switch (component.kind) {
-        case 'resizable-bounds-component': return resizableBoundsComponent(component as ResizableBoundsComponent);
-        case 'fill-component': return fillComponent(doc, shape, component as FillComponent, onDocChange)
-        case 'rounded-corner-component': return roundedCornerComponent(component as RoundedCornerComponent)
-        case 'stroke-component': return strokeComponent(doc, shape, component as StrokeComponent, onDocChange)
-        case 'circle-like-component': return circleLikeComponent(component as CircleLikeComponent)
-        default: {
-            return <li>unknown component</li>
-        }
-    }
-}
-
-export default function PropSheet(props: {
-    selected?: Shape,
-    document?: DrawDocument,
-    onDocChange?: (value: (((prevState: DrawDocument) => DrawDocument) | DrawDocument)) => void
-}) {
-    if(!props.selected) {
-        return <div className={'prop-sheet'}>nothing selected</div>
-    } else {
-        const shape = props.selected
-        const comps = Object.keys(shape.components).map(key => {
-            return <details>
-                <summary>{key}</summary>
-                {componentProps(props.document, shape,shape.components[key], props.onDocChange)}
-            </details>
-        })
-        return <ul className={'prop-sheet'}>
-            <li>
-                <details>
-                    <summary>info</summary>
-                    <ul>
-                        <li><b>id</b><i>{shape.id}</i></li>
-                        <li><b>name</b><i>{shape.name}</i></li>
-                        <li><b>type</b><i>{shape.type}</i></li>
-                    </ul>
-                </details>
-            </li>
-            {comps}
-        </ul>
-    }
+export default function PropSheet({store}: {store: EditorStore}) {
+    const state = useEditorStore(store);
+    const shape = state.document.shapes.find(s => s.id === state.selectedId);
+    if (!shape) return <div className="prop-sheet">nothing selected</div>;
+    const update = (key: string, recipe: (component: Draft<ShapeComponent>) => void) => store.updateShape(shape.id, draft => recipe(componentFor(draft, key)));
+    return <div className="prop-sheet">
+        <details open><summary>info</summary><div>{shape.name} ({shape.type})</div><small>{shape.id}</small></details>
+        {Object.entries(shape.components).map(([key, comp]) => <details open key={key}><summary>{key}</summary><div className="prop-sheet-panel">
+            {comp.kind === 'resizable-bounds-component' && (['x', 'y', 'width', 'height'] as const).map(field =>
+                <Field key={field} store={store} title={field} value={comp.bounds[field]} nonnegative={field === 'width' || field === 'height'} update={value => update(key, c => { if (c.kind === 'resizable-bounds-component') c.bounds[field] = Number(value); })}/>)}
+            {comp.kind === 'fill-component' && <Field store={store} title="Fill color" type="color" value={comp.fill.color} update={value => update(key, c => { if (c.kind === 'fill-component') c.fill.color = value; })}/>}
+            {comp.kind === 'stroke-component' && <>
+                <Field store={store} title="Stroke color" type="color" value={comp.color} update={value => update(key, c => { if (c.kind === 'stroke-component') c.color = value; })}/>
+                <Field store={store} title="Stroke width" value={comp.width} nonnegative update={value => update(key, c => { if (c.kind === 'stroke-component') c.width = Number(value); })}/></>}
+            {(comp.kind === 'rounded-corner-component' || comp.kind === 'circle-like-component') && <Field store={store} title="radius" value={comp.radius} nonnegative update={value => update(key, c => { if (c.kind === 'rounded-corner-component' || c.kind === 'circle-like-component') c.radius = Number(value); })}/>}
+            {comp.kind === 'circle-like-component' && (['x', 'y'] as const).map(field => <Field key={field} store={store} title={`Center ${field}`} value={comp.center[field]} update={value => update(key, c => { if (c.kind === 'circle-like-component') c.center[field] = Number(value); })}/>)}
+        </div></details>)}
+    </div>;
 }
