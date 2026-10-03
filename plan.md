@@ -20,3 +20,18 @@ No new shape creation tools, nesting/groups, collaboration, assets, or migration
 Implemented on 2026-10-03. All seven implementation steps are complete. The ordered shape array preserves drawing order, and rectangle, circle, and oval variants are explicitly typed. Existing rectangle behavior and the sample circle are preserved.
 
 Validation: 18 tests pass, strict TypeScript checking and the production build pass, and Git whitespace checks pass. Browser checks covered rectangle creation, property edits, drag updates, and single-entry drag undo. File-picker interaction and pointer-cancellation UI paths remain unverified manually. See `README.md` for usage, architecture, validation, and next steps.
+
+
+## File menu and multiple documents — 2026-10-03
+
+Completed the next UI increment:
+
+- Grouped Load file, New Document, and Save JSON into a File dropdown with outside-click, focus-leave, and Escape dismissal.
+- Added a horizontally scrollable document tab bar below the menu bar, with active-tab styling and Left/Right/Home/End keyboard navigation.
+- Kept a separate EditorStore for each open document so document contents, selection, and undo/redo history remain independent.
+- Changed New Document and successful file loads to append and activate a new tab. Saving and undo/redo target the active tab. Invalid file loads preserve existing documents.
+- Bound tab labels to document titles and handled editing-session cleanup during switches.
+
+Validation: all 18 existing tests and the strict TypeScript/production build pass. Browser checks verified new-tab creation, switching with preserved contents, independent undo, and arrow-key navigation. Native file loading remains unverified manually.
+
+Scope: tabs remain in memory only. Closing tabs, unsaved-change indicators, and restoring a workspace after reload are deferred. The version-0 document format is unchanged.
