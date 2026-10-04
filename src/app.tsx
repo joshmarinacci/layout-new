@@ -2,7 +2,7 @@ import {useEffect, useRef, useState} from 'react';
 import TreeView from './TreeView';
 import PropSheet from './PropSheet';
 import VisualEditor from './VisualEditor';
-import {makeRect} from './reducer';
+import {makeCircle, makeRect} from './reducer';
 import {EditorStore, emptyDocument} from './EditorStore';
 import {makeExampleDocument} from './exampleDocument';
 import {useEditorStore} from './useEditorStore';
@@ -136,6 +136,10 @@ export default function App() {
                 const shape = makeRect('rect', {x: 50, y: 250, width: 50, height: 50});
                 store.addShape(shape); store.select(shape.id);
             }}>New Rect</button>
+            <button disabled={state.transactionActive} onClick={() => {
+                const shape = makeCircle('circle', {x: 100, y: 300}, 40);
+                store.addShape(shape); store.select(shape.id);
+            }}>New Circle</button>
             <button disabled={!selected || state.transactionActive} onClick={() => { if (selected) store.removeShape(selected.id); }}>Delete</button>
             {undo}{redo}
         </div>
@@ -143,6 +147,6 @@ export default function App() {
         <div className="center scroll-container"><VisualEditor key={activeTab.id} store={store}/></div>
         <div className="right scroll-container"><PropSheet key={activeTab.id} store={store}/></div>
         </div>
-        <div className="statusbar full-span"><span role="alert">{error}</span><span className="spacer"/><label>Drag a rectangle to move; drag its lower-right corner to resize. Escape cancels.</label></div>
+        <div className="statusbar full-span"><span role="alert">{error}</span><span className="spacer"/><label>Drag rectangles or circles to move; drag a selection handle to resize. Escape cancels.</label></div>
     </div>;
 }

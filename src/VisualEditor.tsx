@@ -1,7 +1,8 @@
 import {useEffect, useRef, type PointerEvent} from 'react';
-import type {Bounds, Shape} from './types';
+import type {Bounds, Shape, CircleLikeComponent} from './types';
 import type {EditorStore} from './EditorStore';
 import {useEditorStore} from './useEditorStore';
+import {circleContains, circleHandles, dragCircle} from './circleGeometry';
 
 export function selectionBounds(shape: Shape): Bounds {
     switch (shape.type) {
@@ -13,7 +14,7 @@ export function selectionBounds(shape: Shape): Bounds {
 export default function VisualEditor({store}: {store: EditorStore}) {
     const state = useEditorStore(store);
     const ref = useRef<HTMLCanvasElement>(null);
-    const gesture = useRef<{id: string; pointer: number; x: number; y: number; bounds: Bounds; resize: boolean} | null>(null);
+    const gesture = useRef<{id: string; pointer: number; x: number; y: number; bounds: Bounds; circle?: CircleLikeComponent; resize: boolean} | null>(null);
     useEffect(() => {
         const canvas = ref.current; const ctx = canvas?.getContext('2d'); if (!ctx || !canvas) return;
         ctx.fillStyle = '#333'; ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -27,6 +28,10 @@ export default function VisualEditor({store}: {store: EditorStore}) {
             if (ctx.lineWidth > 0 && shape.components.stroke.width > 0) ctx.stroke();
             if (shape.id === state.selectedId) {
                 ctx.strokeStyle = 'yellow'; ctx.lineWidth = 3; ctx.strokeRect(b.x, b.y, b.width, b.height);
+                if (shape.type === 'circle') {
+                    ctx.fillStyle = 'yellow';
+                    circleHandles(shape.components.circle).forEach(handle => ctx.fillRect(handle.x - 5, handle.y - 5, 10, 10));
+                }
                 if (shape.type === 'rectangle') { ctx.fillStyle = 'yellow'; ctx.fillRect(b.x + b.width - 5, b.y + b.height - 5, 10, 10); }
             }
         });
@@ -50,19 +55,32 @@ export default function VisualEditor({store}: {store: EditorStore}) {
             event.currentTarget.focus({preventScroll: true});
             if (store.getSnapshot().transactionActive) return;
             const p = point(event);
-            const shape = [...state.document.shapes].reverse().find(s => { const b = selectionBounds(s); return p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + b.height; });
+            const selected = state.document.shapes.find(s => s.id === state.selectedId);
+            const circleHandle = selected?.type === 'circle' && circleHandles(selected.components.circle)
+                .some(handle => Math.abs(p.x - handle.x) <= 10 && Math.abs(p.y - handle.y) <= 10);
+            const shape = circleHandle ? selected : [...state.document.shapes].reverse().find(s => {
+                if (s.type === 'circle') return circleContains(s.components.circle, p);
+                const b = selectionBounds(s);
+                return p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + b.height;
+            });
             store.select(shape?.id ?? null);
-            if (shape?.type !== 'rectangle') return;
-            const bounds = shape.components.rect.bounds;
-            const resize = Math.abs(p.x - bounds.x - bounds.width) <= 10 && Math.abs(p.y - bounds.y - bounds.height) <= 10;
-            store.beginTransaction(resize ? 'Resize rectangle' : 'Move rectangle');
-            gesture.current = {id: shape.id, pointer: event.pointerId, ...p, bounds, resize};
+            if (!shape || shape.type === 'oval') return;
+            const bounds = selectionBounds(shape);
+            const resize = shape.type === 'circle' ? !!circleHandle
+                : Math.abs(p.x - bounds.x - bounds.width) <= 10 && Math.abs(p.y - bounds.y - bounds.height) <= 10;
+            store.beginTransaction(`${resize ? 'Resize' : 'Move'} ${shape.type}`);
+            gesture.current = {id: shape.id, pointer: event.pointerId, ...p, bounds, resize,
+                circle: shape.type === 'circle' ? shape.components.circle : undefined};
             event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={event => {
             const g = gesture.current; if (!g || g.pointer !== event.pointerId) return;
             const p = point(event); const dx = p.x - g.x, dy = p.y - g.y;
             store.updateShape(g.id, shape => {
+                if (shape.type === 'circle' && g.circle) {
+                    shape.components.circle = dragCircle(g.circle, g, p, g.resize);
+                    return;
+                }
                 if (shape.type !== 'rectangle') return;
                 shape.components.rect.bounds = g.resize
                     ? {...g.bounds, width: Math.max(1, g.bounds.width + dx), height: Math.max(1, g.bounds.height + dy)}

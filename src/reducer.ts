@@ -1,5 +1,5 @@
 import type {
-    Bounds,
+    Bounds, CircleShape, Point,
     DrawDocument,
     FillComponent,
     RectangleShape,
@@ -38,6 +38,17 @@ export function makeRect(name: string, bounds: Bounds): RectangleShape {
             }
         }
     }
+}
+
+export function makeCircle(name: string, center: Point, radius: number): CircleShape {
+    return {
+        id: gen_id('circle'), name, type: 'circle',
+        components: {
+            circle: {kind: 'circle-like-component', center: {...center}, radius},
+            fill: {kind: 'fill-component', fill: {kind: 'solid', color: '#ff0000'}},
+            stroke: {kind: 'stroke-component', width: 1, color: '#000000'},
+        },
+    };
 }
 
 export function updateRectName(rect: RectangleShape, name: string): RectangleShape {

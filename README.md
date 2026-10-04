@@ -4,7 +4,7 @@ Run `npm install`, then `npm run dev`. Validate with `npm test` and `npm run bui
 
 ## Editing
 
-Create rectangles with **New Rect**. Select shapes in the tree or canvas. Edit position, size, fill, and stroke in the property sheet. Drag rectangles to move them, or drag inside their lower-right corner to resize. One gesture or focused property-editing session creates one undo entry. Enter or blur commits an input session; Escape cancels. Pointer cancellation or loss of capture cancels an unfinished gesture.
+Create rectangles with **New Rect** and circles with **New Circle**. Select shapes in the tree or canvas. Edit position, size, fill, and stroke in the property sheet. Drag rectangles or circles to move them. Drag a rectangle’s lower-right corner to resize; selected circles have four handles at the top, right, bottom, and left. Circle handles adjust the radius while keeping the center fixed, with a minimum radius of zero. Circle hit testing follows the circular area. One gesture or focused property-editing session creates one undo entry. Enter or blur commits an input session; Escape cancels. Pointer cancellation or loss of capture cancels an unfinished gesture.
 
 Use Undo/Redo or Command/Control-Z, Shift-Command/Control-Z, and Control-Y outside text inputs. Text fields retain native text-edit shortcuts while focused.
 
@@ -22,16 +22,18 @@ Use `setTitle`, `addShape`, `updateShape`, `removeShape`, or `edit` for mutation
 
 `serialization.ts` validates schema version, discriminants, components, finite geometry, nonnegative dimensions, and unique IDs. Only document data is serialized; callbacks, history, and selection are excluded. Unknown fields/types/versions are rejected rather than silently discarded. No migrations are implemented yet.
 
-Rectangles and the existing circle remain rendered. Oval data/rendering is supported by the union, but new shape tools are intentionally deferred. Rounded-corner metadata remains stored; rectangle rendering retains its existing square-corner appearance. The legacy reducer helpers remain pure for compatibility; the UI uses only the store for edits.
+Rectangles and circles support creation, movement, and resizing. Oval data/rendering is supported by the union, but oval creation and gestures remain deferred. Rounded-corner metadata remains stored; rectangle rendering retains its existing square-corner appearance. The legacy reducer helpers remain pure for compatibility; the UI uses only the store for edits.
 
 See `plan.md` for the implementation scope.
 
 ## Validation and follow-up
 
-The implementation passes 18 automated tests across the legacy document helpers and the editor store. Coverage includes editing a non-first shape, immutable snapshots, subscriptions, add/delete history, grouped updates, cancellation, redo invalidation, invalid operations, bounded history, and JSON round trips for rectangle/circle/oval documents.
+The implementation passes 35 automated tests across the legacy document helpers, editor store, and multiple-document isolation. Coverage includes editing a non-first shape, immutable snapshots, subscriptions, add/delete history, grouped updates, cancellation, redo invalidation, invalid operations, bounded history, and JSON round trips for rectangle/circle/oval documents.
 
 Strict TypeScript checking and the production build pass. Browser checks confirmed rectangle creation, property editing, live drag updates, and a single undo restoring the entire drag. No browser warnings or errors were observed. Native file-picker interaction and pointer-cancellation UI paths have not been manually exercised; store cancellation and JSON validation are tested automatically.
 
-Browser checks for document tabs confirmed new-tab creation, preserved contents when switching, independent undo history, and arrow-key navigation. These UI checks are manual; the 18 automated tests cover the existing model and store.
+Browser checks for document tabs confirmed new-tab creation, preserved contents when switching, independent undo history, and arrow-key navigation. These UI checks are manual. Six model-level tests in `test/multiple-documents.test.ts` verify independent edits, selections, subscriptions, interleaved undo/redo, simultaneous transactions, loading, and opening another copy with the same shape IDs. These test the per-document stores without rendering the GUI; tab routing itself remains manually verified.
 
-Next steps are adding shape-specific creation tools and interactions, implementing rounded-corner rendering, and defining schema migrations before changing the saved-document format.
+Eleven circle tests cover creation and serialization, hit testing, baseline movement, all four resize handles, off-center grabs, zero radius, grouped undo/redo, cancellation, and invalid geometry. Circle geometry helpers are shared by the canvas and tests. The new circle pointer interactions have not yet been manually verified in the browser.
+
+Next steps are adding oval creation and interactions, implementing rounded-corner rendering, and defining schema migrations before changing the saved-document format.
