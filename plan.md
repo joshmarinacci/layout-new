@@ -83,3 +83,10 @@ Selecting an image asset in the Assets tree switches the workspace from the canv
 Added asset preview zoom controls (1×–32×) that preserve nearest-neighbor pixels and leave exported PNG dimensions unchanged.
 
 Document version 3 stores the optional original filename. Version-1 and version-2 documents migrate to version 3 while preserving image pixels and, for version 2, source regions. Version-0 migration remains supported. Strict TypeScript and production build pass; tests and browser verification were not run for this increment. No commit made.
+
+
+## Multiple selection — 2026-10-04
+
+Added shift-click toggling in the canvas and shape tree, marquee selection by dragging empty canvas, selection outlines for all selected objects, and group movement. The primary selected object retains resize handles. The property sheet intersects component keys and kinds across the selection, displays mixed values, and applies edits to all selected shapes in one transaction. Delete removes a multi-selection in one undo step.
+
+Strict TypeScript, production build, and whitespace checks pass. Tests and browser verification were not run for this increment. No commit made.

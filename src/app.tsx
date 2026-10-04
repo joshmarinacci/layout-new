@@ -56,6 +56,7 @@ export default function App() {
     const state = useEditorStore(store);
     const doc = state.document;
     const selected = doc.shapes.find(shape => shape.id === state.selectedId);
+    const selectedShapes = doc.shapes.filter(shape => state.selectedIds.includes(shape.id));
     const file = useRef<HTMLInputElement>(null);
     const [error, setError] = useState('');
     const [imageDialog, setImageDialog] = useState<{kind: 'create' | 'import'} | {kind: 'edit'; imageId: string; source?: Bounds} | null>(null);
@@ -129,22 +130,26 @@ export default function App() {
                 onKeyDown={event => { if (event.key === 'Escape') { store.cancelTransaction(); event.currentTarget.blur(); } if (event.key === 'Enter') event.currentTarget.blur(); }}
                 onChange={event => store.setTitle(event.target.value)}/>
             {selectedAsset && <button onClick={() => setSelectedAssetId(null)}>Back to canvas</button>}
-            {!selectedAsset && selected?.type === 'pixel-image' && <>
+            {!selectedAsset && selectedShapes.length === 1 && selected?.type === 'pixel-image' && <>
                 <button disabled={state.transactionActive} onClick={() => setImageDialog({kind: 'edit', imageId: selected.components.image.imageId, source: selected.components.image.source})}>Edit Pixels</button>
                 <button disabled={state.transactionActive} onClick={() => store.select(store.linkImageShape(selected.id))}>Linked Copy</button>
             </>}
-            {!selectedAsset && <button disabled={!selected || state.transactionActive} onClick={() => { if (selected) store.removeShape(selected.id); }}>Delete</button>}
+            {!selectedAsset && <button disabled={!selectedShapes.length || state.transactionActive} onClick={() => {
+                store.beginTransaction('Delete selection');
+                selectedShapes.forEach(shape => store.removeShape(shape.id));
+                store.commitTransaction(); store.select(null);
+            }}>Delete</button>}
             {undo}{redo}
         </div>
-        <div className="left scroll-container"><TreeView document={doc} selected={selected} selectedAssetId={selectedAssetId}
-            onSelect={shape => { setSelectedAssetId(null); store.select(shape.id); }}
+        <div className="left scroll-container"><TreeView document={doc} selectedIds={state.selectedIds} selectedAssetId={selectedAssetId}
+            onSelect={(shape, additive) => { setSelectedAssetId(null); additive ? store.toggleSelection(shape.id) : store.select(shape.id); }}
             onSelectAsset={image => { finishEditing(); store.select(null); setSelectedAssetId(image.id); }}/></div>
         {selectedAsset ? <div className="asset-center scroll-container"><PixelAssetView store={store} image={selectedAsset} onBack={() => setSelectedAssetId(null)}/></div> : <>
             <div className="center scroll-container"><VisualEditor key={activeTab.id} store={store} onEditImage={reference => setImageDialog({kind: 'edit', imageId: reference.imageId, source: reference.source})}/></div>
             <div className="right scroll-container"><PropSheet key={activeTab.id} store={store}/></div>
         </>}
         </div>
-        <div className="statusbar full-span"><span role="alert">{error}</span><span className="spacer"/><label>Drag shapes to move; drag a handle to resize. Shift-resize images to keep proportions. Double-click a pixel image to edit. Escape cancels.</label></div>
+        <div className="statusbar full-span"><span role="alert">{error}</span><span className="spacer"/><label>Shift-click to toggle selection; drag empty canvas to select objects. Drag shapes to move; drag a handle to resize. Shift-resize images to keep proportions. Double-click a pixel image to edit. Escape cancels.</label></div>
         {imageDialog?.kind === 'import' && <ImportPixelImage store={store} onClose={() => setImageDialog(null)}/>}
         {imageDialog?.kind === 'create' && <NewPixelImage store={store} onClose={() => setImageDialog(null)} onCreated={imageId => setImageDialog({kind: 'edit', imageId})}/>}
         {imageDialog?.kind === 'edit' && <PixelImageEditor key={imageDialog.imageId} store={store} imageId={imageDialog.imageId} source={imageDialog.source} onClose={() => setImageDialog(null)}/>}

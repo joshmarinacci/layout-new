@@ -8,7 +8,7 @@ function Field({store, title, value, type = 'number', nonnegative = false, updat
     store: EditorStore; title: string; value: number | string; type?: 'number' | 'color'; nonnegative?: boolean;
     update: (value: string) => void;
 }) {
-    return <label className="number-input"><span className="title">{title}</span><input aria-label={title} type={type} value={value}
+    return <label className="number-input"><span className="title">{title}</span>{value === '' && <small>Mixed</small>}<input aria-label={title} type={type} value={value}
         min={nonnegative ? 0 : undefined} step="any"
         onFocus={() => store.beginTransaction(title)}
         onBlur={() => { if (store.getSnapshot().transactionActive) store.commitTransaction(); }}
@@ -28,24 +28,39 @@ function componentFor(shape: Draft<Shape>, key: string): Draft<ShapeComponent> {
 }
 export default function PropSheet({store}: {store: EditorStore}) {
     const state = useEditorStore(store);
-    const shape = state.document.shapes.find(s => s.id === state.selectedId);
-    if (!shape) return <div className="prop-sheet">nothing selected</div>;
-    const update = (key: string, recipe: (component: Draft<ShapeComponent>) => void) => store.updateShape(shape.id, draft => recipe(componentFor(draft, key)));
+    const shapes = state.document.shapes.filter(shape => state.selectedIds.includes(shape.id));
+    if (!shapes.length) return <div className="prop-sheet">nothing selected</div>;
+    const common = Object.entries(shapes[0].components).filter(([key, component]) => shapes.every(shape => {
+        const entry = Object.entries(shape.components).find(([name]) => name === key);
+        return entry?.[1].kind === component.kind;
+    }));
+    const update = (key: string, recipe: (component: Draft<ShapeComponent>) => void) => shapes.forEach(shape =>
+        store.updateShape(shape.id, draft => recipe(componentFor(draft, key))));
+    const fieldValue = (key: string, read: (component: ShapeComponent) => number | string) => {
+        const values = shapes.map(shape => read(shape.components[key as keyof Shape['components']] as ShapeComponent));
+        return values.every(value => value === values[0]) ? values[0] : '';
+    };
+    const field = (key: string, title: string, read: (component: ShapeComponent) => number | string,
+        write: (component: Draft<ShapeComponent>, value: string) => void, type: 'number' | 'color' = 'number', nonnegative = false) =>
+        <Field key={`${key}.${title}`} store={store} title={title} value={fieldValue(key, read)} type={type} nonnegative={nonnegative}
+            update={value => update(key, component => write(component, value))}/>;
     return <div className="prop-sheet">
         <details open><summary>info</summary><div>
-            <NameField store={store} label="Shape name" value={shape.name} rename={name => store.renameShape(shape.id, name)}/>
-            <div>{shape.type}</div><small>{shape.id}</small>
+            {shapes.length === 1 ? <><NameField store={store} label="Shape name" value={shapes[0].name} rename={name => store.renameShape(shapes[0].id, name)}/>
+                <div>{shapes[0].type}</div><small>{shapes[0].id}</small></> : <div>{shapes.length} objects selected</div>}
         </div></details>
-        {Object.entries(shape.components).map(([key, comp]) => <details open key={key}><summary>{key}</summary><div className="prop-sheet-panel">
-            {comp.kind === 'pixel-image-reference' && <span>Shared image: {state.document.images.find(image => image.id === comp.imageId)?.name}{comp.source && <><br/>Source: {comp.source.x}, {comp.source.y} · {comp.source.width} × {comp.source.height} pixels</>}</span>}
-            {comp.kind === 'resizable-bounds-component' && (['x', 'y', 'width', 'height'] as const).map(field =>
-                <Field key={field} store={store} title={field} value={comp.bounds[field]} nonnegative={field === 'width' || field === 'height'} update={value => update(key, c => { if (c.kind === 'resizable-bounds-component') c.bounds[field] = Number(value); })}/>)}
-            {comp.kind === 'fill-component' && <Field store={store} title="Fill color" type="color" value={comp.fill.color} update={value => update(key, c => { if (c.kind === 'fill-component') c.fill.color = value; })}/>}
+        {common.map(([key, comp]) => <details open key={key}><summary>{key}</summary><div className="prop-sheet-panel">
+            {comp.kind === 'resizable-bounds-component' && (['x', 'y', 'width', 'height'] as const).map(name => field(key, name,
+                c => c.kind === 'resizable-bounds-component' ? c.bounds[name] : '', (c, value) => { if (c.kind === 'resizable-bounds-component') c.bounds[name] = Number(value); }, 'number', name === 'width' || name === 'height'))}
+            {comp.kind === 'fill-component' && field(key, 'Fill color', c => c.kind === 'fill-component' ? c.fill.color : '',
+                (c, value) => { if (c.kind === 'fill-component') c.fill.color = value; }, 'color')}
             {comp.kind === 'stroke-component' && <>
-                <Field store={store} title="Stroke color" type="color" value={comp.color} update={value => update(key, c => { if (c.kind === 'stroke-component') c.color = value; })}/>
-                <Field store={store} title="Stroke width" value={comp.width} nonnegative update={value => update(key, c => { if (c.kind === 'stroke-component') c.width = Number(value); })}/></>}
-            {(comp.kind === 'rounded-corner-component' || comp.kind === 'circle-like-component') && <Field store={store} title="radius" value={comp.radius} nonnegative update={value => update(key, c => { if (c.kind === 'rounded-corner-component' || c.kind === 'circle-like-component') c.radius = Number(value); })}/>}
-            {comp.kind === 'circle-like-component' && (['x', 'y'] as const).map(field => <Field key={field} store={store} title={`Center ${field}`} value={comp.center[field]} update={value => update(key, c => { if (c.kind === 'circle-like-component') c.center[field] = Number(value); })}/>)}
+                {field(key, 'Stroke color', c => c.kind === 'stroke-component' ? c.color : '', (c, value) => { if (c.kind === 'stroke-component') c.color = value; }, 'color')}
+                {field(key, 'Stroke width', c => c.kind === 'stroke-component' ? c.width : '', (c, value) => { if (c.kind === 'stroke-component') c.width = Number(value); }, 'number', true)}</>}
+            {(comp.kind === 'rounded-corner-component' || comp.kind === 'circle-like-component') && field(key, 'radius', c => c.kind === 'rounded-corner-component' || c.kind === 'circle-like-component' ? c.radius : '',
+                (c, value) => { if (c.kind === 'rounded-corner-component' || c.kind === 'circle-like-component') c.radius = Number(value); }, 'number', true)}
+            {comp.kind === 'circle-like-component' && (['x', 'y'] as const).map(name => field(key, `Center ${name}`, c => c.kind === 'circle-like-component' ? c.center[name] : '',
+                (c, value) => { if (c.kind === 'circle-like-component') c.center[name] = Number(value); }))}
         </div></details>)}
     </div>;
 }

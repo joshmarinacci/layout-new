@@ -12,24 +12,25 @@ function cls(props:Record<string,boolean>) {
 
 function TreeItem(props: {
     item: Shape,
-    selected: Shape | undefined,
-    onSelect: (value: Shape) => void
+    selectedIds: readonly string[],
+    onSelect: (value: Shape, additive: boolean) => void
 }) {
-    const {item, selected, onSelect} = props
+    const {item, selectedIds, onSelect} = props
     return <div key={item.id}
                className={cls({
                    'tree-item':true,
-                   selected: item.id === selected?.id
+                   selected: selectedIds.includes(item.id)
                })}
-               onClick={()=>{
-                   onSelect(item)
+               onClick={event=>{
+                   onSelect(item, event.shiftKey)
+               }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') onSelect(item, event.shiftKey);
                }}>{item.name}</div>
 }
 
 export default function TreeView(props: {
     document: DrawDocument,
-    selected: Shape | undefined,
-    onSelect: (value: Shape) => void,
+    selectedIds: readonly string[],
+    onSelect: (value: Shape, additive: boolean) => void,
     selectedAssetId: string | null,
     onSelectAsset: (image: PixelImageData) => void,
 }) {
@@ -41,9 +42,8 @@ export default function TreeView(props: {
             </div>
             <ul>
                 {doc.shapes.map((shape,n)=>
-                    <TreeItem key={shape.id}
-                              item={shape}
-                              selected={props.selected}
+                    <TreeItem key={shape.id} item={shape}
+                              selectedIds={props.selectedIds}
                               onSelect={props.onSelect}/>)}
             </ul>
         </li>

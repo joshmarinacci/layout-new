@@ -9,6 +9,7 @@ interface HistoryEntry { label: string; patches: Patch[]; inversePatches: Patch[
 export interface EditorSnapshot {
     readonly document: Document;
     readonly selectedId: string | null;
+    readonly selectedIds: readonly string[];
     readonly canUndo: boolean;
     readonly canRedo: boolean;
     readonly transactionActive: boolean;
@@ -18,9 +19,10 @@ export const emptyDocument = (): Document => ({version: 3, images: [], title: 'U
 export class EditorStore {
     private document: Document;
     private selectedId: string | null = null;
+    private selectedIds: string[] = [];
     private past: HistoryEntry[] = [];
     private future: HistoryEntry[] = [];
-    private transaction: {label: string; before: Document; selectedId: string | null} | null = null;
+    private transaction: {label: string; before: Document; selectedId: string | null; selectedIds: string[]} | null = null;
     private listeners = new Set<() => void>();
     private snapshot!: EditorSnapshot;
     constructor(document: Document = emptyDocument(), private readonly historyLimit = 100) {
@@ -32,16 +34,30 @@ export class EditorStore {
     getSnapshot = (): EditorSnapshot => this.snapshot;
     subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
     private publish() {
-        if (this.selectedId && !this.document.shapes.some(s => s.id === this.selectedId)) this.selectedId = null;
-        this.snapshot = Object.freeze({document: this.document, selectedId: this.selectedId,
+        const shapeIds = new Set(this.document.shapes.map(shape => shape.id));
+        this.selectedIds = this.selectedIds.filter(id => shapeIds.has(id));
+        if (this.selectedId && !shapeIds.has(this.selectedId)) this.selectedId = null;
+        if (!this.selectedId && this.selectedIds.length) this.selectedId = this.selectedIds.at(-1)!;
+        this.snapshot = Object.freeze({document: this.document, selectedId: this.selectedId, selectedIds: Object.freeze([...this.selectedIds]),
             canUndo: !this.transaction && this.past.length > 0, canRedo: !this.transaction && this.future.length > 0,
             transactionActive: !!this.transaction});
         this.listeners.forEach(listener => listener());
     }
     select(id: string | null) {
         if (id !== null && !this.document.shapes.some(s => s.id === id)) throw new Error('Unknown shape');
-        if (this.selectedId === id) return;
-        this.selectedId = id; this.publish();
+        const ids = id ? [id] : [];
+        this.setSelection(ids);
+    }
+    setSelection(ids: readonly string[]) {
+        const unique = [...new Set(ids)];
+        if (unique.some(id => !this.document.shapes.some(shape => shape.id === id))) throw new Error('Unknown shape');
+        const primary = unique.at(-1) ?? null;
+        if (this.selectedId === primary && this.selectedIds.length === unique.length && this.selectedIds.every((id, index) => id === unique[index])) return;
+        this.selectedIds = unique; this.selectedId = primary; this.publish();
+    }
+    toggleSelection(id: string) {
+        if (!this.document.shapes.some(shape => shape.id === id)) throw new Error('Unknown shape');
+        this.setSelection(this.selectedIds.includes(id) ? this.selectedIds.filter(item => item !== id) : [...this.selectedIds, id]);
     }
     private requireIdle() { if (this.transaction) throw new Error('Finish the active transaction first'); }
     private record(entry: HistoryEntry) {
@@ -128,7 +144,7 @@ export class EditorStore {
     }
     beginTransaction(label: string) {
         this.requireIdle();
-        this.transaction = {label, before: this.document, selectedId: this.selectedId}; this.publish();
+        this.transaction = {label, before: this.document, selectedId: this.selectedId, selectedIds: [...this.selectedIds]}; this.publish();
     }
     commitTransaction() {
         const transaction = this.transaction;
@@ -151,7 +167,7 @@ export class EditorStore {
     }
     cancelTransaction() {
         if (!this.transaction) throw new Error('No active transaction');
-        this.document = this.transaction.before; this.selectedId = this.transaction.selectedId;
+        this.document = this.transaction.before; this.selectedId = this.transaction.selectedId; this.selectedIds = this.transaction.selectedIds;
         this.transaction = null; this.publish();
     }
     undo() {
@@ -167,6 +183,6 @@ export class EditorStore {
     replaceDocument(document: Document) {
         this.requireIdle(); validateDocument(document);
         this.document = freeze(structuredClone(document), true);
-        this.selectedId = null; this.past = []; this.future = []; this.publish();
+        this.selectedId = null; this.selectedIds = []; this.past = []; this.future = []; this.publish();
     }
 }
