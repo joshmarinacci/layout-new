@@ -195,13 +195,13 @@ describe('document migration', () => {
         const legacy = {version: 0, title: current.title, shapes: current.shapes};
         const migrated = deserializeDocument(JSON.stringify(legacy));
         expect(migrated).toEqual(current);
-        expect(JSON.parse(serializeDocument(migrated)).version).toBe(1);
+        expect(JSON.parse(serializeDocument(migrated)).version).toBe(3);
     });
     it('rejects unknown versions, unknown legacy fields, and image shapes in legacy documents', () => {
         const {store} = setup();
         const {shapes} = store.getSnapshot().document;
         expect(() => deserializeDocument(JSON.stringify({version: 0, title: 'bad', shapes}))).toThrow();
         expect(() => deserializeDocument('{"version":0,"title":"bad","shapes":[],"extra":true}')).toThrow();
-        expect(() => deserializeDocument('{"version":2,"title":"bad","shapes":[],"images":[]}')).toThrow();
+        expect(() => deserializeDocument('{"version":99,"title":"bad","shapes":[],"images":[]}')).toThrow();
     });
 });

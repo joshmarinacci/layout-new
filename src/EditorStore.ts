@@ -1,5 +1,6 @@
 import {applyPatches, enablePatches, freeze, produceWithPatches, type Draft, type Patch} from 'immer';
 import type {Document, Shape, PixelImageData} from './types';
+import {convertImportedPixels, type DecodedPixels, type TileSize} from './pngImport';
 import {makeImageShape, makePixelImage} from './pixelImages';
 import {deserializeDocument, serializeDocument, validateDocument} from './serialization';
 
@@ -12,7 +13,7 @@ export interface EditorSnapshot {
     readonly canRedo: boolean;
     readonly transactionActive: boolean;
 }
-export const emptyDocument = (): Document => ({version: 1, images: [], title: 'Untitled', shapes: []});
+export const emptyDocument = (): Document => ({version: 3, images: [], title: 'Untitled', shapes: []});
 
 export class EditorStore {
     private document: Document;
@@ -73,15 +74,40 @@ export class EditorStore {
     createPixelImage(width: number, height: number, palette: readonly string[]) {
         const image = makePixelImage(width, height, palette);
         const scale = Math.max(1, Math.floor(128 / Math.max(width, height)));
-        const shape = makeImageShape(image.id, {x: 50, y: 50, width: width * scale, height: height * scale});
+        const shape = makeImageShape(image.id, {x: 50, y: 50, width: width * scale, height: height * scale}, {x: 0, y: 0, width, height});
         this.edit('Create pixel image', draft => { draft.images.push(image); draft.shapes.push(shape); });
         return shape.id;
+    }
+    renameShape(id: string, name: string) {
+        this.updateShape(id, shape => { shape.name = name; });
+    }
+    renamePixelImage(id: string, name: string) {
+        this.edit('Rename image asset', draft => {
+            const image = draft.images.find(item => item.id === id);
+            if (!image) throw new Error('Unknown image asset');
+            image.name = name;
+        });
+    }
+    importPixelImages(source: DecodedPixels, name: string, tile?: TileSize, originalName: string | null = null) {
+        this.requireIdle();
+        const {image, regions, columns, rows} = convertImportedPixels(source, name, tile, originalName);
+        const gap = 8;
+        const scale = Math.max(1, Math.min(8, Math.floor(Math.min(
+            (900 - gap * (columns - 1)) / source.width,
+            (900 - gap * (rows - 1)) / source.height))));
+        const shapes = regions.map((region, i) => makeImageShape(image.id, {
+            x: 30 + (i % columns) * (region.width * scale + gap),
+            y: 30 + Math.floor(i / columns) * (region.height * scale + gap),
+            width: region.width * scale, height: region.height * scale,
+        }, region, tile ? `${name} (${i % columns + 1}, ${Math.floor(i / columns) + 1})` : name));
+        this.edit('Import PNG', draft => { draft.images.push(image); draft.shapes.push(...shapes); });
+        return shapes.map(shape => shape.id);
     }
     linkImageShape(id: string) {
         const source = this.document.shapes.find(shape => shape.id === id);
         if (source?.type !== 'pixel-image') throw new Error('Expected an image shape');
         const bounds = source.components.rect.bounds;
-        const shape = makeImageShape(source.components.image.imageId, {...bounds, x: bounds.x + 20, y: bounds.y + 20}, `${source.name} copy`);
+        const shape = makeImageShape(source.components.image.imageId, {...bounds, x: bounds.x + 20, y: bounds.y + 20}, source.components.image.source, `${source.name} copy`);
         this.addShape(shape);
         return shape.id;
     }

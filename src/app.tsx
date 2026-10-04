@@ -7,10 +7,12 @@ import {EditorStore, emptyDocument} from './EditorStore';
 import {makeExampleDocument} from './exampleDocument';
 import {useEditorStore} from './useEditorStore';
 import {deserializeDocument} from './serialization';
-import type {Document as DrawingDocument} from './types';
+import type {Document as DrawingDocument, Bounds} from './types';
+import {ImportPixelImage} from './ImportPixelImage';
 import {NewPixelImage} from './NewPixelImage';
 import {PixelImageEditor} from './PixelImageEditor';
 import {DropdownMenu} from './DropdownMenu';
+import {PixelAssetView} from './PixelAssetView';
 import './app.css';
 
 interface DocumentTab { id: string; store: EditorStore }
@@ -48,6 +50,7 @@ export default function App() {
     const activateTab = (id: string) => {
         if (id === workspace.activeId) return;
         finishEditing();
+        setSelectedAssetId(null);
         setWorkspace(current => ({...current, activeId: id}));
     };
     const state = useEditorStore(store);
@@ -55,7 +58,9 @@ export default function App() {
     const selected = doc.shapes.find(shape => shape.id === state.selectedId);
     const file = useRef<HTMLInputElement>(null);
     const [error, setError] = useState('');
-    const [imageDialog, setImageDialog] = useState<{kind: 'create'} | {kind: 'edit'; imageId: string} | null>(null);
+    const [imageDialog, setImageDialog] = useState<{kind: 'create' | 'import'} | {kind: 'edit'; imageId: string; source?: Bounds} | null>(null);
+    const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+    const selectedAsset = doc.images.find(image => image.id === selectedAssetId);
     useEffect(() => {
         const keydown = (event: KeyboardEvent) => {
             if (event.target instanceof HTMLElement && (event.target.matches('input, textarea, select') || event.target.isContentEditable)) return;
@@ -67,7 +72,7 @@ export default function App() {
         };
         window.addEventListener('keydown', keydown);
         return () => window.removeEventListener('keydown', keydown);
-    }, [store]);
+    }, [store, selectedAssetId]);
     const undo = <button disabled={!state.canUndo} onClick={() => store.undo()}>Undo</button>;
     const redo = <button disabled={!state.canRedo} onClick={() => store.redo()}>Redo</button>;
     return <div className="main-layout">
@@ -81,7 +86,7 @@ export default function App() {
                     setTimeout(() => URL.revokeObjectURL(url), 1000);
                 }}>Save JSON</button>
             </DropdownMenu>
-            <DropdownMenu title="Shape">
+            {!selectedAsset && <DropdownMenu title="Shape">
             <button disabled={state.transactionActive} onClick={() => {
                 const shape = makeRect('rect', {x: 50, y: 250, width: 50, height: 50});
                 store.addShape(shape); store.select(shape.id);
@@ -91,7 +96,8 @@ export default function App() {
                 store.addShape(shape); store.select(shape.id);
             }}>New Circle</button>
             <button disabled={state.transactionActive} onClick={() => setImageDialog({kind: 'create'})}>New Pixel Image</button>
-            </DropdownMenu>
+            <button disabled={state.transactionActive} onClick={() => setImageDialog({kind: 'import'})}>Import PNG</button>
+            </DropdownMenu>}
             <ul><li>{undo}</li><li>{redo}</li></ul>
             <input hidden ref={file} type="file" accept=".json,application/json" onChange={async event => {
                 const chosen = event.target.files?.[0]; event.target.value = '';
@@ -122,19 +128,25 @@ export default function App() {
                 onBlur={() => { if (store.getSnapshot().transactionActive) store.commitTransaction(); }}
                 onKeyDown={event => { if (event.key === 'Escape') { store.cancelTransaction(); event.currentTarget.blur(); } if (event.key === 'Enter') event.currentTarget.blur(); }}
                 onChange={event => store.setTitle(event.target.value)}/>
-            {selected?.type === 'pixel-image' && <>
-                <button disabled={state.transactionActive} onClick={() => setImageDialog({kind: 'edit', imageId: selected.components.image.imageId})}>Edit Pixels</button>
+            {selectedAsset && <button onClick={() => setSelectedAssetId(null)}>Back to canvas</button>}
+            {!selectedAsset && selected?.type === 'pixel-image' && <>
+                <button disabled={state.transactionActive} onClick={() => setImageDialog({kind: 'edit', imageId: selected.components.image.imageId, source: selected.components.image.source})}>Edit Pixels</button>
                 <button disabled={state.transactionActive} onClick={() => store.select(store.linkImageShape(selected.id))}>Linked Copy</button>
             </>}
-            <button disabled={!selected || state.transactionActive} onClick={() => { if (selected) store.removeShape(selected.id); }}>Delete</button>
+            {!selectedAsset && <button disabled={!selected || state.transactionActive} onClick={() => { if (selected) store.removeShape(selected.id); }}>Delete</button>}
             {undo}{redo}
         </div>
-        <div className="left scroll-container"><TreeView document={doc} selected={selected} onSelect={shape => store.select(shape.id)}/></div>
-        <div className="center scroll-container"><VisualEditor key={activeTab.id} store={store} onEditImage={imageId => setImageDialog({kind: 'edit', imageId})}/></div>
-        <div className="right scroll-container"><PropSheet key={activeTab.id} store={store}/></div>
+        <div className="left scroll-container"><TreeView document={doc} selected={selected} selectedAssetId={selectedAssetId}
+            onSelect={shape => { setSelectedAssetId(null); store.select(shape.id); }}
+            onSelectAsset={image => { finishEditing(); store.select(null); setSelectedAssetId(image.id); }}/></div>
+        {selectedAsset ? <div className="asset-center scroll-container"><PixelAssetView store={store} image={selectedAsset} onBack={() => setSelectedAssetId(null)}/></div> : <>
+            <div className="center scroll-container"><VisualEditor key={activeTab.id} store={store} onEditImage={reference => setImageDialog({kind: 'edit', imageId: reference.imageId, source: reference.source})}/></div>
+            <div className="right scroll-container"><PropSheet key={activeTab.id} store={store}/></div>
+        </>}
         </div>
         <div className="statusbar full-span"><span role="alert">{error}</span><span className="spacer"/><label>Drag shapes to move; drag a handle to resize. Shift-resize images to keep proportions. Double-click a pixel image to edit. Escape cancels.</label></div>
+        {imageDialog?.kind === 'import' && <ImportPixelImage store={store} onClose={() => setImageDialog(null)}/>}
         {imageDialog?.kind === 'create' && <NewPixelImage store={store} onClose={() => setImageDialog(null)} onCreated={imageId => setImageDialog({kind: 'edit', imageId})}/>}
-        {imageDialog?.kind === 'edit' && <PixelImageEditor key={imageDialog.imageId} store={store} imageId={imageDialog.imageId} onClose={() => setImageDialog(null)}/>}
+        {imageDialog?.kind === 'edit' && <PixelImageEditor key={imageDialog.imageId} store={store} imageId={imageDialog.imageId} source={imageDialog.source} onClose={() => setImageDialog(null)}/>}
     </div>;
 }

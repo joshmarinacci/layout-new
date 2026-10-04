@@ -20,22 +20,23 @@ function component(value: unknown, kind: string, fields: string[]) {
     if (c.kind !== kind) throw new Error(`Expected ${kind}`);
     return c;
 }
-export function validateDocument(value: unknown): asserts value is Document {
+function validateSchema(value: unknown, version: 1 | 2 | 3): asserts value is Document {
     const doc = object(value); keys(doc, ['version', 'title', 'shapes', 'images']);
-    if (doc.version !== 1) throw new Error('Unsupported document version');
+    if (doc.version !== version) throw new Error('Unsupported document version');
     text(doc.title);
     if (!Array.isArray(doc.shapes)) throw new Error('Expected shapes array');
     if (!Array.isArray(doc.images)) throw new Error('Expected images array');
     const imageIds = new Set<string>();
     for (const item of doc.images) {
         const image = object(item);
-        keys(image, ['id', 'name', 'width', 'height', 'palette', 'pixels']);
+        keys(image, version === 3 ? ['id', 'name', 'originalName', 'width', 'height', 'palette', 'pixels'] : ['id', 'name', 'width', 'height', 'palette', 'pixels']);
         text(image.id); text(image.name);
+        if (version === 3 && image.originalName !== null) text(image.originalName);
         if (!image.id || imageIds.has(image.id as string)) throw new Error('Image IDs must be nonempty and unique');
         imageIds.add(image.id as string);
         for (const size of [image.width, image.height]) {
-            if (typeof size !== 'number' || !Number.isInteger(size) || size < 1 || size > 256)
-                throw new Error('Pixel image dimensions must be integers from 1 to 256');
+            if (typeof size !== 'number' || !Number.isInteger(size) || size < 1 || size > (version === 1 ? 256 : 2048))
+                throw new Error('Invalid pixel image dimensions');
         }
         if (!Array.isArray(image.palette) || image.palette.length < 1 || image.palette.length > 256)
             throw new Error('Expected 1–256 hex palette colors');
@@ -59,8 +60,18 @@ export function validateDocument(value: unknown): asserts value is Document {
         const c = object(s.components);
         if (s.type === 'pixel-image') {
             keys(c, ['image', 'rect']);
-            const reference = component(c.image, 'pixel-image-reference', ['imageId']);
+            const reference = component(c.image, 'pixel-image-reference', version === 1 ? ['imageId'] : ['imageId', 'source']);
             if (!imageIds.has(reference.imageId as string)) throw new Error('Missing pixel image data');
+            if (version >= 2) {
+                const region = object(reference.source); keys(region, ['x', 'y', 'width', 'height']);
+                const asset = doc.images.map(object).find(image => image.id === reference.imageId)!;
+                for (const field of ['x', 'y', 'width', 'height']) {
+                    if (typeof region[field] !== 'number' || !Number.isInteger(region[field])) throw new Error('Image source must use integer pixels');
+                }
+                const {x, y, width, height} = region as unknown as {x: number; y: number; width: number; height: number};
+                if (x < 0 || y < 0 || width < 1 || height < 1 || x + width > (asset.width as number) || y + height > (asset.height as number))
+                    throw new Error('Image source region must be inside its asset');
+            }
             const bounds = object(component(c.rect, 'resizable-bounds-component', ['bounds']).bounds);
             keys(bounds, ['x', 'y', 'width', 'height']);
             number(bounds.x); number(bounds.y); number(bounds.width, true); number(bounds.height, true);
@@ -88,22 +99,34 @@ export function validateDocument(value: unknown): asserts value is Document {
         if (s.type === 'rectangle') number(component(c.cornerRadius, 'rounded-corner-component', ['radius']).radius, true);
     }
 }
+export function validateDocument(value: unknown): asserts value is Document {
+    validateSchema(value, 3);
+}
 export function serializeDocument(document: Document): string {
     validateDocument(document);
     return JSON.stringify(document, null, 2);
 }
 export function deserializeDocument(json: string): Document {
     const value: unknown = JSON.parse(json);
-    const source = object(value);
+    let source = object(value);
     if (source.version === 0) {
         keys(source, ['version', 'title', 'shapes']);
-        // Version 0 had no image collection or image references.
         if (!Array.isArray(source.shapes) || source.shapes.some(shape => object(shape).type === 'pixel-image'))
             throw new Error('Invalid version-0 shapes');
-        const migrated = {...source, version: 1, images: []};
-        validateDocument(migrated);
-        return migrated;
+        source = {...source, version: 1, images: []};
     }
-    validateDocument(value);
-    return value;
+    if (source.version === 1 || source.version === 2) {
+        const fromVersion = source.version;
+        validateSchema(source, fromVersion);
+        const legacy = source as unknown as Document;
+        source = {...legacy, version: 3, images: legacy.images.map(image => ({...image, originalName: null})),
+            shapes: fromVersion === 1 ? legacy.shapes.map(shape => {
+                if (shape.type !== 'pixel-image') return shape;
+                const image = legacy.images.find(image => image.id === shape.components.image.imageId)!;
+                return {...shape, components: {...shape.components, image: {...shape.components.image,
+                    source: {x: 0, y: 0, width: image.width, height: image.height}}}};
+            }) : source.shapes};
+    }
+    validateDocument(source);
+    return source;
 }

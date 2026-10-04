@@ -58,3 +58,28 @@ Added Shift-constrained image resizing, the standard 16-color PICO-8 palette, an
 Added Shape beside File and moved New Rect, New Circle, and New Pixel Image into it. Both menus reuse DropdownMenu for outside-click, focus-leave, action, and Escape dismissal. Selection-specific toolbar actions remain available. README usage now reflects the menus.
 
 The user confirmed the pixel editor works in the live preview. All 70 automated tests, strict TypeScript checking, production build, and Git whitespace checks pass.
+
+
+## PNG import and tile splitting — 2026-10-04
+
+Added Shape → Import PNG with file preview and optional splitting into independently editable tiles. Tile width and height can each be 8, 16, or 32; dimensions must divide exactly. Original decoded colors, resolution, transparency, and tile order are preserved. Source limits and unsupported alpha/animation/16-bit channels produce actionable errors before document mutation. Creation of every imported data object and shape is atomic and undoable in one step.
+
+Validation: 79 tests pass, including nine importer tests and the supplied terrain.png regression fixture. Type checking and production build pass. Browser verification imported terrain.png into twenty 8 × 8 tiles and confirmed a single undo/redo removes/restores the whole import. Existing user documents were preserved by testing in a fresh tab. Older development tabs require saving/reloading or a new tab after store methods are hot-loaded.
+
+
+## Shared sprite-sheet imports — 2026-10-04
+
+Changed sliced imports to retain one source image asset, with per-shape integer source rectangles. Tile bounds remain independent of image coordinates. Linked Copy preserves the source rectangle, rendering crops from a cached asset bitmap, and pixel editing is confined to the opened tile's source region. Flood fill cannot cross tile boundaries.
+
+Source PNGs may now be up to 2048 × 2048 pixels; sources above 256 pixels require slicing. Tile-size choices extend through 256 pixels, with at most 1024 shapes per import. Document version 2 validates source rectangles; version-0/1 saved files migrate to it. Existing separate assets are preserved rather than merged speculatively.
+
+Validation: 88 model tests, strict TypeScript, production build, and whitespace checks pass. Tests cover a large sheet, the supplied terrain fixture as one asset, crop bounds, overlapping linked copies, isolated tile edits, history, and migration. Shared-sheet browser checks remain pending. No commit made for this increment.
+
+
+## Asset view and item names — 2026-10-04
+
+Selecting an image asset in the Assets tree switches the workspace from the canvas/property panels to a full-image asset view. The view shows native pixel dimensions, palette size, and the imported filename, and supports PNG export. Imported assets retain the source filename separately from their editable asset name; files created in the editor have no original filename. Image assets and shapes can both be renamed through their name fields, with edits recorded in document history.
+
+Added asset preview zoom controls (1×–32×) that preserve nearest-neighbor pixels and leave exported PNG dimensions unchanged.
+
+Document version 3 stores the optional original filename. Version-1 and version-2 documents migrate to version 3 while preserving image pixels and, for version 2, source regions. Version-0 migration remains supported. Strict TypeScript and production build pass; tests and browser verification were not run for this increment. No commit made.

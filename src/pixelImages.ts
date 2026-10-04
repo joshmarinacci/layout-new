@@ -13,15 +13,15 @@ export function makePixelImage(width: number, height: number, palette: readonly 
         throw new Error('Choose dimensions from 1 to 256 pixels');
     if (!palette.length || palette.length > 256 || palette.some(color => !/^#[0-9a-f]{6}$/i.test(color)))
         throw new Error('Invalid palette');
-    return {id: crypto.randomUUID(), name, width, height, palette: [...palette], pixels: Array(width * height).fill(-1)};
+    return {id: crypto.randomUUID(), name, originalName: null, width, height, palette: [...palette], pixels: Array(width * height).fill(-1)};
 }
-export function makeImageShape(imageId: string, bounds: Bounds, name = 'Pixel art'): PixelImageShape {
+export function makeImageShape(imageId: string, bounds: Bounds, source: Bounds, name = 'Pixel art'): PixelImageShape {
     return {id: crypto.randomUUID(), name, type: 'pixel-image', components: {
-        image: {kind: 'pixel-image-reference', imageId},
+        image: {kind: 'pixel-image-reference', imageId, source: {...source}},
         rect: {kind: 'resizable-bounds-component', bounds: {...bounds}},
     }};
 }
-function inside(image: PixelImageData, p: Point) {
+function inside(image: Pick<PixelImageData, 'width' | 'height'>, p: Point) {
     return Number.isInteger(p.x) && Number.isInteger(p.y) && p.x >= 0 && p.y >= 0 && p.x < image.width && p.y < image.height;
 }
 function checkColor(image: PixelImageData, color: number) {
@@ -83,4 +83,35 @@ export function resizeImageBounds(bounds: Bounds, dx: number, dy: number, lockAs
         return {...bounds, width: bounds.width * scale, height: bounds.height * scale};
     }
     return {...bounds, width: Math.max(1, bounds.width + dx), height: Math.max(1, bounds.height + dy)};
+}
+
+export function validateImageRegion(image: PixelImageData, region: Bounds) {
+    if (![region.x, region.y, region.width, region.height].every(Number.isInteger) ||
+        region.x < 0 || region.y < 0 || region.width < 1 || region.height < 1 ||
+        region.x + region.width > image.width || region.y + region.height > image.height)
+        throw new Error('Image source region must be an integer rectangle inside its asset');
+}
+export function readImageRegion(image: PixelImageData, region: Bounds): PixelImageData {
+    validateImageRegion(image, region);
+    const pixels: number[] = [];
+    for (let y = 0; y < region.height; y++) {
+        const start = (region.y + y) * image.width + region.x;
+        pixels.push(...image.pixels.slice(start, start + region.width));
+    }
+    return {...image, width: region.width, height: region.height, pixels, palette: [...image.palette]};
+}
+export function paintImageRegion(image: PixelImageData, region: Bounds, from: Point, to: Point, color: number) {
+    validateImageRegion(image, region);
+    const view = {width: region.width, height: region.height};
+    if (!inside(view, from) || !inside(view, to)) throw new Error('Pixel coordinates are out of bounds');
+    paintPixelLine(image, {x: region.x + from.x, y: region.y + from.y}, {x: region.x + to.x, y: region.y + to.y}, color);
+}
+export function fillImageRegion(image: PixelImageData, region: Bounds, point: Point, color: number) {
+    const view = readImageRegion(image, region);
+    floodFillPixels(view, point, color);
+    for (let y = 0; y < region.height; y++) for (let x = 0; x < region.width; x++) {
+        const destination = (region.y + y) * image.width + region.x + x;
+        const value = view.pixels[y * region.width + x];
+        if (image.pixels[destination] !== value) image.pixels[destination] = value;
+    }
 }

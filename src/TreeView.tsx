@@ -1,4 +1,4 @@
-import type {DrawDocument, Shape} from "./types";
+import type {DrawDocument, PixelImageData, Shape} from "./types";
 
 function cls(props:Record<string,boolean>) {
     let classname = ""
@@ -29,7 +29,9 @@ function TreeItem(props: {
 export default function TreeView(props: {
     document: DrawDocument,
     selected: Shape | undefined,
-    onSelect: (value: Shape) => void
+    onSelect: (value: Shape) => void,
+    selectedAssetId: string | null,
+    onSelectAsset: (image: PixelImageData) => void,
 }) {
     const doc = props.document
     return <ul className={'tree-view'}>
@@ -48,7 +50,11 @@ export default function TreeView(props: {
         <li>
             <label>Assets</label>
             <ul>
-                {doc.images.map(image => <li key={image.id}>{image.name} ({image.width} × {image.height})</li>)}
+                {doc.images.map(image => <li key={image.id}>
+                    <button className={cls({'asset-item': true, selected: image.id === props.selectedAssetId})}
+                        aria-current={image.id === props.selectedAssetId ? 'true' : undefined}
+                        onClick={() => props.onSelectAsset(image)}>{image.name} ({image.width} × {image.height})</button>
+                </li>)}
             </ul>
         </li>
     </ul>

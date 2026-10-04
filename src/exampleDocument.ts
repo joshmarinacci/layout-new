@@ -60,7 +60,7 @@ export function makeExampleDocument():DrawDocument {
         }
     }
     return {
-        version: 1, images: [],
+        version: 3, images: [],
         title:'test doc',
         shapes: [rect, circle],
     }

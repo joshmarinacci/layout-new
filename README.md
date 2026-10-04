@@ -22,13 +22,29 @@ Choose **Shape → New Pixel Image**, then **8 × 8**, **16 × 16**, or **32 × 
 
 Each completed stroke or fill is one undo step in the document's history. Escape cancels an active stroke; otherwise it closes the panel. Closing preserves completed edits. Pointer cancellation, lost capture, or focus loss cancels an unfinished stroke.
 
-Drag the image to move it and its lower-right handle to resize its display bounds. Hold **Shift** while resizing to preserve the aspect ratio from the start of the drag; release Shift for free resizing. Rendering uses nearest-neighbor scaling; resizing does not change the pixel resolution. Select an image and choose **Linked Copy** to add another shape referencing the same data. Editing either shape's pixels updates both, while their positions and display sizes stay independent. Sharing is within a document, not across document tabs.
+Drag the image to move it and its lower-right handle to resize its display bounds. Hold **Shift** while resizing to preserve the aspect ratio from the start of the drag; release Shift for free resizing. Rendering uses nearest-neighbor scaling; resizing does not change the pixel resolution. Select an image and choose **Linked Copy** to add another shape referencing the same data. Editing either shape's source pixels updates both, while their positions and display sizes stay independent. Sharing is within a document, not across document tabs.
+
+## Importing PNGs
+
+Choose **Shape → Import PNG**, then select a file. Import the whole image, or enable **Slice into tile shapes** and choose tile width and height (8, 16, 32, 64, 128, or 256 pixels independently). Dimensions must divide the source exactly; nothing is cropped or padded. Shapes are created left-to-right, then top-to-bottom, including transparent tiles.
+
+**A sliced import creates one shared image asset.** Each tile shape references its own source rectangle in that asset. Assets lists the original sheet once, at its original dimensions. Double-clicking a tile edits only its source region; pencil, eraser, and flood fill cannot spill into neighboring tiles. Shapes with overlapping source regions, including Linked Copies, reflect the same pixel edits. Moving/resizing a shape changes only its display bounds. Deleting a tile keeps the shared asset.
+
+Select an image in the Assets tree to open its asset view. It shows the complete source image and its original imported filename, with zoom controls from 1× to 32× and **Export PNG**. Zoom affects only the preview; exported PNG dimensions remain the asset's native pixel dimensions. Rename an asset in this view or rename a shape in the property sheet. Names are undoable document edits.
+
+Import preserves decoded opaque RGB colors and full transparency without resizing, quantization, or dithering. Limits: 2048 × 2048 source pixels, 256 unique opaque colors, 10 MB per file, and 1024 tile shapes. Sources larger than 256 pixels require slicing. Tile source regions can be up to 256 × 256 pixels. Choose larger tiles when a sheet would exceed the shape limit. Partially transparent pixels, animated PNGs, and 16-bit-channel PNGs are rejected. Fully transparent images receive one editable black palette color. Processing stays local and leaves the source file untouched.
+
+An entire import is one undo entry, including the asset and all referencing shapes. Invalid/cancelled imports leave the document unchanged. Import tests include the supplied 160 × 8 terrain.png fixture: twenty 8 × 8 source regions backed by one asset. Tests cover exact pixels, large sheets, boundary-limited tile edits, shared references, placement independence, deletion, undo/redo, cancellation, invalid regions, JSON round trips, and version-1 migration.
+
+Browser verification previously confirmed PNG decoding, preview, and one-step undo/redo for separate-image imports. The shared-sheet rendering, region editor, asset view, name editing, and asset preview zoom have not yet been manually checked in the browser.
+
+During development, tabs created before new EditorStore methods were hot-loaded retain the older class instance. Use a new document tab, or save documents and reload the page, before trying a newly added store action.
 
 ## Architecture
 
-`types.ts` contains only serializable data. `Document` version 1 retains the ordered `shapes` array; IDs are unique and drawing order is array order. `Shape` and `ShapeComponent` are discriminated unions. `editorTypes.ts` holds extension/UI contracts separately.
+`types.ts` contains only serializable data. `Document` version 3 retains the ordered `shapes` array; IDs are unique and drawing order is array order. `Shape` and `ShapeComponent` are discriminated unions. `editorTypes.ts` holds extension/UI contracts separately.
 
-`Document.images` contains `PixelImageData` objects: stable ID, name, dimensions, hex palette colors, and row-major palette indices (`-1` means transparent). A `PixelImageShape` holds a reference by image ID and separate display bounds. Validation rejects dangling references, duplicate image IDs, invalid dimensions/palettes, wrong pixel counts, and invalid palette indices. Deleting a shape retains its image data, so other linked shapes and undo remain valid; unused-data cleanup is not implemented.
+`Document.images` contains `PixelImageData` objects: stable ID, editable name, original imported filename (when available), dimensions, hex palette colors, and row-major palette indices (`-1` means transparent). Selecting an image asset opens its full-resolution asset view, where it can be renamed or exported as PNG. A `PixelImageShape` holds an image ID, an integer source rectangle within that asset, and separate display bounds. Multiple shapes can show different regions of one sprite sheet. Validation rejects dangling references, duplicate image IDs, invalid dimensions/palettes, wrong pixel counts, and invalid palette indices. Deleting a shape retains its image data, so other linked shapes and undo remain valid; unused-data cleanup is not implemented.
 
 Use `createPixelImage`, `linkImageShape`, and `updatePixelImage` on the store. Creation adds image data and its first shape atomically. Pixel tool algorithms live in `pixelImages.ts` and operate on drafts through the store, with no GUI dependency. Image data participates in snapshots, transactions, undo/redo, and JSON save/load. The editor's tool, zoom, and selected color are transient UI state.
 
@@ -40,7 +56,7 @@ Use `createPixelImage`, `linkImageShape`, and `updatePixelImage` on the store. C
 
 Use `setTitle`, `addShape`, `updateShape`, `removeShape`, or `edit` for mutations. `edit` recipes receive an Immer draft and must be synchronous. Invalid edits are rejected before publication. Individual edits record Immer patches and inverse patches. For gestures, call `beginTransaction(label)`, perform live updates, then `commitTransaction()` or `cancelTransaction()`. Commit reconciles the starting and ending document, generating patches per changed shape or image-data object, independent of the number of pointer events. No-op gestures and cancellation preserve redo. Transactions cannot nest, and history navigation/loading is rejected while one is active. Keep unrelated operations outside a gesture transaction.
 
-`serialization.ts` validates schema version, discriminants, components, finite geometry, nonnegative dimensions, and unique IDs. Only document data is serialized; callbacks, history, and selection are excluded. Unknown fields/types/versions are rejected rather than silently discarded. Version-0 JSON files migrate to version 1 on load by adding an empty image collection, preserving existing shapes. Saves use version 1.
+`serialization.ts` validates schema version, discriminants, components, finite geometry, nonnegative dimensions, and unique IDs. Only document data is serialized; callbacks, history, and selection are excluded. Unknown fields/types/versions are rejected rather than silently discarded. Version-0 JSON files gain an empty image collection. Version-1 files gain full-image source rectangles for their existing image shapes, and version-2 files gain a null original filename. Older formats migrate to version 3, the current save format; image IDs, palettes, pixels, and source regions are preserved. Previously imported separate assets stay separate.
 
 Rectangles and circles support creation, movement, and resizing. Oval data/rendering is supported by the union, but oval creation and gestures remain deferred. Rounded-corner metadata remains stored; rectangle rendering retains its existing square-corner appearance. The legacy reducer helpers remain pure for compatibility; the UI uses only the store for edits.
 
@@ -48,7 +64,7 @@ See `plan.md` for the implementation scope.
 
 ## Validation and follow-up
 
-The implementation passes 70 automated tests across the legacy document helpers, editor store, and multiple-document isolation. Coverage includes editing a non-first shape, immutable snapshots, subscriptions, add/delete history, grouped updates, cancellation, redo invalidation, invalid operations, bounded history, and JSON round trips for rectangle/circle/oval documents.
+The implementation passes 88 automated tests across the legacy document helpers, editor store, and multiple-document isolation. Coverage includes editing a non-first shape, immutable snapshots, subscriptions, add/delete history, grouped updates, cancellation, redo invalidation, invalid operations, bounded history, and JSON round trips for rectangle/circle/oval documents.
 
 Strict TypeScript checking and the production build pass. Browser checks confirmed rectangle creation, property editing, live drag updates, and a single undo restoring the entire drag. No browser warnings or errors were observed. Native file-picker interaction and pointer-cancellation UI paths have not been manually exercised; store cancellation and JSON validation are tested automatically.
 
@@ -58,6 +74,6 @@ Eleven circle tests cover creation and serialization, hit testing, baseline move
 
 Twenty-eight pixel-image and migration tests cover shared references, independent display bounds, immutable snapshots, document isolation, atomic creation, deletion, stroke grouping/cancellation, undo/redo, pencil interpolation, erasure, flood-fill boundaries, sampling, invalid data, JSON round trips, and version-0 migration. Type checking and production build pass. The user confirmed the pixel editor works in the live preview on 2026-10-04. Agent-driven browser verification was unavailable while the Mac was locked; this is not a full pointer-path UI audit.
 
-Next steps include oval creation/interactions and rounded-corner rendering. Custom palettes, image import/export, pixel-resolution changes, and unused-image cleanup are outside the current pixel-art scope.
+Next steps include oval creation/interactions and rounded-corner rendering. Custom palettes, pixel-resolution changes, and unused-image cleanup are outside the current pixel-art scope.
 
 Seven image-resize tests cover free and constrained resizing, shrinking and minimum bounds, modifier changes, zero-size bounds, and undo/redo without changing shared pixels. The creation UI offers square presets; the model still supports existing 1–256 pixel dimensions.

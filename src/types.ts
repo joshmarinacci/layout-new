@@ -121,6 +121,7 @@ export interface OvalShape extends BaseShape {
 export interface PixelImageData {
     id: string;
     name: string;
+    originalName: string | null;
     width: number;
     height: number;
     palette: string[];
@@ -131,6 +132,8 @@ export interface PixelImageData {
 export interface PixelImageReferenceComponent {
     kind: 'pixel-image-reference';
     imageId: string;
+    /** Pixel rectangle in the shared image, independent of display bounds. */
+    source: Bounds;
 }
 
 export interface PixelImageShape extends BaseShape {
@@ -146,7 +149,7 @@ export interface PixelImageShape extends BaseShape {
 export type Shape = RectangleShape | CircleShape | OvalShape | PixelImageShape;
 
 export interface Document {
-    version: 1
+    version: 3
     title: string
     shapes: Shape[];
     images: PixelImageData[];

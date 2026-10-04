@@ -1,14 +1,16 @@
-import {useEffect, useRef, useState, type PointerEvent} from 'react';
+import {useEffect, useMemo, useRef, useState, type PointerEvent} from 'react';
 import type {EditorStore} from './EditorStore';
-import type {Point} from './types';
+import type {Point, Bounds} from './types';
 import {useEditorStore} from './useEditorStore';
 import {EditorDialog} from './EditorDialog';
-import {drawPixelImage, floodFillPixels, paintPixelLine, samplePixel} from './pixelImages';
+import {drawPixelImage, fillImageRegion, paintImageRegion, readImageRegion, samplePixel} from './pixelImages';
 
 type Tool = 'pencil' | 'eraser' | 'fill' | 'picker';
-export function PixelImageEditor({store, imageId, onClose}: {store: EditorStore; imageId: string; onClose: () => void}) {
+export function PixelImageEditor({store, imageId, source, onClose}: {store: EditorStore; imageId: string; source?: Bounds; onClose: () => void}) {
     const state = useEditorStore(store);
-    const image = state.document.images.find(item => item.id === imageId);
+    const asset = state.document.images.find(item => item.id === imageId);
+    const region = useMemo(() => source ?? {x: 0, y: 0, width: asset?.width ?? 1, height: asset?.height ?? 1}, [source, asset?.width, asset?.height]);
+    const image = useMemo(() => asset ? readImageRegion(asset, region) : undefined, [asset, region]);
     const [tool, setTool] = useState<Tool>('pencil');
     const [color, setColor] = useState(0);
     const [zoom, setZoom] = useState(() => image ? Math.max(1, Math.min(24, Math.floor(480 / Math.max(image.width, image.height)))) : 16);
@@ -68,7 +70,7 @@ export function PixelImageEditor({store, imageId, onClose}: {store: EditorStore;
                 if (next) { event.preventDefault(); setTool(next); }
             }
         }}>
-            <p>{image.width} × {image.height} pixels · {linked} linked {linked === 1 ? 'shape' : 'shapes'}. Changes apply to every linked shape.</p>
+            <p>{image.width} × {image.height} pixels · {linked} linked {linked === 1 ? 'shape' : 'shapes'}. Editing region ({region.x}, {region.y}) in the shared asset. Shapes showing these pixels update together.</p>
             <div className="pixel-tools" role="group" aria-label="Pixel tools">
                 {(['pencil', 'eraser', 'fill', 'picker'] as const).map(value => <button key={value} disabled={state.transactionActive}
                     aria-pressed={tool === value} onClick={() => setTool(value)}>{value === 'picker' ? 'Color picker (I)' : value === 'fill' ? 'Flood fill (G)' : value === 'eraser' ? 'Eraser (E)' : 'Pencil (B)'}</button>)}
@@ -94,24 +96,24 @@ export function PixelImageEditor({store, imageId, onClose}: {store: EditorStore;
                         event.preventDefault(); event.currentTarget.focus();
                         const p = point(event);
                         if (tool === 'picker') { setColor(samplePixel(image, p)!); setTool('pencil'); return; }
-                        if (tool === 'fill') { store.updatePixelImage(imageId, draft => floodFillPixels(draft, p, color)); return; }
+                        if (tool === 'fill') { store.updatePixelImage(imageId, draft => fillImageRegion(draft, region, p, color)); return; }
                         store.beginTransaction(tool === 'eraser' ? 'Erase pixels' : 'Draw pixels');
                         stroke.current = {pointer: event.pointerId, last: p, color: tool === 'eraser' ? -1 : color};
                         event.currentTarget.setPointerCapture(event.pointerId);
-                        store.updatePixelImage(imageId, draft => paintPixelLine(draft, p, p, stroke.current!.color));
+                        store.updatePixelImage(imageId, draft => paintImageRegion(draft, region, p, p, stroke.current!.color));
                     }}
                     onPointerMove={event => {
                         const active = stroke.current;
                         if (!active || active.pointer !== event.pointerId) return;
                         const p = point(event);
-                        store.updatePixelImage(imageId, draft => paintPixelLine(draft, active.last, p, active.color));
+                        store.updatePixelImage(imageId, draft => paintImageRegion(draft, region, active.last, p, active.color));
                         active.last = p;
                     }}
                     onPointerUp={event => {
                         const active = stroke.current;
                         if (!active || active.pointer !== event.pointerId) return;
                         const p = point(event);
-                        store.updatePixelImage(imageId, draft => paintPixelLine(draft, active.last, p, active.color));
+                        store.updatePixelImage(imageId, draft => paintImageRegion(draft, region, active.last, p, active.color));
                         finish(false);
                     }}
                     onPointerCancel={() => finish(true)} onLostPointerCapture={() => finish(true)} onBlur={() => finish(true)}/>

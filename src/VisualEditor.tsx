@@ -1,5 +1,5 @@
 import {useEffect, useRef, type PointerEvent} from 'react';
-import type {Bounds, Shape, CircleLikeComponent} from './types';
+import type {Bounds, Shape, CircleLikeComponent, PixelImageReferenceComponent, PixelImageData} from './types';
 import type {EditorStore} from './EditorStore';
 import {useEditorStore} from './useEditorStore';
 import {drawPixelImage, resizeImageBounds} from './pixelImages';
@@ -13,18 +13,22 @@ export function selectionBounds(shape: Shape): Bounds {
         case 'circle': { const {center, radius} = shape.components.circle; return {x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2}; }
     }
 }
-export default function VisualEditor({store, onEditImage}: {store: EditorStore; onEditImage: (imageId: string) => void}) {
+export default function VisualEditor({store, onEditImage}: {store: EditorStore; onEditImage: (reference: PixelImageReferenceComponent) => void}) {
     const state = useEditorStore(store);
     const ref = useRef<HTMLCanvasElement>(null);
+    const bitmaps = useRef(new WeakMap<PixelImageData, HTMLCanvasElement>());
     const gesture = useRef<{id: string; pointer: number; x: number; y: number; bounds: Bounds; circle?: CircleLikeComponent; resize: boolean} | null>(null);
     useEffect(() => {
         const canvas = ref.current; const ctx = canvas?.getContext('2d'); if (!ctx || !canvas) return;
         ctx.fillStyle = '#333'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         const images = new Map(state.document.images.map(image => {
+            const cached = bitmaps.current.get(image);
+            if (cached) return [image.id, cached];
             const bitmap = document.createElement('canvas');
             bitmap.width = image.width; bitmap.height = image.height;
             const context = bitmap.getContext('2d');
             if (context) drawPixelImage(context, image);
+            bitmaps.current.set(image, bitmap);
             return [image.id, bitmap];
         }));
         ctx.imageSmoothingEnabled = false;
@@ -32,7 +36,10 @@ export default function VisualEditor({store, onEditImage}: {store: EditorStore; 
             const b = selectionBounds(shape);
             if (shape.type === 'pixel-image') {
                 const bitmap = images.get(shape.components.image.imageId);
-                if (bitmap) ctx.drawImage(bitmap, b.x, b.y, b.width, b.height);
+                if (bitmap) {
+                    const region = shape.components.image.source ?? {x: 0, y: 0, width: bitmap.width, height: bitmap.height};
+                    ctx.drawImage(bitmap, region.x, region.y, region.width, region.height, b.x, b.y, b.width, b.height);
+                }
                 // A faint boundary keeps a fully transparent new image discoverable.
                 ctx.strokeStyle = '#657b83'; ctx.lineWidth = 1;
                 ctx.strokeRect(b.x, b.y, b.width, b.height);
@@ -75,7 +82,7 @@ export default function VisualEditor({store, onEditImage}: {store: EditorStore; 
                 const b = selectionBounds(s);
                 return p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + b.height;
             });
-            if (shape?.type === 'pixel-image') { finish(false); onEditImage(shape.components.image.imageId); }
+            if (shape?.type === 'pixel-image') { finish(false); onEditImage(shape.components.image); }
         }}
         onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); finish(true); } }}
         onPointerDown={event => {

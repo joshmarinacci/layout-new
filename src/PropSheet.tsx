@@ -2,6 +2,7 @@ import type {Draft} from 'immer';
 import type {Shape, ShapeComponent} from './types';
 import type {EditorStore} from './EditorStore';
 import {useEditorStore} from './useEditorStore';
+import {NameField} from './NameField';
 
 function Field({store, title, value, type = 'number', nonnegative = false, update}: {
     store: EditorStore; title: string; value: number | string; type?: 'number' | 'color'; nonnegative?: boolean;
@@ -31,9 +32,12 @@ export default function PropSheet({store}: {store: EditorStore}) {
     if (!shape) return <div className="prop-sheet">nothing selected</div>;
     const update = (key: string, recipe: (component: Draft<ShapeComponent>) => void) => store.updateShape(shape.id, draft => recipe(componentFor(draft, key)));
     return <div className="prop-sheet">
-        <details open><summary>info</summary><div>{shape.name} ({shape.type})</div><small>{shape.id}</small></details>
+        <details open><summary>info</summary><div>
+            <NameField store={store} label="Shape name" value={shape.name} rename={name => store.renameShape(shape.id, name)}/>
+            <div>{shape.type}</div><small>{shape.id}</small>
+        </div></details>
         {Object.entries(shape.components).map(([key, comp]) => <details open key={key}><summary>{key}</summary><div className="prop-sheet-panel">
-            {comp.kind === 'pixel-image-reference' && <span>Shared image: {state.document.images.find(image => image.id === comp.imageId)?.name}</span>}
+            {comp.kind === 'pixel-image-reference' && <span>Shared image: {state.document.images.find(image => image.id === comp.imageId)?.name}{comp.source && <><br/>Source: {comp.source.x}, {comp.source.y} · {comp.source.width} × {comp.source.height} pixels</>}</span>}
             {comp.kind === 'resizable-bounds-component' && (['x', 'y', 'width', 'height'] as const).map(field =>
                 <Field key={field} store={store} title={field} value={comp.bounds[field]} nonnegative={field === 'width' || field === 'height'} update={value => update(key, c => { if (c.kind === 'resizable-bounds-component') c.bounds[field] = Number(value); })}/>)}
             {comp.kind === 'fill-component' && <Field store={store} title="Fill color" type="color" value={comp.fill.color} update={value => update(key, c => { if (c.kind === 'fill-component') c.fill.color = value; })}/>}
