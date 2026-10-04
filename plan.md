@@ -35,3 +35,26 @@ Completed the next UI increment:
 Validation: all 18 existing tests and the strict TypeScript/production build pass. Browser checks verified new-tab creation, switching with preserved contents, independent undo, and arrow-key navigation. Native file loading remains unverified manually.
 
 Scope: tabs remain in memory only. Closing tabs, unsaved-change indicators, and restoring a workspace after reload are deferred. The version-0 document format is unchanged.
+
+
+## Shared pixel-art images — 2026-10-03
+
+Implemented a pixel-image shape backed by document-owned image data. Each shape has independent display bounds and an image ID; linked copies reuse the same palette and pixel array. The version-1 schema adds an image collection. Loading a version-0 document migrates it without changing its shapes.
+
+Creation accepts 1–256 pixel dimensions and built-in palettes. Double-clicking opens a dedicated editor panel with pencil, eraser, four-connected flood fill, color picker, zoom, transparency, and grid controls. Main-canvas movement and lower-right resizing affect only display bounds. Linked Copy exposes shared data in the UI. Each stroke/fill uses document history; cancelled and no-op transactions preserve redo. Shape deletion retains shared data.
+
+Validation: 63 tests pass, including 28 pixel-image/migration tests. Strict TypeScript and production build pass. Browser verification was blocked by unavailable computer-use access on a locked Mac; pixel editor gestures and modal transitions remain unverified manually.
+
+Deferred: custom palettes, pixel-resolution changes, image import/export, and unused-data cleanup. Earlier scope boundaries and version-0 notes describe prior increments.
+
+
+## Pixel-image refinements — 2026-10-04
+
+Added Shift-constrained image resizing, the standard 16-color PICO-8 palette, and a square size selector (8 × 8, 16 × 16, 32 × 32). Existing image dimensions remain supported in the model and saved files. All 70 tests and the strict TypeScript/production build pass.
+
+
+## Shape menu — 2026-10-04
+
+Added Shape beside File and moved New Rect, New Circle, and New Pixel Image into it. Both menus reuse DropdownMenu for outside-click, focus-leave, action, and Escape dismissal. Selection-specific toolbar actions remain available. README usage now reflects the menus.
+
+The user confirmed the pixel editor works in the live preview. All 70 automated tests, strict TypeScript checking, production build, and Git whitespace checks pass.

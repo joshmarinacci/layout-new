@@ -8,6 +8,9 @@ import {makeExampleDocument} from './exampleDocument';
 import {useEditorStore} from './useEditorStore';
 import {deserializeDocument} from './serialization';
 import type {Document as DrawingDocument} from './types';
+import {NewPixelImage} from './NewPixelImage';
+import {PixelImageEditor} from './PixelImageEditor';
+import {DropdownMenu} from './DropdownMenu';
 import './app.css';
 
 interface DocumentTab { id: string; store: EditorStore }
@@ -51,18 +54,8 @@ export default function App() {
     const doc = state.document;
     const selected = doc.shapes.find(shape => shape.id === state.selectedId);
     const file = useRef<HTMLInputElement>(null);
-    const fileMenu = useRef<HTMLDivElement>(null);
-    const fileMenuButton = useRef<HTMLButtonElement>(null);
-    const [fileMenuOpen, setFileMenuOpen] = useState(false);
     const [error, setError] = useState('');
-    useEffect(() => {
-        if (!fileMenuOpen) return;
-        const dismiss = (event: globalThis.PointerEvent) => {
-            if (event.target instanceof Node && !fileMenu.current?.contains(event.target)) setFileMenuOpen(false);
-        };
-        document.addEventListener('pointerdown', dismiss);
-        return () => document.removeEventListener('pointerdown', dismiss);
-    }, [fileMenuOpen]);
+    const [imageDialog, setImageDialog] = useState<{kind: 'create'} | {kind: 'edit'; imageId: string} | null>(null);
     useEffect(() => {
         const keydown = (event: KeyboardEvent) => {
             if (event.target instanceof HTMLElement && (event.target.matches('input, textarea, select') || event.target.isContentEditable)) return;
@@ -79,20 +72,7 @@ export default function App() {
     const redo = <button disabled={!state.canRedo} onClick={() => store.redo()}>Redo</button>;
     return <div className="main-layout">
         <nav className="menubar full-span">
-            <div className="file-menu" ref={fileMenu}
-                onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFileMenuOpen(false); }}
-                onKeyDown={event => {
-                    if (event.key === 'Escape') {
-                        event.preventDefault(); setFileMenuOpen(false); fileMenuButton.current?.focus();
-                    }
-                }}>
-                <button ref={fileMenuButton} aria-expanded={fileMenuOpen} aria-controls="file-actions"
-                    onClick={() => setFileMenuOpen(open => !open)}>File <span aria-hidden="true">▾</span></button>
-                {fileMenuOpen && <div id="file-actions" className="file-menu-actions" onClick={event => {
-                    if (event.target instanceof HTMLButtonElement && !event.target.disabled) {
-                        setFileMenuOpen(false); fileMenuButton.current?.focus();
-                    }
-                }}>
+            <DropdownMenu title="File">
                 <button disabled={state.transactionActive} onClick={() => file.current?.click()}>Load file</button>
                 <button disabled={state.transactionActive} onClick={() => openDocument(emptyDocument())}>New Document</button>
                 <button disabled={state.transactionActive} onClick={() => {
@@ -100,8 +80,18 @@ export default function App() {
                     const link = document.createElement('a'); link.href = url; link.download = 'drawing.json'; link.click();
                     setTimeout(() => URL.revokeObjectURL(url), 1000);
                 }}>Save JSON</button>
-                </div>}
-            </div>
+            </DropdownMenu>
+            <DropdownMenu title="Shape">
+            <button disabled={state.transactionActive} onClick={() => {
+                const shape = makeRect('rect', {x: 50, y: 250, width: 50, height: 50});
+                store.addShape(shape); store.select(shape.id);
+            }}>New Rect</button>
+            <button disabled={state.transactionActive} onClick={() => {
+                const shape = makeCircle('circle', {x: 100, y: 300}, 40);
+                store.addShape(shape); store.select(shape.id);
+            }}>New Circle</button>
+            <button disabled={state.transactionActive} onClick={() => setImageDialog({kind: 'create'})}>New Pixel Image</button>
+            </DropdownMenu>
             <ul><li>{undo}</li><li>{redo}</li></ul>
             <input hidden ref={file} type="file" accept=".json,application/json" onChange={async event => {
                 const chosen = event.target.files?.[0]; event.target.value = '';
@@ -132,21 +122,19 @@ export default function App() {
                 onBlur={() => { if (store.getSnapshot().transactionActive) store.commitTransaction(); }}
                 onKeyDown={event => { if (event.key === 'Escape') { store.cancelTransaction(); event.currentTarget.blur(); } if (event.key === 'Enter') event.currentTarget.blur(); }}
                 onChange={event => store.setTitle(event.target.value)}/>
-            <button disabled={state.transactionActive} onClick={() => {
-                const shape = makeRect('rect', {x: 50, y: 250, width: 50, height: 50});
-                store.addShape(shape); store.select(shape.id);
-            }}>New Rect</button>
-            <button disabled={state.transactionActive} onClick={() => {
-                const shape = makeCircle('circle', {x: 100, y: 300}, 40);
-                store.addShape(shape); store.select(shape.id);
-            }}>New Circle</button>
+            {selected?.type === 'pixel-image' && <>
+                <button disabled={state.transactionActive} onClick={() => setImageDialog({kind: 'edit', imageId: selected.components.image.imageId})}>Edit Pixels</button>
+                <button disabled={state.transactionActive} onClick={() => store.select(store.linkImageShape(selected.id))}>Linked Copy</button>
+            </>}
             <button disabled={!selected || state.transactionActive} onClick={() => { if (selected) store.removeShape(selected.id); }}>Delete</button>
             {undo}{redo}
         </div>
         <div className="left scroll-container"><TreeView document={doc} selected={selected} onSelect={shape => store.select(shape.id)}/></div>
-        <div className="center scroll-container"><VisualEditor key={activeTab.id} store={store}/></div>
+        <div className="center scroll-container"><VisualEditor key={activeTab.id} store={store} onEditImage={imageId => setImageDialog({kind: 'edit', imageId})}/></div>
         <div className="right scroll-container"><PropSheet key={activeTab.id} store={store}/></div>
         </div>
-        <div className="statusbar full-span"><span role="alert">{error}</span><span className="spacer"/><label>Drag rectangles or circles to move; drag a selection handle to resize. Escape cancels.</label></div>
+        <div className="statusbar full-span"><span role="alert">{error}</span><span className="spacer"/><label>Drag shapes to move; drag a handle to resize. Shift-resize images to keep proportions. Double-click a pixel image to edit. Escape cancels.</label></div>
+        {imageDialog?.kind === 'create' && <NewPixelImage store={store} onClose={() => setImageDialog(null)} onCreated={imageId => setImageDialog({kind: 'edit', imageId})}/>}
+        {imageDialog?.kind === 'edit' && <PixelImageEditor key={imageDialog.imageId} store={store} imageId={imageDialog.imageId} onClose={() => setImageDialog(null)}/>}
     </div>;
 }

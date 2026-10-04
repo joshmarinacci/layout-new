@@ -48,8 +48,7 @@ export default function TreeView(props: {
         <li>
             <label>Assets</label>
             <ul>
-                <li>asset 1</li>
-                <li>asset 2</li>
+                {doc.images.map(image => <li key={image.id}>{image.name} ({image.width} × {image.height})</li>)}
             </ul>
         </li>
     </ul>

@@ -14,7 +14,7 @@ describe('EditorStore', () => {
     it('edits the second shape, preserves old snapshots and resolves selection by ID', () => {
         const {store, document, first, second} = setup();
         const old = store.getSnapshot(); store.select(second.id);
-        store.updateShape(second.id, s => { s.name = 'edited'; s.components.fill.fill.color = '#123456'; });
+        store.updateShape(second.id, s => { s.name = 'edited'; if (s.type !== 'pixel-image') s.components.fill.fill.color = '#123456'; });
         expect(store.getSnapshot().document.shapes.map(s => s.name)).toEqual(['first', 'edited']);
         expect(old.document.shapes[1].name).toBe('second');
         expect(document.shapes[1].name).toBe('second');
@@ -95,7 +95,7 @@ describe('serialization', () => {
         document.shapes.push({id: 'oval', name: 'oval', type: 'oval', components: {oval: rectangle.components.rect, fill: rectangle.components.fill, stroke: rectangle.components.stroke}});
         expect(deserializeDocument(serializeDocument(document))).toEqual(document);
         const store = new EditorStore(document); store.select(document.shapes[0].id); store.setTitle('updated');
-        expect(Object.keys(JSON.parse(store.toJSON()))).toEqual(['version', 'title', 'shapes']);
+        expect(Object.keys(JSON.parse(store.toJSON()))).toEqual(['version', 'images', 'title', 'shapes']);
         store.loadJSON(serializeDocument(document)); expect(store.getSnapshot()).toMatchObject({document, selectedId: null, canUndo: false, canRedo: false});
     });
     it.each(['{', 'null', '{"version":1,"title":"x","shapes":[]}', '{"version":0,"title":"x","shapes":[{}]}'])('rejects malformed input: %s', json => {

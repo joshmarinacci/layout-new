@@ -1,5 +1,6 @@
 import {applyPatches, enablePatches, freeze, produceWithPatches, type Draft, type Patch} from 'immer';
-import type {Document, Shape} from './types';
+import type {Document, Shape, PixelImageData} from './types';
+import {makeImageShape, makePixelImage} from './pixelImages';
 import {deserializeDocument, serializeDocument, validateDocument} from './serialization';
 
 enablePatches();
@@ -11,7 +12,7 @@ export interface EditorSnapshot {
     readonly canRedo: boolean;
     readonly transactionActive: boolean;
 }
-export const emptyDocument = (): Document => ({version: 0, title: 'Untitled', shapes: []});
+export const emptyDocument = (): Document => ({version: 1, images: [], title: 'Untitled', shapes: []});
 
 export class EditorStore {
     private document: Document;
@@ -69,6 +70,29 @@ export class EditorStore {
             if (shape.id !== id) throw new Error('Shape IDs cannot be edited');
         });
     }
+    createPixelImage(width: number, height: number, palette: readonly string[]) {
+        const image = makePixelImage(width, height, palette);
+        const scale = Math.max(1, Math.floor(128 / Math.max(width, height)));
+        const shape = makeImageShape(image.id, {x: 50, y: 50, width: width * scale, height: height * scale});
+        this.edit('Create pixel image', draft => { draft.images.push(image); draft.shapes.push(shape); });
+        return shape.id;
+    }
+    linkImageShape(id: string) {
+        const source = this.document.shapes.find(shape => shape.id === id);
+        if (source?.type !== 'pixel-image') throw new Error('Expected an image shape');
+        const bounds = source.components.rect.bounds;
+        const shape = makeImageShape(source.components.image.imageId, {...bounds, x: bounds.x + 20, y: bounds.y + 20}, `${source.name} copy`);
+        this.addShape(shape);
+        return shape.id;
+    }
+    updatePixelImage(id: string, recipe: (image: Draft<PixelImageData>) => void) {
+        this.edit('Edit pixels', draft => {
+            const image = draft.images.find(item => item.id === id);
+            if (!image) throw new Error('Unknown image');
+            recipe(image);
+            if (image.id !== id) throw new Error('Image IDs cannot be edited');
+        });
+    }
     removeShape(id: string) {
         this.edit('Delete shape', draft => {
             const index = draft.shapes.findIndex(s => s.id === id);
@@ -84,9 +108,13 @@ export class EditorStore {
         const transaction = this.transaction;
         if (!transaction) throw new Error('No active transaction');
         const final = this.document;
-        // Reconcile once against the baseline: bounded by changed shapes, not pointer events.
+        // Reconcile once against the baseline: bounded by changed shapes/images, not pointer events.
         const [next, patches, inversePatches] = produceWithPatches(transaction.before, draft => {
             draft.title = final.title;
+            draft.images.length = final.images.length;
+            final.images.forEach((image, i) => {
+                if (JSON.stringify(transaction.before.images[i]) !== JSON.stringify(image)) draft.images[i] = image;
+            });
             draft.shapes.length = final.shapes.length;
             final.shapes.forEach((shape, i) => {
                 if (JSON.stringify(transaction.before.shapes[i]) !== JSON.stringify(shape)) draft.shapes[i] = shape;

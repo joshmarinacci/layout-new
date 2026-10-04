@@ -196,3 +196,29 @@ button:disabled { opacity: 0.5; }
     outline: 2px solid var(--selected-background);
     outline-offset: -2px;
 }
+
+.editor-dialog {
+    color: #c9d5d8;
+    background: var(--panel-background);
+    border: 1px solid var(--selected-background);
+    padding: 1rem;
+    max-width: min(900px, 90vw);
+    max-height: 90vh;
+    overflow: auto;
+}
+.editor-dialog::backdrop { background: #0009; }
+.editor-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
+.editor-dialog h2 { margin: 0; font-size: 1.15rem; }
+.editor-dialog p { font-size: 0.85rem; }
+.editor-dialog button, .editor-dialog label, .editor-dialog input, .editor-dialog select { color: #c9d5d8; }
+.editor-dialog select { background: var(--primary-control-background); padding: 0.25rem; }
+.pixel-create { display: grid; gap: 0.75rem; padding-top: 1rem; }
+.pixel-create label { display: flex; justify-content: space-between; gap: 1rem; }
+.pixel-create input { width: 6rem; }
+.pixel-tools { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.75rem 0; align-items: center; }
+.pixel-palette { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: 0.75rem 0; }
+.pixel-palette button, .pixel-palette span { width: 28px; height: 28px; border: 1px solid #888; box-sizing: border-box; }
+.pixel-tools button[aria-pressed="true"], .pixel-palette button[aria-pressed="true"] { outline: 2px solid #fff; outline-offset: 1px; }
+.pixel-viewport { overflow: auto; max-height: 55vh; max-width: 80vw; border: 1px solid var(--panel-border-color); }
+.pixel-canvas { display: block; touch-action: none; image-rendering: pixelated; cursor: crosshair; }
+.checkerboard { background: repeating-conic-gradient(#747474 0% 25%, #a0a0a0 0% 50%) 0 0 / 16px 16px; }

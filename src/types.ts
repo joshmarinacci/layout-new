@@ -53,7 +53,7 @@ export interface ImageAsset {
 
 /* ========== components ========= */
 
-export type ShapeComponent = ResizableBoundsComponent | FillComponent | RoundedCornerComponent | StrokeComponent | CircleLikeComponent;
+export type ShapeComponent = ResizableBoundsComponent | FillComponent | RoundedCornerComponent | StrokeComponent | CircleLikeComponent | PixelImageReferenceComponent;
 
 export interface ResizableBoundsComponent {
     kind: 'resizable-bounds-component'
@@ -118,14 +118,38 @@ export interface OvalShape extends BaseShape {
     };
 }
 
+export interface PixelImageData {
+    id: string;
+    name: string;
+    width: number;
+    height: number;
+    palette: string[];
+    /** Row-major palette indices; -1 is transparent. */
+    pixels: number[];
+}
+
+export interface PixelImageReferenceComponent {
+    kind: 'pixel-image-reference';
+    imageId: string;
+}
+
+export interface PixelImageShape extends BaseShape {
+    type: 'pixel-image';
+    components: {
+        image: PixelImageReferenceComponent;
+        rect: ResizableBoundsComponent;
+    };
+}
+
 /* ========== document ======== */
 
-export type Shape = RectangleShape | CircleShape | OvalShape;
+export type Shape = RectangleShape | CircleShape | OvalShape | PixelImageShape;
 
 export interface Document {
-    version: 0
+    version: 1
     title: string
     shapes: Shape[];
+    images: PixelImageData[];
 }
 
 export type DrawDocument = Document;
