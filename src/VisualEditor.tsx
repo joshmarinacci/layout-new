@@ -13,15 +13,22 @@ export function selectionBounds(shape: Shape): Bounds {
         case 'circle': { const {center, radius} = shape.components.circle; return {x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2}; }
     }
 }
-export default function VisualEditor({store, onEditImage}: {store: EditorStore; onEditImage: (reference: PixelImageReferenceComponent) => void}) {
+const clampZoom = (zoom: number) => Math.max(0.25, Math.min(4, zoom));
+export default function VisualEditor({store, onEditImage, zoom, onZoomChange}: {store: EditorStore; onEditImage: (reference: PixelImageReferenceComponent) => void; zoom: number; onZoomChange: (zoom: number) => void}) {
     const state = useEditorStore(store);
     const ref = useRef<HTMLCanvasElement>(null);
+    const viewport = useRef<HTMLDivElement>(null);
+    const spacePan = useRef(false);
     const bitmaps = useRef(new WeakMap<PixelImageData, HTMLCanvasElement>());
-    const gesture = useRef<{kind: 'move' | 'resize' | 'marquee'; ids: string[]; pointer: number; x: number; y: number; bounds: Bounds[]; circles?: Map<string, CircleLikeComponent>; additive?: boolean} | null>(null);
+    const gesture = useRef<{kind: 'move' | 'resize' | 'marquee' | 'pan'; ids: string[]; pointer: number; x: number; y: number; bounds: Bounds[]; circles?: Map<string, CircleLikeComponent>; additive?: boolean; scrollX?: number; scrollY?: number} | null>(null);
     const [marquee, setMarquee] = useState<Bounds | null>(null);
     useEffect(() => {
         const canvas = ref.current; const ctx = canvas?.getContext('2d'); if (!ctx || !canvas) return;
-        ctx.fillStyle = '#333'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const pixelRatio = window.devicePixelRatio || 1;
+        const resolution = 1024 * zoom * pixelRatio;
+        if (canvas.width !== resolution || canvas.height !== resolution) { canvas.width = resolution; canvas.height = resolution; }
+        ctx.setTransform(zoom * pixelRatio, 0, 0, zoom * pixelRatio, 0, 0);
+        ctx.fillStyle = '#333'; ctx.fillRect(0, 0, 1024, 1024);
         const images = new Map(state.document.images.map(image => {
             const cached = bitmaps.current.get(image);
             if (cached) return [image.id, cached];
@@ -53,33 +60,58 @@ export default function VisualEditor({store, onEditImage}: {store: EditorStore; 
                 if (ctx.lineWidth > 0 && shape.components.stroke.width > 0) ctx.stroke();
             }
             if (state.selectedIds.includes(shape.id)) {
-                ctx.strokeStyle = 'yellow'; ctx.lineWidth = 3; ctx.strokeRect(b.x, b.y, b.width, b.height);
+                ctx.strokeStyle = 'yellow'; ctx.lineWidth = 2 / zoom; ctx.strokeRect(b.x, b.y, b.width, b.height);
                 if (shape.id === state.selectedId && shape.type === 'circle') {
                     ctx.fillStyle = 'yellow';
-                    circleHandles(shape.components.circle).forEach(handle => ctx.fillRect(handle.x - 5, handle.y - 5, 10, 10));
+                    circleHandles(shape.components.circle).forEach(handle => ctx.fillRect(handle.x - 5 / zoom, handle.y - 5 / zoom, 10 / zoom, 10 / zoom));
                 }
-                if (shape.id === state.selectedId && (shape.type === 'rectangle' || shape.type === 'pixel-image')) { ctx.fillStyle = 'yellow'; ctx.fillRect(b.x + b.width - 5, b.y + b.height - 5, 10, 10); }
+                if (shape.id === state.selectedId && (shape.type === 'rectangle' || shape.type === 'pixel-image')) { ctx.fillStyle = 'yellow'; ctx.fillRect(b.x + b.width - 5 / zoom, b.y + b.height - 5 / zoom, 10 / zoom, 10 / zoom); }
             }
         });
         if (marquee) { ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#f0df00'; ctx.fillStyle = '#f0df0030'; ctx.lineWidth = 1; ctx.fillRect(marquee.x, marquee.y, marquee.width, marquee.height); ctx.strokeRect(marquee.x, marquee.y, marquee.width, marquee.height); ctx.restore(); }
-    }, [state.document, state.selectedId, state.selectedIds, marquee]);
+    }, [state.document, state.selectedId, state.selectedIds, marquee, zoom]);
     useEffect(() => () => { if (gesture.current) { gesture.current = null; if (store.getSnapshot().transactionActive) store.cancelTransaction(); } }, [store]);
     const point = (event: PointerEvent<HTMLCanvasElement>) => {
         const rect = event.currentTarget.getBoundingClientRect();
-        return {x: (event.clientX - rect.left) * event.currentTarget.width / rect.width, y: (event.clientY - rect.top) * event.currentTarget.height / rect.height};
+        return {x: (event.clientX - rect.left) / zoom, y: (event.clientY - rect.top) / zoom};
     };
     const finish = (cancel: boolean) => {
         if (!gesture.current) return;
         const current = gesture.current; const pointer = current.pointer; gesture.current = null;
         if (current.kind === 'marquee') setMarquee(null);
+        else if (current.kind === 'pan') { /* viewport offsets already reflect the pan */ }
         else if (store.getSnapshot().transactionActive) { if (cancel) store.cancelTransaction(); else store.commitTransaction(); }
         if (ref.current?.hasPointerCapture(pointer)) ref.current.releasePointerCapture(pointer);
     };
-    return <canvas aria-label="Drawing canvas" tabIndex={0} ref={ref} width={1024} height={1024} style={{touchAction: 'none'}}
+    const setZoomAt = (nextZoom: number, clientX?: number, clientY?: number) => {
+        const element = viewport.current;
+        const oldZoom = zoom, next = clampZoom(nextZoom);
+        if (next === oldZoom) return;
+        if (element && clientX !== undefined && clientY !== undefined) {
+            const rect = element.getBoundingClientRect();
+            const anchorX = clientX - rect.left, anchorY = clientY - rect.top;
+            const docX = (element.scrollLeft + anchorX) / oldZoom;
+            const docY = (element.scrollTop + anchorY) / oldZoom;
+            onZoomChange(next);
+            requestAnimationFrame(() => { element.scrollLeft = docX * next - anchorX; element.scrollTop = docY * next - anchorY; });
+        } else onZoomChange(next);
+    };
+    useEffect(() => {
+        const element = viewport.current;
+        if (!element) return;
+        const handleWheel = (event: WheelEvent) => {
+            if (!event.ctrlKey && !event.metaKey) return;
+            event.preventDefault();
+            setZoomAt(zoom * Math.exp(-event.deltaY * 0.002), event.clientX, event.clientY);
+        };
+        element.addEventListener('wheel', handleWheel, {passive: false});
+        return () => element.removeEventListener('wheel', handleWheel);
+    }, [zoom, onZoomChange]);
+    return <div className="canvas-viewport" ref={viewport}>
+    <canvas aria-label="Drawing canvas" tabIndex={0} ref={ref} width={1024 * zoom * (window.devicePixelRatio || 1)} height={1024 * zoom * (window.devicePixelRatio || 1)} style={{width: 1024 * zoom, height: 1024 * zoom, touchAction: 'none'}}
         onDoubleClick={event => {
             const rect = event.currentTarget.getBoundingClientRect();
-            const p = {x: (event.clientX - rect.left) * event.currentTarget.width / rect.width,
-                y: (event.clientY - rect.top) * event.currentTarget.height / rect.height};
+            const p = {x: (event.clientX - rect.left) / zoom, y: (event.clientY - rect.top) / zoom};
             const shape = [...store.getSnapshot().document.shapes].reverse().find(s => {
                 if (s.type === 'circle') return circleContains(s.components.circle, p);
                 const b = selectionBounds(s);
@@ -88,19 +120,32 @@ export default function VisualEditor({store, onEditImage}: {store: EditorStore; 
             if (shape?.type === 'pixel-image') { finish(false); onEditImage(shape.components.image); }
         }}
         onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); finish(true); } }}
+        onKeyDownCapture={event => { if (event.code === 'Space') { spacePan.current = true; event.preventDefault(); } }}
+        onKeyUpCapture={event => { if (event.code === 'Space') spacePan.current = false; }}
         onPointerDown={event => {
-            if (event.button !== 0 || gesture.current) return;
+            if (gesture.current) return;
+            const isPan = event.button === 1 || (event.button === 0 && spacePan.current);
+            if (isPan) {
+                event.preventDefault();
+                const element = viewport.current;
+                if (!element) return;
+                gesture.current = {kind: 'pan', ids: [], pointer: event.pointerId, x: event.clientX, y: event.clientY, bounds: [], scrollX: element.scrollLeft, scrollY: element.scrollTop};
+                event.currentTarget.setPointerCapture(event.pointerId);
+                return;
+            }
+            if (event.button !== 0) return;
             event.preventDefault();
             event.currentTarget.focus({preventScroll: true});
             if (store.getSnapshot().transactionActive) return;
             const p = point(event);
+            const hitTolerance = 10 / zoom;
             const selected = state.document.shapes.find(s => s.id === state.selectedId);
             const selectedShapes = state.document.shapes.filter(shape => state.selectedIds.includes(shape.id));
             const circleHandle = selected?.type === 'circle' && circleHandles(selected.components.circle)
-                .some(handle => Math.abs(p.x - handle.x) <= 10 && Math.abs(p.y - handle.y) <= 10);
+                .some(handle => Math.abs(p.x - handle.x) <= hitTolerance && Math.abs(p.y - handle.y) <= hitTolerance);
             const selectedBounds = selected ? selectionBounds(selected) : null;
             const boxHandle = (selected?.type === 'rectangle' || selected?.type === 'pixel-image') && selectedBounds &&
-                Math.abs(p.x - selectedBounds.x - selectedBounds.width) <= 10 && Math.abs(p.y - selectedBounds.y - selectedBounds.height) <= 10;
+                Math.abs(p.x - selectedBounds.x - selectedBounds.width) <= hitTolerance && Math.abs(p.y - selectedBounds.y - selectedBounds.height) <= hitTolerance;
             const shape = circleHandle || boxHandle ? selected : [...state.document.shapes].reverse().find(s => {
                 if (s.type === 'circle') return circleContains(s.components.circle, p);
                 const b = selectionBounds(s);
@@ -121,7 +166,7 @@ export default function VisualEditor({store, onEditImage}: {store: EditorStore; 
             if (shape.type === 'oval') return;
             const bounds = selectionBounds(shape);
             const resize = shape.type === 'circle' ? !!circleHandle
-                : Math.abs(p.x - bounds.x - bounds.width) <= 10 && Math.abs(p.y - bounds.y - bounds.height) <= 10;
+                : Math.abs(p.x - bounds.x - bounds.width) <= hitTolerance && Math.abs(p.y - bounds.y - bounds.height) <= hitTolerance;
             const targets = !resize && state.selectedIds.includes(shape.id) && selectedShapes.length > 1 ? selectedShapes : [shape];
             store.beginTransaction(`${resize ? 'Resize' : 'Move'} ${targets.length > 1 ? 'selection' : shape.type}`);
             gesture.current = {kind: resize ? 'resize' : 'move', ids: targets.map(target => target.id), pointer: event.pointerId, ...p,
@@ -130,6 +175,7 @@ export default function VisualEditor({store, onEditImage}: {store: EditorStore; 
         }}
         onPointerMove={event => {
             const g = gesture.current; if (!g || g.pointer !== event.pointerId) return;
+            if (g.kind === 'pan') { if (viewport.current) { viewport.current.scrollLeft = (g.scrollX ?? 0) - (event.clientX - g.x); viewport.current.scrollTop = (g.scrollY ?? 0) - (event.clientY - g.y); } return; }
             const p = point(event); const dx = p.x - g.x, dy = p.y - g.y;
             if (g.kind === 'marquee') { setMarquee({x: Math.min(g.x, p.x), y: Math.min(g.y, p.y), width: Math.abs(dx), height: Math.abs(dy)}); return; }
             g.ids.forEach((id, index) => store.updateShape(id, shape => {
@@ -156,4 +202,5 @@ export default function VisualEditor({store, onEditImage}: {store: EditorStore; 
             if (ref.current?.hasPointerCapture(event.pointerId)) ref.current.releasePointerCapture(event.pointerId);
         }}
         onPointerCancel={() => finish(true)} onLostPointerCapture={() => finish(true)} onBlur={() => finish(true)}/>;
+    </div>;
 }

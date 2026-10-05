@@ -59,6 +59,7 @@ export default function App() {
     const selectedShapes = doc.shapes.filter(shape => state.selectedIds.includes(shape.id));
     const file = useRef<HTMLInputElement>(null);
     const [error, setError] = useState('');
+    const [canvasZoom, setCanvasZoom] = useState(1);
     const [imageDialog, setImageDialog] = useState<{kind: 'create' | 'import'} | {kind: 'edit'; imageId: string; source?: Bounds} | null>(null);
     const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
     const selectedAsset = doc.images.find(image => image.id === selectedAssetId);
@@ -130,6 +131,12 @@ export default function App() {
                 onKeyDown={event => { if (event.key === 'Escape') { store.cancelTransaction(); event.currentTarget.blur(); } if (event.key === 'Enter') event.currentTarget.blur(); }}
                 onChange={event => store.setTitle(event.target.value)}/>
             {selectedAsset && <button onClick={() => setSelectedAssetId(null)}>Back to canvas</button>}
+            {!selectedAsset && <div className="canvas-zoom-controls" role="group" aria-label="Canvas zoom controls">
+                <button aria-label="Zoom out" title="Zoom out" disabled={canvasZoom <= 0.25} onClick={() => setCanvasZoom(value => Math.max(0.25, value / 1.25))}>−</button>
+                <span aria-live="polite">{Math.round(canvasZoom * 100)}%</span>
+                <button aria-label="Zoom in" title="Zoom in" disabled={canvasZoom >= 4} onClick={() => setCanvasZoom(value => Math.min(4, value * 1.25))}>+</button>
+                <button onClick={() => setCanvasZoom(1)}>Reset zoom</button>
+            </div>}
             {!selectedAsset && selectedShapes.length === 1 && selected?.type === 'pixel-image' && <>
                 <button disabled={state.transactionActive} onClick={() => setImageDialog({kind: 'edit', imageId: selected.components.image.imageId, source: selected.components.image.source})}>Edit Pixels</button>
                 <button disabled={state.transactionActive} onClick={() => store.select(store.linkImageShape(selected.id))}>Linked Copy</button>
@@ -145,11 +152,11 @@ export default function App() {
             onSelect={(shape, additive) => { setSelectedAssetId(null); additive ? store.toggleSelection(shape.id) : store.select(shape.id); }}
             onSelectAsset={image => { finishEditing(); store.select(null); setSelectedAssetId(image.id); }}/></div>
         {selectedAsset ? <div className="asset-center scroll-container"><PixelAssetView store={store} image={selectedAsset} onBack={() => setSelectedAssetId(null)}/></div> : <>
-            <div className="center scroll-container"><VisualEditor key={activeTab.id} store={store} onEditImage={reference => setImageDialog({kind: 'edit', imageId: reference.imageId, source: reference.source})}/></div>
+            <div className="center"><VisualEditor key={activeTab.id} store={store} zoom={canvasZoom} onZoomChange={setCanvasZoom} onEditImage={reference => setImageDialog({kind: 'edit', imageId: reference.imageId, source: reference.source})}/></div>
             <div className="right scroll-container"><PropSheet key={activeTab.id} store={store}/></div>
         </>}
         </div>
-        <div className="statusbar full-span"><span role="alert">{error}</span><span className="spacer"/><label>Shift-click to toggle selection; drag empty canvas to select objects. Drag shapes to move; drag a handle to resize. Shift-resize images to keep proportions. Double-click a pixel image to edit. Escape cancels.</label></div>
+        <div className="statusbar full-span"><span role="alert">{error}</span><span className="spacer"/><label>Scroll to pan; Ctrl/⌘+scroll to zoom; Space or middle-drag to pan. Shift-click toggles selection; drag empty canvas to select. Drag selected shapes to move; handles resize. Shift-resize images to keep proportions. Double-click a pixel image to edit.</label></div>
         {imageDialog?.kind === 'import' && <ImportPixelImage store={store} onClose={() => setImageDialog(null)}/>}
         {imageDialog?.kind === 'create' && <NewPixelImage store={store} onClose={() => setImageDialog(null)} onCreated={imageId => setImageDialog({kind: 'edit', imageId})}/>}
         {imageDialog?.kind === 'edit' && <PixelImageEditor key={imageDialog.imageId} store={store} imageId={imageDialog.imageId} source={imageDialog.source} onClose={() => setImageDialog(null)}/>}

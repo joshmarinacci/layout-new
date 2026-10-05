@@ -90,3 +90,10 @@ Document version 3 stores the optional original filename. Version-1 and version-
 Added shift-click toggling in the canvas and shape tree, marquee selection by dragging empty canvas, selection outlines for all selected objects, and group movement. The primary selected object retains resize handles. The property sheet intersects component keys and kinds across the selection, displays mixed values, and applies edits to all selected shapes in one transaction. Delete removes a multi-selection in one undo step.
 
 Strict TypeScript, production build, and whitespace checks pass. Tests and browser verification were not run for this increment. No commit made.
+
+
+## Canvas pan and zoom — 2026-10-04
+
+Added scrollable viewport panning, Space/middle-button drag panning, pointer-anchored Ctrl/Command-wheel and trackpad zoom, plus toolbar zoom controls from 25% to 400%. Canvas backing resolution follows zoom and device-pixel ratio so vector drawing no longer stretches a fixed 1024 × 1024 bitmap; document-space geometry and image nearest-neighbor rendering are preserved. The wheel listener is native and non-passive to prevent the browser from also zooming the page.
+
+Strict TypeScript, production build, and whitespace checks pass. Tests and browser verification were not run for this increment. No commit made.
