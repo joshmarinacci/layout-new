@@ -1,30 +1,24 @@
-import type {DrawDocument, PixelImageData, Shape} from "./types";
+import {Children, useState, type MouseEvent, type ReactNode} from 'react';
+import type {DrawDocument, PixelImageData, Shape} from './types';
 
-function cls(props:Record<string,boolean>) {
-    let classname = ""
-    for(let prop in props) {
-        if(props[prop] === true) {
-            classname += ` ${prop}`
-        }
-    }
-    return classname
+function cls(props: Record<string, boolean>) {
+    return Object.entries(props).filter(([, active]) => active).map(([name]) => name).join(' ');
 }
 
-function TreeItem(props: {
-    item: Shape,
-    selectedIds: readonly string[],
-    onSelect: (value: Shape, additive: boolean) => void
+function TreeNode({label, depth, defaultExpanded = true, selected, onSelect, children}: {
+    label: string; depth: number; defaultExpanded?: boolean; selected?: boolean;
+    onSelect?: (event: MouseEvent<HTMLButtonElement>) => void; children?: ReactNode;
 }) {
-    const {item, selectedIds, onSelect} = props
-    return <div key={item.id}
-               className={cls({
-                   'tree-item':true,
-                   selected: selectedIds.includes(item.id)
-               })}
-               onClick={event=>{
-                   onSelect(item, event.shiftKey)
-               }} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') onSelect(item, event.shiftKey);
-               }}>{item.name}</div>
+    const [expanded, setExpanded] = useState(defaultExpanded);
+    const hasChildren = Children.count(children) > 0;
+    return <li className="tree-node" aria-expanded={hasChildren ? expanded : undefined}>
+        <div className={cls({'tree-row': true, selected: !!selected})} style={{paddingLeft: `${depth * 0.9}rem`}}>
+            {hasChildren ? <button className="tree-disclosure" aria-label={`${expanded ? 'Collapse' : 'Expand'} ${label}`}
+                aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? '▾' : '▸'}</button> : <span className="tree-disclosure-spacer"/>}
+            <button className="tree-label" aria-current={selected ? 'true' : undefined} onClick={onSelect}>{label}</button>
+        </div>
+        {hasChildren && expanded && <ul>{children}</ul>}
+    </li>;
 }
 
 export default function TreeView(props: {
@@ -34,28 +28,18 @@ export default function TreeView(props: {
     selectedAssetId: string | null,
     onSelectAsset: (image: PixelImageData) => void,
 }) {
-    const doc = props.document
-    return <ul className={'tree-view'}>
-        <li>
-            <div className={'tree-item'}>
-                Doc: {doc.title}
-            </div>
-            <ul>
-                {doc.shapes.map((shape,n)=>
-                    <TreeItem key={shape.id} item={shape}
-                              selectedIds={props.selectedIds}
-                              onSelect={props.onSelect}/>)}
-            </ul>
-        </li>
-        <li>
-            <label>Assets</label>
-            <ul>
-                {doc.images.map(image => <li key={image.id}>
-                    <button className={cls({'asset-item': true, selected: image.id === props.selectedAssetId})}
-                        aria-current={image.id === props.selectedAssetId ? 'true' : undefined}
-                        onClick={() => props.onSelectAsset(image)}>{image.name} ({image.width} × {image.height})</button>
-                </li>)}
-            </ul>
-        </li>
-    </ul>
+    const doc = props.document;
+    return <ul className="tree-view" aria-label="Document contents">
+        <TreeNode label={`Doc: ${doc.title}`} depth={0}>
+            <TreeNode label="Shapes" depth={1}>
+                {doc.shapes.map(shape => <TreeNode key={shape.id} label={shape.name} depth={2}
+                    selected={props.selectedIds.includes(shape.id)}
+                    onSelect={event => props.onSelect(shape, event.shiftKey)}/>)}
+            </TreeNode>
+            <TreeNode label="Assets" depth={1}>
+                {doc.images.map(image => <TreeNode key={image.id} label={`${image.name} (${image.width} × ${image.height})`} depth={2}
+                    selected={image.id === props.selectedAssetId} onSelect={() => props.onSelectAsset(image)}/>)}
+            </TreeNode>
+        </TreeNode>
+    </ul>;
 }

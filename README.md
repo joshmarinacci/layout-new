@@ -8,7 +8,9 @@ Use the **Shape** dropdown beside **File** to create shapes with **New Rect**, *
 
 Use Undo/Redo or Command/Control-Z, Shift-Command/Control-Z, and Control-Y outside text inputs. Text fields retain native text-edit shortcuts while focused.
 
-The **File** dropdown contains Load file, New Document, and Save JSON. It closes after choosing an action, clicking outside, moving focus outside, or pressing Escape. Load file validates JSON before opening a document; invalid files leave existing tabs intact. New Document and successful loads open a new tab below the menu bar. Each tab retains its own document, selection, and undo/redo history. Save JSON saves the active document. Tab titles follow document titles; use Left/Right arrows or Home/End while focused on the tab bar to switch documents. Open tabs live in memory; save each document before refreshing or leaving the page.
+The **File** dropdown contains Load file, New Document, and Save JSON. It closes after choosing an action, clicking outside, moving focus outside, or pressing Escape. Load file validates JSON before opening a document; invalid files leave existing tabs intact. New Document and successful loads open a new tab below the menu bar. Each tab retains its own document, selection, and undo/redo history. Save JSON saves the active document as `<document title>.json`, replacing filename-unsafe characters; a blank title uses `Untitled.json`. Tab titles follow document titles; use Left/Right arrows or Home/End while focused on the tab bar to switch documents. Open tabs live in memory; save each document before refreshing or leaving the page.
+
+The left tree has collapsible document, Shapes, and Assets nodes. Expanding nodes reveals their children; the nested tree structure is ready to hold groups and pages.
 
 ## Pixel art images
 

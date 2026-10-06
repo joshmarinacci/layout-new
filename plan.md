@@ -97,3 +97,10 @@ Strict TypeScript, production build, and whitespace checks pass. Tests and brows
 Added scrollable viewport panning, Space/middle-button drag panning, pointer-anchored Ctrl/Command-wheel and trackpad zoom, plus toolbar zoom controls from 25% to 400%. Canvas backing resolution follows zoom and device-pixel ratio so vector drawing no longer stretches a fixed 1024 × 1024 bitmap; document-space geometry and image nearest-neighbor rendering are preserved. The wheel listener is native and non-passive to prevent the browser from also zooming the page.
 
 Strict TypeScript, production build, and whitespace checks pass. Tests and browser verification were not run for this increment. No commit made.
+
+
+## Collapsible tree and named JSON saves — 2026-10-06
+
+Made the document, Shapes, and Assets tree nodes collapsible, with nested structure prepared for future group and page nodes. JSON saves now use a filesystem-safe document title as the filename and fall back to `Untitled.json` for blank titles.
+
+Strict TypeScript, production build, and whitespace checks pass. No tests were run for this increment.

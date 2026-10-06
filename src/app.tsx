@@ -84,7 +84,8 @@ export default function App() {
                 <button disabled={state.transactionActive} onClick={() => openDocument(emptyDocument())}>New Document</button>
                 <button disabled={state.transactionActive} onClick={() => {
                     const url = URL.createObjectURL(new Blob([store.toJSON()], {type: 'application/json'}));
-                    const link = document.createElement('a'); link.href = url; link.download = 'drawing.json'; link.click();
+                    const safeTitle = doc.title.trim().replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').replace(/\s+/g, ' ').replace(/\.+$/g, '') || 'Untitled';
+                    const link = document.createElement('a'); link.href = url; link.download = `${safeTitle}.json`; link.click();
                     setTimeout(() => URL.revokeObjectURL(url), 1000);
                 }}>Save JSON</button>
             </DropdownMenu>

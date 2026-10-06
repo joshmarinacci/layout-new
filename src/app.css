@@ -137,9 +137,14 @@ input {
 
 .tree-view {
     color: var(--primary-control-text);
-    .tree-item {
+    list-style: none;
+    ul { list-style: none; }
+    .tree-node { list-style: none; }
+    .tree-row {
+        display: flex;
+        align-items: center;
         border: 1px solid transparent;
-        padding: 0.25rem 0.5rem;
+        min-height: 1.8rem;
         &.selected {
             background-color: var(--selected-background);
             color: var(--selected-color);
@@ -150,6 +155,9 @@ input {
         }
     }
 }
+.tree-disclosure, .tree-disclosure-spacer { flex: 0 0 1.6rem; width: 1.6rem; text-align: center; padding: 0.15rem; border: 0; background: transparent; }
+.tree-label { flex: 1 1 auto; min-width: 0; border: 0; background: transparent; text-align: left; overflow-wrap: anywhere; }
+.tree-node[aria-expanded="true"] > .tree-row .tree-disclosure { color: var(--selected-background); }
 
 .prop-sheet {
     details {
