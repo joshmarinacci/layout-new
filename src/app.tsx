@@ -242,7 +242,9 @@ export default function App() {
             onSelectPage={id => store.selectPage(id)}
             onUngroup={id => store.ungroup(id)} onRenameGroup={(id, name) => store.renameGroup(id, name)}
             onSelectGroup={ids => store.setSelection(ids)} onPageContextMenu={showPageContextMenu}
-            onPagesContextMenu={event => { event.preventDefault(); setContextMenu(null); setPageMenu(null); setPagesMenu({x: event.clientX, y: event.clientY}); }}/></div>
+            onPagesContextMenu={event => { event.preventDefault(); setContextMenu(null); setPageMenu(null); setPagesMenu({x: event.clientX, y: event.clientY}); }}
+            onReorderPage={(id, targetId, position) => store.reorderPage(id, targetId, position)}
+            onReorderShape={(pageId, id, targetId, position) => store.reorderShapes(pageId, id, targetId, position)}/></div>
         {selectedAsset ? <div className="asset-center scroll-container"><PixelAssetView store={store} image={selectedAsset} onBack={() => setSelectedAssetId(null)}/></div> : <>
             <div className="center"><VisualEditor key={activeTab.id} store={store} zoom={canvasZoom} onZoomChange={setCanvasZoom} onEditImage={reference => setImageDialog({kind: 'edit', imageId: reference.imageId, source: reference.source})} onShapeContextMenu={showShapeContextMenu} onCanvasContextMenu={event => {
                 event.preventDefault();

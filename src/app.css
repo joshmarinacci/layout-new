@@ -167,11 +167,15 @@ input {
             border: 1px solid var(--primary-control-border-color);
         }
     }
+    .tree-row.drop-before { box-shadow: inset 0 3px 0 #f0df00; }
+    .tree-row.drop-after { box-shadow: inset 0 -3px 0 #f0df00; }
 }
 .tree-disclosure, .tree-disclosure-spacer { flex: 0 0 1.6rem; width: 1.6rem; text-align: center; padding: 0.15rem; border: 0; background: transparent; }
 .tree-actions { list-style: none; display: flex; flex-wrap: wrap; gap: 0.2rem; padding: 0.2rem 0.4rem 0.2rem 2.5rem; }
 .tree-actions button { font-size: 0.8rem; }
 .tree-label { flex: 1 1 auto; min-width: 0; border: 0; background: transparent; text-align: left; overflow-wrap: anywhere; }
+.tree-label[draggable="true"] { cursor: grab; }
+.tree-label[draggable="true"]:active { cursor: grabbing; }
 .tree-node[aria-expanded="true"] > .tree-row .tree-disclosure { color: var(--selected-background); }
 
 .prop-sheet {

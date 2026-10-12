@@ -78,6 +78,28 @@ export class EditorStore {
     renamePage(id: string, name: string) {
         this.edit('Rename page', draft => { const page = draft.pages.find(item => item.id === id); if (!page) throw new Error('Unknown page'); page.name = name; });
     }
+    reorderPage(id: string, targetId: string, position: 'before' | 'after' = 'before') {
+        if (id === targetId) return;
+        this.edit('Reorder pages', draft => {
+            const from = draft.pages.findIndex(page => page.id === id);
+            const to = draft.pages.findIndex(page => page.id === targetId);
+            if (from < 0 || to < 0) throw new Error('Unknown page');
+            const [page] = draft.pages.splice(from, 1);
+            const targetIndex = draft.pages.findIndex(item => item.id === targetId);
+            draft.pages.splice(targetIndex + (position === 'after' ? 1 : 0), 0, page);
+        });
+    }
+    reorderShapes(pageId: string, id: string, targetId: string, position: 'before' | 'after' = 'before') {
+        if (id === targetId) return;
+        this.edit('Reorder shapes', draft => {
+            const from = draft.shapes.findIndex(shape => shape.id === id && shape.pageId === pageId);
+            const to = draft.shapes.findIndex(shape => shape.id === targetId && shape.pageId === pageId);
+            if (from < 0 || to < 0) throw new Error('Shapes must be on the same page');
+            const [shape] = draft.shapes.splice(from, 1);
+            const targetIndex = draft.shapes.findIndex(item => item.id === targetId);
+            draft.shapes.splice(targetIndex + (position === 'after' ? 1 : 0), 0, shape);
+        });
+    }
     deletePage(id: string) {
         if (this.document.pages.length <= 1) throw new Error('A document must keep at least one page');
         const page = this.document.pages.find(item => item.id === id); if (!page) return;
