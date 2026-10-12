@@ -20,8 +20,8 @@ function component(value: unknown, kind: string, fields: string[]) {
     if (c.kind !== kind) throw new Error(`Expected ${kind}`);
     return c;
 }
-function validateSchema(value: unknown, version: 1 | 2 | 3): asserts value is Document {
-    const doc = object(value); keys(doc, ['version', 'title', 'shapes', 'images']);
+function validateSchema(value: unknown, version: 1 | 2 | 3 | 4): asserts value is Document {
+    const doc = object(value); keys(doc, version === 4 ? ['version', 'title', 'shapes', 'images', 'pages'] : ['version', 'title', 'shapes', 'images']);
     if (doc.version !== version) throw new Error('Unsupported document version');
     text(doc.title);
     if (!Array.isArray(doc.shapes)) throw new Error('Expected shapes array');
@@ -29,9 +29,11 @@ function validateSchema(value: unknown, version: 1 | 2 | 3): asserts value is Do
     const imageIds = new Set<string>();
     for (const item of doc.images) {
         const image = object(item);
-        keys(image, version === 3 ? ['id', 'name', 'originalName', 'width', 'height', 'palette', 'pixels'] : ['id', 'name', 'width', 'height', 'palette', 'pixels']);
+        const imageFields = ['id', 'name', 'width', 'height', 'palette', 'pixels'];
+        if (version >= 3 || (version === 1 && Object.hasOwn(image, 'originalName'))) imageFields.splice(2, 0, 'originalName');
+        keys(image, imageFields);
         text(image.id); text(image.name);
-        if (version === 3 && image.originalName !== null) text(image.originalName);
+        if (version >= 3 && image.originalName !== null) text(image.originalName);
         if (!image.id || imageIds.has(image.id as string)) throw new Error('Image IDs must be nonempty and unique');
         imageIds.add(image.id as string);
         for (const size of [image.width, image.height]) {
@@ -51,10 +53,33 @@ function validateSchema(value: unknown, version: 1 | 2 | 3): asserts value is Do
                 throw new Error('Invalid pixel palette index');
         }
     }
+    if (version === 4) {
+        if (!Array.isArray(doc.pages) || !doc.pages.length) throw new Error('Documents must contain at least one page');
+        const pageIds = new Set<string>(); const groupIds = new Set<string>(); const membership = new Set<string>();
+        for (const pageValue of doc.pages) {
+            const page = object(pageValue); keys(page, ['id', 'name', 'groups']); text(page.id); text(page.name);
+            if (!page.id || pageIds.has(page.id as string) || !Array.isArray(page.groups)) throw new Error('Invalid or duplicate page');
+            pageIds.add(page.id as string);
+            for (const groupValue of page.groups) {
+                const group = object(groupValue); keys(group, ['id', 'name', 'shapeIds']); text(group.id); text(group.name);
+                if (!group.id || groupIds.has(group.id as string) || !Array.isArray(group.shapeIds)) throw new Error('Invalid or duplicate group');
+                groupIds.add(group.id as string);
+                for (const id of group.shapeIds) {
+                    text(id);
+                    if (membership.has(id as string)) throw new Error('A shape can belong to only one group');
+                    membership.add(id as string);
+                }
+            }
+        }
+    }
     const ids = new Set<string>();
     for (const item of doc.shapes) {
-        const s = object(item); keys(s, ['id', 'name', 'type', 'components']);
+        const s = object(item);
+        const expectedShapeKeys = version === 4 ? ['id', 'name', 'type', 'components', 'pageId'] : ['id', 'name', 'type', 'components'];
+        if (version < 4 && Object.hasOwn(s, 'pageId')) expectedShapeKeys.push('pageId');
+        keys(s, expectedShapeKeys);
         text(s.id); text(s.name);
+        if (version === 4) { text(s.pageId); if (!(doc.pages as ObjectValue[]).some(page => page.id === s.pageId)) throw new Error('Shape references a missing page'); }
         if (!s.id || ids.has(s.id as string)) throw new Error('Shape IDs must be nonempty and unique');
         ids.add(s.id as string);
         const c = object(s.components);
@@ -98,13 +123,23 @@ function validateSchema(value: unknown, version: 1 | 2 | 3): asserts value is Do
         }
         if (s.type === 'rectangle') number(component(c.cornerRadius, 'rounded-corner-component', ['radius']).radius, true);
     }
+    if (version === 4) {
+        const ids = new Set((doc.shapes as ObjectValue[]).map(shape => shape.id as string));
+        for (const pageValue of doc.pages as unknown[]) for (const groupValue of object(pageValue).groups as unknown[]) {
+            for (const id of object(groupValue).shapeIds as unknown[]) if (!ids.has(id as string)) throw new Error('Group references a missing shape');
+        }
+    }
 }
 export function validateDocument(value: unknown): asserts value is Document {
-    validateSchema(value, 3);
+    validateSchema(value, 4);
 }
 export function serializeDocument(document: Document): string {
-    validateDocument(document);
-    return JSON.stringify(document, null, 2);
+    const normalized = structuredClone(document) as Document;
+    const legacyPage = normalized.pages?.[0] ?? {id: 'page_1', name: 'Page 1', groups: []};
+    if (!normalized.pages?.length) normalized.pages = [legacyPage];
+    normalized.shapes.forEach(shape => { if (!shape.pageId || !normalized.pages.some(page => page.id === shape.pageId)) shape.pageId = legacyPage.id; });
+    validateDocument(normalized);
+    return JSON.stringify(normalized, null, 2);
 }
 export function deserializeDocument(json: string): Document {
     const value: unknown = JSON.parse(json);
@@ -115,17 +150,23 @@ export function deserializeDocument(json: string): Document {
             throw new Error('Invalid version-0 shapes');
         source = {...source, version: 1, images: []};
     }
-    if (source.version === 1 || source.version === 2) {
+    if (source.version === 1 || source.version === 2 || source.version === 3) {
         const fromVersion = source.version;
+        if (fromVersion < 4 && Object.hasOwn(source, 'pages')) delete source.pages;
         validateSchema(source, fromVersion);
         const legacy = source as unknown as Document;
-        source = {...legacy, version: 3, images: legacy.images.map(image => ({...image, originalName: null})),
-            shapes: fromVersion === 1 ? legacy.shapes.map(shape => {
-                if (shape.type !== 'pixel-image') return shape;
-                const image = legacy.images.find(image => image.id === shape.components.image.imageId)!;
-                return {...shape, components: {...shape.components, image: {...shape.components.image,
-                    source: {x: 0, y: 0, width: image.width, height: image.height}}}};
-            }) : source.shapes};
+        const originalImages = (source.images as unknown as Record<string, unknown>[]).map(image => ({...image, originalName: source.version === 3 ? image.originalName : image.originalName ?? null}));
+        const page = {id: 'page_1', name: 'Page 1', groups: []};
+        const sourcePages = (source.pages as unknown as Document['pages'] | undefined) ?? [page];
+        source = {...legacy, version: 4, pages: sourcePages, images: originalImages,
+            shapes: legacy.shapes.map(shape => {
+                if (shape.type === 'pixel-image' && fromVersion === 1) {
+                    const image = legacy.images.find(image => image.id === shape.components.image.imageId)!;
+                    return {...shape, pageId: shape.pageId ?? page.id, components: {...shape.components, image: {...shape.components.image,
+                        source: {x: 0, y: 0, width: image.width, height: image.height}}}};
+                }
+                return {...shape, pageId: shape.pageId ?? page.id};
+            })};
     }
     validateDocument(source);
     return source;

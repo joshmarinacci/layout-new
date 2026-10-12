@@ -87,6 +87,7 @@ export interface CircleLikeComponent {
 interface BaseShape {
     id: string;
     name: string;
+    pageId?: string;
 
 }
 
@@ -148,11 +149,24 @@ export interface PixelImageShape extends BaseShape {
 
 export type Shape = RectangleShape | CircleShape | OvalShape | PixelImageShape;
 
+export interface ShapeGroup {
+    id: string;
+    name: string;
+    shapeIds: string[];
+}
+
+export interface Page {
+    id: string;
+    name: string;
+    groups: ShapeGroup[];
+}
+
 export interface Document {
-    version: 3
+    version: 4
     title: string
     shapes: Shape[];
     images: PixelImageData[];
+    pages: Page[];
 }
 
 export type DrawDocument = Document;

@@ -93,6 +93,19 @@ input {
     border: 0;
     white-space: nowrap;
 }
+.menu-shortcut { margin-left: 1.5rem; opacity: 0.65; font-size: 0.8em; }
+.shape-context-menu {
+    position: fixed;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    min-width: 10rem;
+    padding: 0.25rem;
+    background: var(--panel-background);
+    border: 1px solid var(--panel-border-color);
+    box-shadow: 0 4px 12px #0008;
+}
+.shape-context-menu button { text-align: left; border: 0; white-space: nowrap; }
 .file-menu button:focus-visible {
     outline: 2px solid var(--selected-background);
     outline-offset: -2px;
@@ -156,6 +169,8 @@ input {
     }
 }
 .tree-disclosure, .tree-disclosure-spacer { flex: 0 0 1.6rem; width: 1.6rem; text-align: center; padding: 0.15rem; border: 0; background: transparent; }
+.tree-actions { list-style: none; display: flex; flex-wrap: wrap; gap: 0.2rem; padding: 0.2rem 0.4rem 0.2rem 2.5rem; }
+.tree-actions button { font-size: 0.8rem; }
 .tree-label { flex: 1 1 auto; min-width: 0; border: 0; background: transparent; text-align: left; overflow-wrap: anywhere; }
 .tree-node[aria-expanded="true"] > .tree-row .tree-disclosure { color: var(--selected-background); }
 

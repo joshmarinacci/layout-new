@@ -92,10 +92,10 @@ describe('EditorStore', () => {
 describe('serialization', () => {
     it('round trips all supported shape variants with no editor state', () => {
         const document = makeExampleDocument(); const rectangle = makeRect('oval', {x: 2, y: 4, width: 80, height: 40});
-        document.shapes.push({id: 'oval', name: 'oval', type: 'oval', components: {oval: rectangle.components.rect, fill: rectangle.components.fill, stroke: rectangle.components.stroke}});
+        document.shapes.push({id: 'oval', name: 'oval', type: 'oval', pageId: 'page_1', components: {oval: rectangle.components.rect, fill: rectangle.components.fill, stroke: rectangle.components.stroke}});
         expect(deserializeDocument(serializeDocument(document))).toEqual(document);
         const store = new EditorStore(document); store.select(document.shapes[0].id); store.setTitle('updated');
-        expect(Object.keys(JSON.parse(store.toJSON()))).toEqual(['version', 'images', 'title', 'shapes']);
+        expect(Object.keys(JSON.parse(store.toJSON()))).toEqual(['version', 'images', 'pages', 'title', 'shapes']);
         store.loadJSON(serializeDocument(document)); expect(store.getSnapshot()).toMatchObject({document, selectedId: null, canUndo: false, canRedo: false});
     });
     it.each(['{', 'null', '{"version":1,"title":"x","shapes":[]}', '{"version":0,"title":"x","shapes":[{}]}'])('rejects malformed input: %s', json => {

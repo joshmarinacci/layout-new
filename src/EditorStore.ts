@@ -13,13 +13,15 @@ export interface EditorSnapshot {
     readonly canUndo: boolean;
     readonly canRedo: boolean;
     readonly transactionActive: boolean;
+    readonly selectedPageId: string;
 }
-export const emptyDocument = (): Document => ({version: 3, images: [], title: 'Untitled', shapes: []});
+export const emptyDocument = (): Document => ({version: 4, images: [], title: 'Untitled', shapes: [], pages: [{id: 'page_1', name: 'Page 1', groups: []}]});
 
 export class EditorStore {
     private document: Document;
     private selectedId: string | null = null;
     private selectedIds: string[] = [];
+    private selectedPageId: string;
     private past: HistoryEntry[] = [];
     private future: HistoryEntry[] = [];
     private transaction: {label: string; before: Document; selectedId: string | null; selectedIds: string[]} | null = null;
@@ -27,8 +29,13 @@ export class EditorStore {
     private snapshot!: EditorSnapshot;
     constructor(document: Document = emptyDocument(), private readonly historyLimit = 100) {
         if (!Number.isInteger(historyLimit) || historyLimit < 1) throw new Error('History limit must be positive');
-        validateDocument(document);
-        this.document = freeze(structuredClone(document), true);
+        const normalized = structuredClone(document) as Document;
+        const legacyPage = normalized.pages?.[0] ?? {id: 'page_1', name: 'Page 1', groups: []};
+        if (!normalized.pages?.length) normalized.pages = [legacyPage];
+        normalized.shapes.forEach(shape => { if (!shape.pageId || !normalized.pages.some(page => page.id === shape.pageId)) shape.pageId = legacyPage.id; });
+        validateDocument(normalized);
+        this.document = freeze(normalized, true);
+        this.selectedPageId = this.document.pages[0].id;
         this.publish();
     }
     getSnapshot = (): EditorSnapshot => this.snapshot;
@@ -40,7 +47,7 @@ export class EditorStore {
         if (!this.selectedId && this.selectedIds.length) this.selectedId = this.selectedIds.at(-1)!;
         this.snapshot = Object.freeze({document: this.document, selectedId: this.selectedId, selectedIds: Object.freeze([...this.selectedIds]),
             canUndo: !this.transaction && this.past.length > 0, canRedo: !this.transaction && this.future.length > 0,
-            transactionActive: !!this.transaction});
+            transactionActive: !!this.transaction, selectedPageId: this.selectedPageId});
         this.listeners.forEach(listener => listener());
     }
     select(id: string | null) {
@@ -58,6 +65,65 @@ export class EditorStore {
     toggleSelection(id: string) {
         if (!this.document.shapes.some(shape => shape.id === id)) throw new Error('Unknown shape');
         this.setSelection(this.selectedIds.includes(id) ? this.selectedIds.filter(item => item !== id) : [...this.selectedIds, id]);
+    }
+    selectPage(id: string) {
+        if (!this.document.pages.some(page => page.id === id)) throw new Error('Unknown page');
+        this.selectedPageId = id; this.setSelection([]);
+    }
+    createPage(name = `Page ${this.document.pages.length + 1}`) {
+        const page = {id: crypto.randomUUID(), name, groups: []};
+        this.edit('Create page', draft => { draft.pages.push(page); });
+        this.selectedPageId = page.id; this.setSelection([]); this.publish(); return page.id;
+    }
+    renamePage(id: string, name: string) {
+        this.edit('Rename page', draft => { const page = draft.pages.find(item => item.id === id); if (!page) throw new Error('Unknown page'); page.name = name; });
+    }
+    deletePage(id: string) {
+        if (this.document.pages.length <= 1) throw new Error('A document must keep at least one page');
+        const page = this.document.pages.find(item => item.id === id); if (!page) return;
+        const target = this.document.pages.find(item => item.id !== id)!;
+        this.edit('Delete page', draft => {
+            for (const shape of draft.shapes) if (shape.pageId === id) shape.pageId = target.id;
+            for (const item of draft.pages) if (item.id !== id) {
+                for (const group of page.groups) item.groups.push(...group.shapeIds.map(shapeId => ({id: crypto.randomUUID(), name: group.name, shapeIds: [shapeId]})));
+            }
+            draft.pages = draft.pages.filter(item => item.id !== id);
+        });
+        if (this.selectedPageId === id) this.selectedPageId = target.id;
+        this.publish();
+    }
+    createGroup(pageId: string, shapeIds: readonly string[], name = 'Group') {
+        const ids = [...new Set(shapeIds)].filter(id => this.document.shapes.some(shape => shape.id === id));
+        if (!ids.length) return null;
+        const group = {id: crypto.randomUUID(), name, shapeIds: ids};
+        this.edit('Group selection', draft => {
+            for (const page of draft.pages) page.groups = page.groups.filter(item => !ids.some(id => item.shapeIds.includes(id)));
+            for (const id of ids) { const shape = draft.shapes.find(item => item.id === id); if (shape) shape.pageId = pageId; }
+            const page = draft.pages.find(item => item.id === pageId); if (!page) throw new Error('Unknown page'); page.groups.push(group);
+        });
+        return group.id;
+    }
+    ungroup(id: string) { this.edit('Ungroup', draft => { for (const page of draft.pages) page.groups = page.groups.filter(group => group.id !== id); }); }
+    ungroupSelection(ids: readonly string[]) {
+        const selected = new Set(ids);
+        this.edit('Ungroup selection', draft => {
+            for (const page of draft.pages) {
+                page.groups = page.groups.flatMap(group => {
+                    const remaining = group.shapeIds.filter(id => !selected.has(id));
+                    return remaining.length ? [{...group, shapeIds: remaining}] : [];
+                });
+            }
+        });
+    }
+    renameGroup(id: string, name: string) {
+        this.edit('Rename group', draft => { const group = draft.pages.flatMap(page => page.groups).find(item => item.id === id); if (!group) throw new Error('Unknown group'); group.name = name; });
+    }
+    moveShapesToPage(ids: readonly string[], pageId: string) {
+        this.edit('Move shapes to page', draft => {
+            if (!draft.pages.some(page => page.id === pageId)) throw new Error('Unknown page');
+            for (const id of ids) { const shape = draft.shapes.find(item => item.id === id); if (shape) shape.pageId = pageId; }
+            for (const page of draft.pages) page.groups = page.groups.filter(group => { group.shapeIds = group.shapeIds.filter(id => !ids.includes(id)); return group.shapeIds.length > 0; });
+        });
     }
     private requireIdle() { if (this.transaction) throw new Error('Finish the active transaction first'); }
     private record(entry: HistoryEntry) {
@@ -77,7 +143,72 @@ export class EditorStore {
     setTitle(title: string) { this.edit('Document title', draft => { draft.title = title; }); }
     addShape(shape: Shape) {
         const copy = structuredClone(shape);
+        copy.pageId = this.selectedPageId;
         this.edit('Add shape', draft => { draft.shapes.push(copy); });
+    }
+    duplicateShapes(ids: readonly string[]) {
+        this.requireIdle();
+        const originals = this.document.shapes.filter(shape => ids.includes(shape.id));
+        const imageIds = new Map<string, string>();
+        const copies = originals.map(original => {
+            const copy = structuredClone(original);
+            copy.id = crypto.randomUUID();
+            copy.pageId = this.selectedPageId;
+            copy.name = `${copy.name} copy`;
+            if (copy.type === 'pixel-image') {
+                const oldId = copy.components.image.imageId;
+                let newId = imageIds.get(oldId);
+                if (!newId) { newId = crypto.randomUUID(); imageIds.set(oldId, newId); }
+                copy.components.image.imageId = newId;
+                copy.components.rect.bounds.x += 20;
+                copy.components.rect.bounds.y += 20;
+            } else if (copy.type === 'circle') {
+                copy.components.circle.center.x += 20;
+                copy.components.circle.center.y += 20;
+            } else if (copy.type === 'rectangle') {
+                const bounds = copy.components.rect.bounds;
+                bounds.x += 20; bounds.y += 20;
+            } else if (copy.type === 'oval') {
+                const bounds = copy.components.oval.bounds;
+                bounds.x += 20; bounds.y += 20;
+            }
+            return copy;
+        });
+        if (!copies.length) return [];
+        const sourceImages = this.document.images.filter(image => imageIds.has(image.id)).map(image => {
+            const copy = structuredClone(image); copy.id = imageIds.get(image.id)!; copy.name += ' copy';
+            return copy;
+        });
+        this.edit('Duplicate selection', draft => { draft.images.push(...sourceImages); draft.shapes.push(...copies); });
+        this.setSelection(copies.map(shape => shape.id));
+        return copies.map(shape => shape.id);
+    }
+    pasteShapes(shapes: readonly Shape[], images: readonly PixelImageData[]) {
+        this.requireIdle();
+        const referencedImageIds = new Set(shapes.filter((shape): shape is Extract<Shape, {type: 'pixel-image'}> => shape.type === 'pixel-image')
+            .map(shape => shape.components.image.imageId));
+        const requiredImages = images.filter(image => referencedImageIds.has(image.id));
+        const imageMap = new Map(requiredImages.map(image => [image.id, crypto.randomUUID()]));
+        const imageCopies = requiredImages.map(image => ({...structuredClone(image), id: imageMap.get(image.id)!}));
+        const copies = shapes.map(original => {
+            const copy = structuredClone(original);
+            copy.id = crypto.randomUUID(); copy.name = `${copy.name} copy`;
+            copy.pageId = this.selectedPageId;
+            if (copy.type === 'pixel-image') {
+                const mapped = imageMap.get(copy.components.image.imageId);
+                if (!mapped) throw new Error('Clipboard is missing a pixel image asset');
+                copy.components.image.imageId = mapped;
+            }
+            if (copy.type === 'circle') { copy.components.circle.center.x += 20; copy.components.circle.center.y += 20; }
+            else if (copy.type === 'rectangle') { copy.components.rect.bounds.x += 20; copy.components.rect.bounds.y += 20; }
+            else if (copy.type === 'oval') { copy.components.oval.bounds.x += 20; copy.components.oval.bounds.y += 20; }
+            else { copy.components.rect.bounds.x += 20; copy.components.rect.bounds.y += 20; }
+            return copy;
+        });
+        if (!copies.length) return [];
+        this.edit('Paste shapes', draft => { draft.images.push(...imageCopies); draft.shapes.push(...copies); });
+        this.setSelection(copies.map(shape => shape.id));
+        return copies.map(shape => shape.id);
     }
     updateShape(id: string, recipe: (shape: Draft<Shape>) => void) {
         this.edit('Edit shape', draft => {
@@ -91,6 +222,7 @@ export class EditorStore {
         const image = makePixelImage(width, height, palette);
         const scale = Math.max(1, Math.floor(128 / Math.max(width, height)));
         const shape = makeImageShape(image.id, {x: 50, y: 50, width: width * scale, height: height * scale}, {x: 0, y: 0, width, height});
+        shape.pageId = this.selectedPageId;
         this.edit('Create pixel image', draft => { draft.images.push(image); draft.shapes.push(shape); });
         return shape.id;
     }
@@ -116,6 +248,7 @@ export class EditorStore {
             y: 30 + Math.floor(i / columns) * (region.height * scale + gap),
             width: region.width * scale, height: region.height * scale,
         }, region, tile ? `${name} (${i % columns + 1}, ${Math.floor(i / columns) + 1})` : name));
+        shapes.forEach(shape => { shape.pageId = this.selectedPageId; });
         this.edit('Import PNG', draft => { draft.images.push(image); draft.shapes.push(...shapes); });
         return shapes.map(shape => shape.id);
     }
@@ -124,6 +257,7 @@ export class EditorStore {
         if (source?.type !== 'pixel-image') throw new Error('Expected an image shape');
         const bounds = source.components.rect.bounds;
         const shape = makeImageShape(source.components.image.imageId, {...bounds, x: bounds.x + 20, y: bounds.y + 20}, source.components.image.source, `${source.name} copy`);
+        shape.pageId = this.selectedPageId;
         this.addShape(shape);
         return shape.id;
     }
@@ -181,8 +315,13 @@ export class EditorStore {
     toJSON() { return serializeDocument(this.document); }
     loadJSON(json: string) { this.replaceDocument(deserializeDocument(json)); }
     replaceDocument(document: Document) {
-        this.requireIdle(); validateDocument(document);
-        this.document = freeze(structuredClone(document), true);
-        this.selectedId = null; this.selectedIds = []; this.past = []; this.future = []; this.publish();
+        this.requireIdle();
+        const normalized = structuredClone(document) as Document;
+        const legacyPage = normalized.pages?.[0] ?? {id: 'page_1', name: 'Page 1', groups: []};
+        if (!normalized.pages?.length) normalized.pages = [legacyPage];
+        normalized.shapes.forEach(shape => { if (!shape.pageId || !normalized.pages.some(page => page.id === shape.pageId)) shape.pageId = legacyPage.id; });
+        validateDocument(normalized);
+        this.document = freeze(normalized, true);
+        this.selectedId = null; this.selectedIds = []; this.selectedPageId = normalized.pages[0].id; this.past = []; this.future = []; this.publish();
     }
 }

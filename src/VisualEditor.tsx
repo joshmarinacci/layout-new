@@ -1,4 +1,4 @@
-import {useEffect, useRef, useState, type PointerEvent} from 'react';
+import {useEffect, useRef, useState, type MouseEvent, type PointerEvent} from 'react';
 import type {Bounds, Shape, CircleLikeComponent, PixelImageReferenceComponent, PixelImageData} from './types';
 import type {EditorStore} from './EditorStore';
 import {useEditorStore} from './useEditorStore';
@@ -14,7 +14,7 @@ export function selectionBounds(shape: Shape): Bounds {
     }
 }
 const clampZoom = (zoom: number) => Math.max(0.25, Math.min(4, zoom));
-export default function VisualEditor({store, onEditImage, zoom, onZoomChange}: {store: EditorStore; onEditImage: (reference: PixelImageReferenceComponent) => void; zoom: number; onZoomChange: (zoom: number) => void}) {
+export default function VisualEditor({store, onEditImage, onShapeContextMenu, onCanvasContextMenu, zoom, onZoomChange}: {store: EditorStore; onEditImage: (reference: PixelImageReferenceComponent) => void; onShapeContextMenu: (event: MouseEvent<HTMLCanvasElement>, shape: Shape) => void; onCanvasContextMenu: (event: MouseEvent<HTMLCanvasElement>) => void; zoom: number; onZoomChange: (zoom: number) => void}) {
     const state = useEditorStore(store);
     const ref = useRef<HTMLCanvasElement>(null);
     const viewport = useRef<HTMLDivElement>(null);
@@ -40,7 +40,7 @@ export default function VisualEditor({store, onEditImage, zoom, onZoomChange}: {
             return [image.id, bitmap];
         }));
         ctx.imageSmoothingEnabled = false;
-        state.document.shapes.forEach(shape => {
+        state.document.shapes.filter(shape => shape.pageId === state.selectedPageId).forEach(shape => {
             const b = selectionBounds(shape);
             if (shape.type === 'pixel-image') {
                 const bitmap = images.get(shape.components.image.imageId);
@@ -69,7 +69,7 @@ export default function VisualEditor({store, onEditImage, zoom, onZoomChange}: {
             }
         });
         if (marquee) { ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#f0df00'; ctx.fillStyle = '#f0df0030'; ctx.lineWidth = 1; ctx.fillRect(marquee.x, marquee.y, marquee.width, marquee.height); ctx.strokeRect(marquee.x, marquee.y, marquee.width, marquee.height); ctx.restore(); }
-    }, [state.document, state.selectedId, state.selectedIds, marquee, zoom]);
+    }, [state.document, state.selectedId, state.selectedIds, state.selectedPageId, marquee, zoom]);
     useEffect(() => () => { if (gesture.current) { gesture.current = null; if (store.getSnapshot().transactionActive) store.cancelTransaction(); } }, [store]);
     const point = (event: PointerEvent<HTMLCanvasElement>) => {
         const rect = event.currentTarget.getBoundingClientRect();
@@ -109,6 +109,18 @@ export default function VisualEditor({store, onEditImage, zoom, onZoomChange}: {
     }, [zoom, onZoomChange]);
     return <div className="canvas-viewport" ref={viewport}>
     <canvas aria-label="Drawing canvas" tabIndex={0} ref={ref} width={1024 * zoom * (window.devicePixelRatio || 1)} height={1024 * zoom * (window.devicePixelRatio || 1)} style={{width: 1024 * zoom, height: 1024 * zoom, touchAction: 'none'}}
+        onContextMenu={event => {
+            event.preventDefault();
+            const rect = event.currentTarget.getBoundingClientRect();
+            const p = {x: (event.clientX - rect.left) / zoom, y: (event.clientY - rect.top) / zoom};
+            const shape = [...state.document.shapes].reverse().filter(item => item.pageId === state.selectedPageId).find(item => {
+                if (item.type === 'circle') return circleContains(item.components.circle, p);
+                const b = selectionBounds(item);
+                return p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + b.height;
+            });
+            if (shape) onShapeContextMenu(event, shape);
+            else onCanvasContextMenu(event);
+        }}
         onDoubleClick={event => {
             const rect = event.currentTarget.getBoundingClientRect();
             const p = {x: (event.clientX - rect.left) / zoom, y: (event.clientY - rect.top) / zoom};
@@ -140,13 +152,13 @@ export default function VisualEditor({store, onEditImage, zoom, onZoomChange}: {
             const p = point(event);
             const hitTolerance = 10 / zoom;
             const selected = state.document.shapes.find(s => s.id === state.selectedId);
-            const selectedShapes = state.document.shapes.filter(shape => state.selectedIds.includes(shape.id));
+            const selectedShapes = state.document.shapes.filter(shape => shape.pageId === state.selectedPageId && state.selectedIds.includes(shape.id));
             const circleHandle = selected?.type === 'circle' && circleHandles(selected.components.circle)
                 .some(handle => Math.abs(p.x - handle.x) <= hitTolerance && Math.abs(p.y - handle.y) <= hitTolerance);
             const selectedBounds = selected ? selectionBounds(selected) : null;
             const boxHandle = (selected?.type === 'rectangle' || selected?.type === 'pixel-image') && selectedBounds &&
                 Math.abs(p.x - selectedBounds.x - selectedBounds.width) <= hitTolerance && Math.abs(p.y - selectedBounds.y - selectedBounds.height) <= hitTolerance;
-            const shape = circleHandle || boxHandle ? selected : [...state.document.shapes].reverse().find(s => {
+            const shape = circleHandle || boxHandle ? selected : [...state.document.shapes].reverse().filter(s => s.pageId === state.selectedPageId).find(s => {
                 if (s.type === 'circle') return circleContains(s.components.circle, p);
                 const b = selectionBounds(s);
                 return p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + b.height;
@@ -195,7 +207,7 @@ export default function VisualEditor({store, onEditImage, zoom, onZoomChange}: {
             if (!g || g.pointer !== event.pointerId) return;
             if (g.kind === 'marquee') {
                 const p = point(event); const box = {x: Math.min(g.x, p.x), y: Math.min(g.y, p.y), width: Math.abs(p.x - g.x), height: Math.abs(p.y - g.y)};
-                const hits = box.width < 2 && box.height < 2 ? [] : state.document.shapes.filter(shape => { const b = selectionBounds(shape); return b.x <= box.x + box.width && b.x + b.width >= box.x && b.y <= box.y + box.height && b.y + b.height >= box.y; }).map(shape => shape.id);
+                const hits = box.width < 2 && box.height < 2 ? [] : state.document.shapes.filter(shape => shape.pageId === state.selectedPageId).filter(shape => { const b = selectionBounds(shape); return b.x <= box.x + box.width && b.x + b.width >= box.x && b.y <= box.y + box.height && b.y + b.height >= box.y; }).map(shape => shape.id);
                 store.setSelection(g.additive ? [...g.ids, ...hits] : hits); setMarquee(null);
             } else finish(false);
             gesture.current = null;

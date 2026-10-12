@@ -12,7 +12,7 @@ import {
 function makeRectDocument():DrawDocument {
     const rect = makeRect('rect1',{x:200,y:50,width:100, height:100});
     return {
-        version: 3, images: [],
+        version: 4, images: [], pages: [{id: 'page-1', name: 'Page 1', groups: []}],
         title:'document',
         shapes:[rect],
     }
@@ -22,14 +22,14 @@ function makeEmptyDoc():DrawDocument {
     return {
         title:"some doc",
         shapes: [],
-        version: 3, images: [],
+        version: 4, images: [], pages: [{id: 'page-1', name: 'Page 1', groups: []}],
     }
 }
 
 describe("make document",() => {
     it("can update a rectangle", () => {
         const doc = makeRectDocument()
-        expect(doc.version).toBe(3)
+        expect(doc.version).toBe(4)
         expect(doc.shapes.length).toBe(1)
         expect(doc.shapes[0].type).toBe('rectangle')
         let rect = doc.shapes[0] as RectangleShape

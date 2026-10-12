@@ -16,7 +16,7 @@ export function makePixelImage(width: number, height: number, palette: readonly 
     return {id: crypto.randomUUID(), name, originalName: null, width, height, palette: [...palette], pixels: Array(width * height).fill(-1)};
 }
 export function makeImageShape(imageId: string, bounds: Bounds, source: Bounds, name = 'Pixel art'): PixelImageShape {
-    return {id: crypto.randomUUID(), name, type: 'pixel-image', components: {
+    return {id: crypto.randomUUID(), pageId: 'page_1', name, type: 'pixel-image', components: {
         image: {kind: 'pixel-image-reference', imageId, source: {...source}},
         rect: {kind: 'resizable-bounds-component', bounds: {...bounds}},
     }};

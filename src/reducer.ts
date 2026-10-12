@@ -13,6 +13,7 @@ function gen_id(rect1: string) {
 export function makeRect(name: string, bounds: Bounds): RectangleShape {
     return {
         id: gen_id("rect"),
+        pageId: 'page_1',
         type: 'rectangle',
         name: name,
         components: {
@@ -42,7 +43,7 @@ export function makeRect(name: string, bounds: Bounds): RectangleShape {
 
 export function makeCircle(name: string, center: Point, radius: number): CircleShape {
     return {
-        id: gen_id('circle'), name, type: 'circle',
+        id: gen_id('circle'), pageId: 'page_1', name, type: 'circle',
         components: {
             circle: {kind: 'circle-like-component', center: {...center}, radius},
             fill: {kind: 'fill-component', fill: {kind: 'solid', color: '#ff0000'}},

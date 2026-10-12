@@ -2,6 +2,7 @@ import type {DrawDocument, RectangleShape, CircleShape} from "./types";
 export function makeExampleDocument():DrawDocument {
     const rect: RectangleShape = {
         id: "rect_1",
+        pageId: 'page_1',
         type: 'rectangle',
         name: 'rect',
         components: {
@@ -34,6 +35,7 @@ export function makeExampleDocument():DrawDocument {
     }
     const circle: CircleShape = {
         id:'circle_1',
+        pageId: 'page_1',
         type:'circle',
         name:'circle',
         components: {
@@ -60,7 +62,7 @@ export function makeExampleDocument():DrawDocument {
         }
     }
     return {
-        version: 3, images: [],
+        version: 4, images: [], pages: [{id: 'page_1', name: 'Page 1', groups: []}],
         title:'test doc',
         shapes: [rect, circle],
     }
