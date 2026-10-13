@@ -10,7 +10,7 @@ import {deserializeDocument} from './serialization';
 import type {Document as DrawingDocument, Bounds, Shape, PixelImageData} from './types';
 import {ImportPixelImage} from './ImportPixelImage';
 import {NewPixelImage} from './NewPixelImage';
-import {PixelImageEditor} from './PixelImageEditor';
+import {PixelImageEditor, type PixelEditorController} from './PixelImageEditor';
 import {DropdownMenu} from './DropdownMenu';
 import {PixelAssetView} from './PixelAssetView';
 import {NewRepeatingImage} from './NewRepeatingImage';
@@ -65,7 +65,10 @@ export default function App() {
     const file = useRef<HTMLInputElement>(null);
     const [error, setError] = useState('');
     const [canvasZoom, setCanvasZoom] = useState(1);
-    const [imageDialog, setImageDialog] = useState<{kind: 'create' | 'import'} | {kind: 'edit'; imageId: string; source?: Bounds} | null>(null);
+    const [leftPanelVisible, setLeftPanelVisible] = useState(true);
+    const [rightPanelVisible, setRightPanelVisible] = useState(true);
+    const [imageDialog, setImageDialog] = useState<{kind: 'create' | 'import'} | {kind: 'edit'; imageId: string; source?: Bounds; palettePosition?: {x: number; y: number}; imageScreenRect?: Bounds} | null>(null);
+    const [pixelEditor, setPixelEditor] = useState<PixelEditorController | null>(null);
     const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
     const [repeatingImageDialog, setRepeatingImageDialog] = useState(false);
     const [clipboard, setClipboard] = useState<{shapes: Shape[]; images: PixelImageData[]}>({shapes: [], images: []});
@@ -95,6 +98,12 @@ export default function App() {
     useEffect(() => {
         const keydown = (event: KeyboardEvent) => {
             if (event.target instanceof HTMLElement && (event.target.matches('input, textarea, select') || event.target.isContentEditable)) return;
+            if (imageDialog?.kind === 'edit') {
+                const key = event.key.toLowerCase();
+                if (key === 'escape') { event.preventDefault(); pixelEditor?.cancel(); setImageDialog(null); setPixelEditor(null); return; }
+                const shortcuts = {b: 'pencil', e: 'eraser', g: 'fill', i: 'picker', m: 'move'} as const;
+                if (key in shortcuts && !event.metaKey && !event.ctrlKey && !event.altKey && !store.getSnapshot().transactionActive) { event.preventDefault(); pixelEditor?.setTool(shortcuts[key as keyof typeof shortcuts]); return; }
+            }
             if (store.getSnapshot().transactionActive) return;
             const key = event.key.toLowerCase();
             if ((event.metaKey || event.ctrlKey) && !event.altKey && key === 'o') {
@@ -131,7 +140,7 @@ export default function App() {
         };
         window.addEventListener('keydown', keydown);
         return () => window.removeEventListener('keydown', keydown);
-    }, [store, selectedAssetId, state.selectedIds, doc, activeTab, workspace]);
+    }, [store, selectedAssetId, state.selectedIds, doc, activeTab, workspace, imageDialog, pixelEditor]);
     useEffect(() => {
         const close = () => { setContextMenu(null); setPageMenu(null); setPagesMenu(null); };
         window.addEventListener('pointerdown', close);
@@ -247,7 +256,7 @@ export default function App() {
             {workspace.tabs.map(tab => <DocumentTabButton key={tab.id} tab={tab}
                 active={tab.id === workspace.activeId} activate={() => activateTab(tab.id)}/>)}
         </div>
-        <div id="document-editor" className="document-editor full-span" role="tabpanel" aria-labelledby={`tab-${activeTab.id}`}>
+        <div id="document-editor" className={`document-editor full-span${leftPanelVisible ? '' : ' hide-left'}${rightPanelVisible ? '' : ' hide-right'}`} role="tabpanel" aria-labelledby={`tab-${activeTab.id}`}>
         <div className="toolbar full-span" key={activeTab.id}>
             <input aria-label="Document title" value={doc.title}
                 onFocus={() => store.beginTransaction('Document title')}
@@ -257,6 +266,8 @@ export default function App() {
             <label className="page-picker">Page <select aria-label="Current page" value={state.selectedPageId} onChange={event => store.selectPage(event.target.value)}>
                 {doc.pages.map(page => <option key={page.id} value={page.id}>{page.name}</option>)}
             </select></label>
+            <button aria-pressed={leftPanelVisible} aria-label={leftPanelVisible ? 'Hide tree panel' : 'Show tree panel'} title={leftPanelVisible ? 'Hide tree panel' : 'Show tree panel'} onClick={() => setLeftPanelVisible(value => !value)}>{leftPanelVisible ? 'Hide Tree' : 'Show Tree'}</button>
+            <button aria-pressed={rightPanelVisible} aria-label={rightPanelVisible ? 'Hide properties panel' : 'Show properties panel'} title={rightPanelVisible ? 'Hide properties panel' : 'Show properties panel'} onClick={() => setRightPanelVisible(value => !value)}>{rightPanelVisible ? 'Hide properties' : 'Show properties'}</button>
             {selectedAsset && <button onClick={() => setSelectedAssetId(null)}>Back to canvas</button>}
             {!selectedAsset && <div className="canvas-zoom-controls" role="group" aria-label="Canvas zoom controls">
                 <button aria-label="Zoom out" title="Zoom out" disabled={canvasZoom <= 0.25} onClick={() => setCanvasZoom(value => Math.max(0.25, value / 1.25))}>−</button>
@@ -282,11 +293,11 @@ export default function App() {
             onReorderPage={(id, targetId, position) => store.reorderPage(id, targetId, position)}
             onReorderShape={(pageId, id, targetId, position) => store.reorderShapes(pageId, id, targetId, position)}/></div>
         {selectedAsset ? <div className="asset-center scroll-container"><PixelAssetView store={store} image={selectedAsset} onBack={() => setSelectedAssetId(null)}/></div> : <>
-            <div className="center"><VisualEditor key={activeTab.id} store={store} zoom={canvasZoom} onZoomChange={setCanvasZoom} onEditImage={reference => setImageDialog({kind: 'edit', imageId: reference.imageId, source: reference.source})} onShapeContextMenu={showShapeContextMenu} onCanvasContextMenu={event => {
+            <div className={`center${imageDialog?.kind === 'edit' ? ' pixel-edit-active' : ''}`}><VisualEditor key={activeTab.id} store={store} zoom={canvasZoom} onZoomChange={setCanvasZoom} pixelEditor={pixelEditor} onEditImage={(reference, palettePosition, imageScreenRect) => setImageDialog({kind: 'edit', imageId: reference.imageId, source: reference.source, palettePosition, imageScreenRect})} onShapeContextMenu={showShapeContextMenu} onCanvasContextMenu={event => {
                 event.preventDefault();
                 setContextMenu(null);
                 setPageMenu({x: event.clientX, y: event.clientY, pageId: state.selectedPageId});
-            }}/></div>
+            }}/>{imageDialog?.kind === 'edit' && <PixelImageEditor key={imageDialog.imageId} store={store} imageId={imageDialog.imageId} source={imageDialog.source} initialPosition={imageDialog.palettePosition} imageScreenRect={imageDialog.imageScreenRect} onController={setPixelEditor} onClose={() => { setImageDialog(null); setPixelEditor(null); }}/>}</div>
             <div className="right scroll-container"><PropSheet key={activeTab.id} store={store}/></div>
         </>}
         </div>
@@ -314,7 +325,6 @@ export default function App() {
         </div>}
         {imageDialog?.kind === 'import' && <ImportPixelImage store={store} onClose={() => setImageDialog(null)}/>}
         {imageDialog?.kind === 'create' && <NewPixelImage store={store} onClose={() => setImageDialog(null)} onCreated={imageId => setImageDialog({kind: 'edit', imageId})}/>}
-        {imageDialog?.kind === 'edit' && <PixelImageEditor key={imageDialog.imageId} store={store} imageId={imageDialog.imageId} source={imageDialog.source} onClose={() => setImageDialog(null)}/>}
         {repeatingImageDialog && <NewRepeatingImage store={store} onClose={() => setRepeatingImageDialog(false)}/>}
         {savedDocumentsOpen && <SavedDocumentsDialog onClose={() => setSavedDocumentsOpen(false)} onChanged={records => {
             const remaining = new Set(records.map(record => record.id));

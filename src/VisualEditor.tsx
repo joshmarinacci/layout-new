@@ -4,6 +4,7 @@ import type {EditorStore} from './EditorStore';
 import {useEditorStore} from './useEditorStore';
 import {drawPixelImage, resizeImageBounds} from './pixelImages';
 import {circleContains, circleHandles, dragCircle} from './circleGeometry';
+import type {PixelEditorController} from './PixelImageEditor';
 
 export function selectionBounds(shape: Shape): Bounds {
     switch (shape.type) {
@@ -15,12 +16,13 @@ export function selectionBounds(shape: Shape): Bounds {
     }
 }
 const clampZoom = (zoom: number) => Math.max(0.25, Math.min(4, zoom));
-export default function VisualEditor({store, onEditImage, onShapeContextMenu, onCanvasContextMenu, zoom, onZoomChange}: {store: EditorStore; onEditImage: (reference: PixelImageReferenceComponent) => void; onShapeContextMenu: (event: MouseEvent<HTMLCanvasElement>, shape: Shape) => void; onCanvasContextMenu: (event: MouseEvent<HTMLCanvasElement>) => void; zoom: number; onZoomChange: (zoom: number) => void}) {
+export default function VisualEditor({store, onEditImage, onShapeContextMenu, onCanvasContextMenu, zoom, onZoomChange, pixelEditor}: {store: EditorStore; onEditImage: (reference: PixelImageReferenceComponent, position: {x: number; y: number}, imageRect: Bounds) => void; onShapeContextMenu: (event: MouseEvent<HTMLCanvasElement>, shape: Shape) => void; onCanvasContextMenu: (event: MouseEvent<HTMLCanvasElement>) => void; zoom: number; onZoomChange: (zoom: number) => void; pixelEditor?: PixelEditorController | null}) {
     const state = useEditorStore(store);
     const ref = useRef<HTMLCanvasElement>(null);
     const viewport = useRef<HTMLDivElement>(null);
     const spacePan = useRef(false);
     const bitmaps = useRef(new WeakMap<PixelImageData, HTMLCanvasElement>());
+    const pixelTargetId = useRef<string | null>(null);
     const gesture = useRef<{kind: 'move' | 'resize' | 'marquee' | 'pan'; ids: string[]; pointer: number; x: number; y: number; bounds: Bounds[]; circles?: Map<string, CircleLikeComponent>; additive?: boolean; scrollX?: number; scrollY?: number; duplicate?: boolean; duplicateStarted?: boolean} | null>(null);
     const [marquee, setMarquee] = useState<Bounds | null>(null);
     useEffect(() => {
@@ -78,7 +80,7 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
                 ctx.lineWidth = shape.components.stroke.width; ctx.strokeStyle = shape.components.stroke.color;
                 if (ctx.lineWidth > 0 && shape.components.stroke.width > 0) ctx.stroke();
             }
-            if (state.selectedIds.includes(shape.id)) {
+            if (state.selectedIds.includes(shape.id) && !pixelEditor) {
                 ctx.strokeStyle = 'yellow'; ctx.lineWidth = 2 / zoom; ctx.strokeRect(b.x, b.y, b.width, b.height);
                 if (shape.id === state.selectedId && shape.type === 'circle') {
                     ctx.fillStyle = 'yellow';
@@ -86,9 +88,18 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
                 }
                 if (shape.id === state.selectedId && (shape.type === 'rectangle' || shape.type === 'pixel-image' || shape.type === 'repeating-image')) { ctx.fillStyle = 'yellow'; ctx.fillRect(b.x + b.width - 5 / zoom, b.y + b.height - 5 / zoom, 10 / zoom, 10 / zoom); }
             }
+            if (pixelEditor?.imageId === (shape.type === 'pixel-image' ? shape.components.image.imageId : '') && pixelEditor.grid) {
+                const editingImage = pixelEditor.image;
+                if (editingImage) {
+                    ctx.save(); ctx.strokeStyle = '#8889'; ctx.lineWidth = 1 / zoom; ctx.beginPath();
+                    for (let x = 0; x <= editingImage.width; x++) { const px = b.x + x * b.width / editingImage.width; ctx.moveTo(px, b.y); ctx.lineTo(px, b.y + b.height); }
+                    for (let y = 0; y <= editingImage.height; y++) { const py = b.y + y * b.height / editingImage.height; ctx.moveTo(b.x, py); ctx.lineTo(b.x + b.width, py); }
+                    ctx.stroke(); ctx.restore();
+                }
+            }
         });
         if (marquee) { ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#f0df00'; ctx.fillStyle = '#f0df0030'; ctx.lineWidth = 1; ctx.fillRect(marquee.x, marquee.y, marquee.width, marquee.height); ctx.strokeRect(marquee.x, marquee.y, marquee.width, marquee.height); ctx.restore(); }
-    }, [state.document, state.selectedId, state.selectedIds, state.selectedPageId, marquee, zoom]);
+    }, [state.document, state.selectedId, state.selectedIds, state.selectedPageId, marquee, zoom, pixelEditor]);
     useEffect(() => () => { if (gesture.current) { gesture.current = null; if (store.getSnapshot().transactionActive) store.cancelTransaction(); } }, [store]);
     const point = (event: PointerEvent<HTMLCanvasElement>) => {
         const rect = event.currentTarget.getBoundingClientRect();
@@ -137,10 +148,17 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
                 const b = selectionBounds(item);
                 return p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + b.height;
             });
+            if (pixelEditor && shape?.type === 'pixel-image' && shape.components.image.imageId === pixelEditor.imageId) {
+                const b = shape.components.rect.bounds;
+                const editingImage = pixelEditor.image;
+                if (editingImage) pixelEditor.sample({x: (p.x - b.x) * editingImage.width / b.width, y: (p.y - b.y) * editingImage.height / b.height});
+                return;
+            }
             if (shape) onShapeContextMenu(event, shape);
             else onCanvasContextMenu(event);
         }}
         onDoubleClick={event => {
+            if (pixelEditor) return;
             const rect = event.currentTarget.getBoundingClientRect();
             const p = {x: (event.clientX - rect.left) / zoom, y: (event.clientY - rect.top) / zoom};
             const shape = [...store.getSnapshot().document.shapes].reverse().find(s => {
@@ -148,7 +166,19 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
                 const b = selectionBounds(s);
                 return p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + b.height;
             });
-            if (shape?.type === 'pixel-image') { finish(false); onEditImage(shape.components.image); }
+            if (shape?.type === 'pixel-image') {
+                finish(false);
+                const view = viewport.current;
+                const parent = view?.parentElement;
+                const viewRect = view?.getBoundingClientRect();
+                const parentRect = parent?.getBoundingClientRect();
+                const bounds = shape.components.rect.bounds;
+                const position = view && viewRect && parentRect ? {
+                    x: viewRect.left - parentRect.left + bounds.x * zoom - view.scrollLeft,
+                    y: viewRect.top - parentRect.top + bounds.y * zoom - view.scrollTop,
+                } : {x: 12, y: 12};
+                onEditImage(shape.components.image, position, {x: bounds.x * zoom, y: bounds.y * zoom, width: bounds.width * zoom, height: bounds.height * zoom});
+            }
         }}
         onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); finish(true); } }}
         onKeyDownCapture={event => { if (event.code === 'Space') { spacePan.current = true; event.preventDefault(); } }}
@@ -167,6 +197,17 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
             if (event.button !== 0) return;
             event.preventDefault();
             event.currentTarget.focus({preventScroll: true});
+            if (pixelEditor) {
+                if (store.getSnapshot().transactionActive) return;
+                const p = point(event);
+                const target = [...state.document.shapes].reverse().find(shape => shape.type === 'pixel-image' && shape.components.image.imageId === pixelEditor.imageId && shape.pageId === state.selectedPageId && p.x >= shape.components.rect.bounds.x && p.y >= shape.components.rect.bounds.y && p.x <= shape.components.rect.bounds.x + shape.components.rect.bounds.width && p.y <= shape.components.rect.bounds.y + shape.components.rect.bounds.height);
+                if (!target || target.type !== 'pixel-image') return;
+                const bounds = target.components.rect.bounds;
+                pixelTargetId.current = target.id;
+                pixelEditor.pointerDown({x: (p.x - bounds.x) * pixelEditor.image.width / bounds.width, y: (p.y - bounds.y) * pixelEditor.image.height / bounds.height}, event.pointerId);
+                if (pixelEditor.isActive(event.pointerId)) event.currentTarget.setPointerCapture(event.pointerId);
+                return;
+            }
             if (store.getSnapshot().transactionActive) return;
             const p = point(event);
             const hitTolerance = 10 / zoom;
@@ -211,6 +252,15 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
             event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={event => {
+            if (pixelEditor?.isActive(event.pointerId)) {
+                const pointOnCanvas = point(event);
+                const shape = state.document.shapes.find(item => item.id === pixelTargetId.current);
+                if (shape?.type === 'pixel-image') {
+                    const b = shape.components.rect.bounds;
+                    pixelEditor.pointerMove({x: (pointOnCanvas.x - b.x) * pixelEditor.image.width / b.width, y: (pointOnCanvas.y - b.y) * pixelEditor.image.height / b.height}, event.pointerId);
+                }
+                return;
+            }
             const g = gesture.current; if (!g || g.pointer !== event.pointerId) return;
             if (g.kind === 'pan') { if (viewport.current) { viewport.current.scrollLeft = (g.scrollX ?? 0) - (event.clientX - g.x); viewport.current.scrollTop = (g.scrollY ?? 0) - (event.clientY - g.y); } return; }
             const p = point(event); const dx = p.x - g.x, dy = p.y - g.y;
@@ -228,6 +278,17 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
             }));
         }}
         onPointerUp={event => {
+            if (pixelEditor?.isActive(event.pointerId)) {
+                const pointOnCanvas = point(event);
+                const shape = state.document.shapes.find(item => item.id === pixelTargetId.current);
+                if (shape?.type === 'pixel-image') {
+                    const b = shape.components.rect.bounds;
+                    pixelEditor.pointerUp({x: (pointOnCanvas.x - b.x) * pixelEditor.image.width / b.width, y: (pointOnCanvas.y - b.y) * pixelEditor.image.height / b.height}, event.pointerId);
+                } else pixelEditor.cancel();
+                pixelTargetId.current = null;
+                if (ref.current?.hasPointerCapture(event.pointerId)) ref.current.releasePointerCapture(event.pointerId);
+                return;
+            }
             const g = gesture.current;
             if (!g || g.pointer !== event.pointerId) return;
             if (g.kind === 'marquee') {
@@ -238,6 +299,6 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
             gesture.current = null;
             if (ref.current?.hasPointerCapture(event.pointerId)) ref.current.releasePointerCapture(event.pointerId);
         }}
-        onPointerCancel={() => finish(true)} onLostPointerCapture={() => finish(true)} onBlur={() => finish(true)}/>;
+        onPointerCancel={event => { pixelEditor?.cancel(); finish(true); }} onLostPointerCapture={() => { pixelEditor?.cancel(); finish(true); }} onBlur={() => { pixelEditor?.cancel(); finish(true); }}/ >;
     </div>;
 }

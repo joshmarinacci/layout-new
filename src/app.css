@@ -146,6 +146,10 @@ input {
         overflow: auto;
     }
 }
+.document-editor.hide-left { grid-template-columns: 0 minmax(320px, 1fr) 220px; }
+.document-editor.hide-right { grid-template-columns: 200px minmax(320px, 1fr) 0; }
+.document-editor.hide-left.hide-right { grid-template-columns: 0 minmax(320px, 1fr) 0; }
+.document-editor.hide-left > .left, .document-editor.hide-right > .right { display: none; }
 
 
 .tree-view {
@@ -280,3 +284,9 @@ button:disabled { opacity: 0.5; }
 .canvas-viewport canvas { display: block; }
 .canvas-zoom-controls { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0 0.5rem; color: var(--primary-control-text); }
 .canvas-zoom-controls span { min-width: 3.5rem; text-align: center; }
+.pixel-edit-active { position: relative; }
+.pixel-floating-palette { position: absolute; z-index: 5; top: 0.75rem; left: 0.75rem; width: min(340px, calc(100% - 2rem)); max-height: calc(100% - 2rem); overflow: auto; box-sizing: border-box; padding: 0.65rem; color: var(--primary-control-text); background: #002b36f2; border: 1px solid #657b83; box-shadow: 0 4px 18px #0009; }
+.pixel-palette-title { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; cursor: move; user-select: none; }
+.pixel-palette-title { touch-action: none; }
+.pixel-floating-palette p { font-size: 0.78rem; margin: 0.5rem 0; }
+.pixel-floating-palette .pixel-tools { margin: 0.5rem 0; }
