@@ -8,6 +8,7 @@ import {circleContains, circleHandles, dragCircle} from './circleGeometry';
 export function selectionBounds(shape: Shape): Bounds {
     switch (shape.type) {
         case 'pixel-image': return shape.components.rect.bounds;
+        case 'repeating-image': return shape.components.rect.bounds;
         case 'rectangle': return shape.components.rect.bounds;
         case 'oval': return shape.components.oval.bounds;
         case 'circle': { const {center, radius} = shape.components.circle; return {x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2}; }
@@ -20,7 +21,7 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
     const viewport = useRef<HTMLDivElement>(null);
     const spacePan = useRef(false);
     const bitmaps = useRef(new WeakMap<PixelImageData, HTMLCanvasElement>());
-    const gesture = useRef<{kind: 'move' | 'resize' | 'marquee' | 'pan'; ids: string[]; pointer: number; x: number; y: number; bounds: Bounds[]; circles?: Map<string, CircleLikeComponent>; additive?: boolean; scrollX?: number; scrollY?: number} | null>(null);
+    const gesture = useRef<{kind: 'move' | 'resize' | 'marquee' | 'pan'; ids: string[]; pointer: number; x: number; y: number; bounds: Bounds[]; circles?: Map<string, CircleLikeComponent>; additive?: boolean; scrollX?: number; scrollY?: number; duplicate?: boolean; duplicateStarted?: boolean} | null>(null);
     const [marquee, setMarquee] = useState<Bounds | null>(null);
     useEffect(() => {
         const canvas = ref.current; const ctx = canvas?.getContext('2d'); if (!ctx || !canvas) return;
@@ -51,6 +52,24 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
                 // A faint boundary keeps a fully transparent new image discoverable.
                 ctx.strokeStyle = '#657b83'; ctx.lineWidth = 1;
                 ctx.strokeRect(b.x, b.y, b.width, b.height);
+            } else if (shape.type === 'repeating-image') {
+                const bitmap = images.get(shape.components.image.imageId);
+                if (bitmap) {
+                    const region = shape.components.image.source;
+                    const tile = document.createElement('canvas');
+                    tile.width = shape.components.pattern.width; tile.height = shape.components.pattern.height;
+                    const tileCtx = tile.getContext('2d');
+                    if (tileCtx) {
+                        tileCtx.imageSmoothingEnabled = false;
+                        tileCtx.drawImage(bitmap, region.x, region.y, region.width, region.height, 0, 0, tile.width, tile.height);
+                        const pattern = ctx.createPattern(tile, 'repeat');
+                        if (pattern) {
+                            pattern.setTransform(new DOMMatrix().translate(b.x, b.y));
+                            ctx.save(); ctx.beginPath(); ctx.rect(b.x, b.y, b.width, b.height); ctx.clip(); ctx.fillStyle = pattern; ctx.fillRect(b.x, b.y, b.width, b.height); ctx.restore();
+                        }
+                    }
+                }
+                ctx.strokeStyle = '#657b83'; ctx.lineWidth = 1; ctx.strokeRect(b.x, b.y, b.width, b.height);
             } else {
                 ctx.beginPath();
                 if (shape.type === 'rectangle') ctx.rect(b.x, b.y, b.width, b.height);
@@ -65,7 +84,7 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
                     ctx.fillStyle = 'yellow';
                     circleHandles(shape.components.circle).forEach(handle => ctx.fillRect(handle.x - 5 / zoom, handle.y - 5 / zoom, 10 / zoom, 10 / zoom));
                 }
-                if (shape.id === state.selectedId && (shape.type === 'rectangle' || shape.type === 'pixel-image')) { ctx.fillStyle = 'yellow'; ctx.fillRect(b.x + b.width - 5 / zoom, b.y + b.height - 5 / zoom, 10 / zoom, 10 / zoom); }
+                if (shape.id === state.selectedId && (shape.type === 'rectangle' || shape.type === 'pixel-image' || shape.type === 'repeating-image')) { ctx.fillStyle = 'yellow'; ctx.fillRect(b.x + b.width - 5 / zoom, b.y + b.height - 5 / zoom, 10 / zoom, 10 / zoom); }
             }
         });
         if (marquee) { ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#f0df00'; ctx.fillStyle = '#f0df0030'; ctx.lineWidth = 1; ctx.fillRect(marquee.x, marquee.y, marquee.width, marquee.height); ctx.strokeRect(marquee.x, marquee.y, marquee.width, marquee.height); ctx.restore(); }
@@ -156,7 +175,7 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
             const circleHandle = selected?.type === 'circle' && circleHandles(selected.components.circle)
                 .some(handle => Math.abs(p.x - handle.x) <= hitTolerance && Math.abs(p.y - handle.y) <= hitTolerance);
             const selectedBounds = selected ? selectionBounds(selected) : null;
-            const boxHandle = (selected?.type === 'rectangle' || selected?.type === 'pixel-image') && selectedBounds &&
+            const boxHandle = (selected?.type === 'rectangle' || selected?.type === 'pixel-image' || selected?.type === 'repeating-image') && selectedBounds &&
                 Math.abs(p.x - selectedBounds.x - selectedBounds.width) <= hitTolerance && Math.abs(p.y - selectedBounds.y - selectedBounds.height) <= hitTolerance;
             const shape = circleHandle || boxHandle ? selected : [...state.document.shapes].reverse().filter(s => s.pageId === state.selectedPageId).find(s => {
                 if (s.type === 'circle') return circleContains(s.components.circle, p);
@@ -180,9 +199,15 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
             const resize = shape.type === 'circle' ? !!circleHandle
                 : Math.abs(p.x - bounds.x - bounds.width) <= hitTolerance && Math.abs(p.y - bounds.y - bounds.height) <= hitTolerance;
             const targets = !resize && state.selectedIds.includes(shape.id) && selectedShapes.length > 1 ? selectedShapes : [shape];
-            store.beginTransaction(`${resize ? 'Resize' : 'Move'} ${targets.length > 1 ? 'selection' : shape.type}`);
-            gesture.current = {kind: resize ? 'resize' : 'move', ids: targets.map(target => target.id), pointer: event.pointerId, ...p,
-                bounds: targets.map(selectionBounds), circles: new Map(targets.flatMap(target => target.type === 'circle' ? [[target.id, target.components.circle] as const] : []))};
+            const duplicate = !resize && event.altKey && targets.every(target => target.type !== 'oval');
+            if (duplicate) store.duplicateShapes(targets.map(target => target.id));
+            store.beginTransaction(duplicate ? 'Duplicate and move selection' : `${resize ? 'Resize' : 'Move'} ${targets.length > 1 ? 'selection' : shape.type}`);
+            const gestureTargets = duplicate
+                ? store.getSnapshot().document.shapes.filter(item => store.getSnapshot().selectedIds.includes(item.id))
+                : targets;
+            gesture.current = {kind: resize ? 'resize' : 'move', ids: gestureTargets.map(target => target.id), pointer: event.pointerId, ...p,
+                bounds: gestureTargets.map(selectionBounds),
+                circles: new Map(gestureTargets.flatMap(target => target.type === 'circle' ? [[target.id, target.components.circle] as const] : []))};
             event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={event => {
@@ -197,8 +222,8 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
                     shape.components.circle = dragCircle(circle, g, p, g.kind === 'resize' && g.ids.length === 1);
                     return;
                 }
-                if (shape.type === 'rectangle' || shape.type === 'pixel-image') shape.components.rect.bounds = g.kind === 'resize'
-                    ? resizeImageBounds(bounds, dx, dy, shape.type === 'pixel-image' && event.shiftKey)
+                if (shape.type === 'rectangle' || shape.type === 'pixel-image' || shape.type === 'repeating-image') shape.components.rect.bounds = g.kind === 'resize'
+                    ? resizeImageBounds(bounds, dx, dy, (shape.type === 'pixel-image' || shape.type === 'repeating-image') && event.shiftKey)
                     : {...bounds, x: bounds.x + dx, y: bounds.y + dy};
             }));
         }}

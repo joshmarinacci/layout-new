@@ -53,7 +53,7 @@ export interface ImageAsset {
 
 /* ========== components ========= */
 
-export type ShapeComponent = ResizableBoundsComponent | FillComponent | RoundedCornerComponent | StrokeComponent | CircleLikeComponent | PixelImageReferenceComponent;
+export type ShapeComponent = ResizableBoundsComponent | FillComponent | RoundedCornerComponent | StrokeComponent | CircleLikeComponent | PixelImageReferenceComponent | PatternSizeComponent;
 
 export interface ResizableBoundsComponent {
     kind: 'resizable-bounds-component'
@@ -137,6 +137,12 @@ export interface PixelImageReferenceComponent {
     source: Bounds;
 }
 
+export interface PatternSizeComponent {
+    kind: 'pattern-size-component';
+    width: number;
+    height: number;
+}
+
 export interface PixelImageShape extends BaseShape {
     type: 'pixel-image';
     components: {
@@ -145,9 +151,18 @@ export interface PixelImageShape extends BaseShape {
     };
 }
 
+export interface RepeatingImageShape extends BaseShape {
+    type: 'repeating-image';
+    components: {
+        image: PixelImageReferenceComponent;
+        rect: ResizableBoundsComponent;
+        pattern: PatternSizeComponent;
+    };
+}
+
 /* ========== document ======== */
 
-export type Shape = RectangleShape | CircleShape | OvalShape | PixelImageShape;
+export type Shape = RectangleShape | CircleShape | OvalShape | PixelImageShape | RepeatingImageShape;
 
 export interface ShapeGroup {
     id: string;

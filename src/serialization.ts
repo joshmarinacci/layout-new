@@ -75,6 +75,7 @@ function validateSchema(value: unknown, version: 1 | 2 | 3 | 4): asserts value i
     const ids = new Set<string>();
     for (const item of doc.shapes) {
         const s = object(item);
+        if (s.type === 'repeating-image' && version !== 4) throw new Error('Repeating image shapes require document version 4');
         const expectedShapeKeys = version === 4 ? ['id', 'name', 'type', 'components', 'pageId'] : ['id', 'name', 'type', 'components'];
         if (version < 4 && Object.hasOwn(s, 'pageId')) expectedShapeKeys.push('pageId');
         keys(s, expectedShapeKeys);
@@ -83,8 +84,9 @@ function validateSchema(value: unknown, version: 1 | 2 | 3 | 4): asserts value i
         if (!s.id || ids.has(s.id as string)) throw new Error('Shape IDs must be nonempty and unique');
         ids.add(s.id as string);
         const c = object(s.components);
-        if (s.type === 'pixel-image') {
-            keys(c, ['image', 'rect']);
+        if (s.type === 'pixel-image' || s.type === 'repeating-image') {
+            if (s.type === 'pixel-image') keys(c, ['image', 'rect']);
+            else keys(c, ['image', 'rect', 'pattern']);
             const reference = component(c.image, 'pixel-image-reference', version === 1 ? ['imageId'] : ['imageId', 'source']);
             if (!imageIds.has(reference.imageId as string)) throw new Error('Missing pixel image data');
             if (version >= 2) {
@@ -100,6 +102,12 @@ function validateSchema(value: unknown, version: 1 | 2 | 3 | 4): asserts value i
             const bounds = object(component(c.rect, 'resizable-bounds-component', ['bounds']).bounds);
             keys(bounds, ['x', 'y', 'width', 'height']);
             number(bounds.x); number(bounds.y); number(bounds.width, true); number(bounds.height, true);
+            if (s.type === 'repeating-image') {
+                const pattern = component(c.pattern, 'pattern-size-component', ['width', 'height']);
+                number(pattern.width); number(pattern.height);
+                if (!Number.isInteger(pattern.width) || !Number.isInteger(pattern.height) || (pattern.width as number) <= 0 || (pattern.height as number) <= 0)
+                    throw new Error('Pattern dimensions must be positive integer pixel sizes');
+            }
             continue;
         }
         if (s.type === 'rectangle') keys(c, ['rect', 'fill', 'stroke', 'cornerRadius']);

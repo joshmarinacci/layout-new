@@ -1,4 +1,4 @@
-import type {Bounds, PixelImageData, PixelImageShape, Point} from './types';
+import type {Bounds, PixelImageData, PixelImageShape, Point, RepeatingImageShape} from './types';
 
 export const PALETTES = {
     'PICO-8': ['#000000', '#1d2b53', '#7e2553', '#008751', '#ab5236', '#5f574f', '#c2c3c7', '#fff1e8',
@@ -19,6 +19,13 @@ export function makeImageShape(imageId: string, bounds: Bounds, source: Bounds, 
     return {id: crypto.randomUUID(), pageId: 'page_1', name, type: 'pixel-image', components: {
         image: {kind: 'pixel-image-reference', imageId, source: {...source}},
         rect: {kind: 'resizable-bounds-component', bounds: {...bounds}},
+    }};
+}
+export function makeRepeatingImageShape(imageId: string, source: Bounds, bounds: Bounds, name = 'Repeating pixel art'): RepeatingImageShape {
+    return {id: crypto.randomUUID(), pageId: 'page_1', name, type: 'repeating-image', components: {
+        image: {kind: 'pixel-image-reference', imageId, source: {...source}},
+        rect: {kind: 'resizable-bounds-component', bounds: {...bounds}},
+        pattern: {kind: 'pattern-size-component', width: source.width, height: source.height},
     }};
 }
 function inside(image: Pick<PixelImageData, 'width' | 'height'>, p: Point) {

@@ -177,7 +177,7 @@ export class EditorStore {
             copy.id = crypto.randomUUID();
             copy.pageId = this.selectedPageId;
             copy.name = `${copy.name} copy`;
-            if (copy.type === 'pixel-image') {
+            if (copy.type === 'pixel-image' || copy.type === 'repeating-image') {
                 const oldId = copy.components.image.imageId;
                 let newId = imageIds.get(oldId);
                 if (!newId) { newId = crypto.randomUUID(); imageIds.set(oldId, newId); }
@@ -207,7 +207,7 @@ export class EditorStore {
     }
     pasteShapes(shapes: readonly Shape[], images: readonly PixelImageData[]) {
         this.requireIdle();
-        const referencedImageIds = new Set(shapes.filter((shape): shape is Extract<Shape, {type: 'pixel-image'}> => shape.type === 'pixel-image')
+        const referencedImageIds = new Set(shapes.filter((shape): shape is Extract<Shape, {type: 'pixel-image' | 'repeating-image'}> => shape.type === 'pixel-image' || shape.type === 'repeating-image')
             .map(shape => shape.components.image.imageId));
         const requiredImages = images.filter(image => referencedImageIds.has(image.id));
         const imageMap = new Map(requiredImages.map(image => [image.id, crypto.randomUUID()]));
@@ -216,7 +216,7 @@ export class EditorStore {
             const copy = structuredClone(original);
             copy.id = crypto.randomUUID(); copy.name = `${copy.name} copy`;
             copy.pageId = this.selectedPageId;
-            if (copy.type === 'pixel-image') {
+            if (copy.type === 'pixel-image' || copy.type === 'repeating-image') {
                 const mapped = imageMap.get(copy.components.image.imageId);
                 if (!mapped) throw new Error('Clipboard is missing a pixel image asset');
                 copy.components.image.imageId = mapped;

@@ -91,8 +91,16 @@ export function PixelImageEditor({store, imageId, source, onClose}: {store: Edit
             <div className="pixel-viewport">
                 <canvas ref={canvas} className="pixel-canvas checkerboard" aria-label="Pixel editing canvas" tabIndex={0}
                     width={image.width * zoom} height={image.height * zoom}
+                    onContextMenu={event => event.preventDefault()}
                     onPointerDown={event => {
-                        if (event.button !== 0 || stroke.current || store.getSnapshot().transactionActive) return;
+                        if (stroke.current || store.getSnapshot().transactionActive) return;
+                        if (event.button === 2) {
+                            event.preventDefault();
+                            setColor(samplePixel(image, point(event)) ?? -1);
+                            setTool('pencil');
+                            return;
+                        }
+                        if (event.button !== 0) return;
                         event.preventDefault(); event.currentTarget.focus();
                         const p = point(event);
                         if (tool === 'picker') { setColor(samplePixel(image, p)!); setTool('pencil'); return; }

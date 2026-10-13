@@ -242,6 +242,11 @@ button:disabled { opacity: 0.5; }
     overflow: auto;
 }
 .editor-dialog::backdrop { background: #0009; }
+.saved-documents { display: grid; gap: 0.5rem; min-width: min(42rem, 80vw); margin-top: 1rem; }
+.saved-document-row { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem; border: 1px solid var(--panel-border-color); }
+.saved-document-info { display: grid; flex: 1; min-width: 0; color: #c9d5d8; }
+.saved-document-info strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-document-info small { opacity: 0.7; }
 .editor-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
 .editor-dialog h2 { margin: 0; font-size: 1.15rem; }
 .editor-dialog p { font-size: 0.85rem; }

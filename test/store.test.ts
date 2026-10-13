@@ -14,7 +14,7 @@ describe('EditorStore', () => {
     it('edits the second shape, preserves old snapshots and resolves selection by ID', () => {
         const {store, document, first, second} = setup();
         const old = store.getSnapshot(); store.select(second.id);
-        store.updateShape(second.id, s => { s.name = 'edited'; if (s.type !== 'pixel-image') s.components.fill.fill.color = '#123456'; });
+        store.updateShape(second.id, s => { s.name = 'edited'; if (s.type === 'rectangle' || s.type === 'circle' || s.type === 'oval') s.components.fill.fill.color = '#123456'; });
         expect(store.getSnapshot().document.shapes.map(s => s.name)).toEqual(['first', 'edited']);
         expect(old.document.shapes[1].name).toBe('second');
         expect(document.shapes[1].name).toBe('second');

@@ -13,17 +13,21 @@ import {NewPixelImage} from './NewPixelImage';
 import {PixelImageEditor} from './PixelImageEditor';
 import {DropdownMenu} from './DropdownMenu';
 import {PixelAssetView} from './PixelAssetView';
+import {NewRepeatingImage} from './NewRepeatingImage';
+import {SavedDocumentsDialog} from './SavedDocumentsDialog';
+import {readSavedDocuments, writeSavedDocuments, type SavedDocumentRecord} from './savedDocuments';
 import './app.css';
 
-interface DocumentTab { id: string; store: EditorStore }
-function makeTab(document: DrawingDocument): DocumentTab {
-    return {id: crypto.randomUUID(), store: new EditorStore(document)};
+interface DocumentTab { id: string; store: EditorStore; savedDocumentId: string | null; savedJson: string | null }
+function makeTab(document: DrawingDocument, savedDocumentId: string | null = null, savedJson: string | null = null): DocumentTab {
+    return {id: crypto.randomUUID(), store: new EditorStore(document), savedDocumentId, savedJson};
 }
 function DocumentTabButton({tab, active, activate}: {tab: DocumentTab; active: boolean; activate: () => void}) {
     const {document} = useEditorStore(tab.store);
+    const dirty = tab.savedJson !== tab.store.toJSON();
     return <button role="tab" id={`tab-${tab.id}`} aria-selected={active} aria-controls="document-editor"
-        tabIndex={active ? 0 : -1} onClick={activate} title={document.title || 'Untitled'}>
-        {document.title || 'Untitled'}
+        tabIndex={active ? 0 : -1} onClick={activate} title={`${document.title || 'Untitled'}${dirty ? ' — unsaved in browser storage' : ' — saved in browser storage'}`}>
+        {document.title || 'Untitled'}{dirty ? ' •' : ''}
     </button>;
 }
 
@@ -63,16 +67,49 @@ export default function App() {
     const [canvasZoom, setCanvasZoom] = useState(1);
     const [imageDialog, setImageDialog] = useState<{kind: 'create' | 'import'} | {kind: 'edit'; imageId: string; source?: Bounds} | null>(null);
     const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+    const [repeatingImageDialog, setRepeatingImageDialog] = useState(false);
     const [clipboard, setClipboard] = useState<{shapes: Shape[]; images: PixelImageData[]}>({shapes: [], images: []});
     const [contextMenu, setContextMenu] = useState<{x: number; y: number} | null>(null);
     const [pageMenu, setPageMenu] = useState<{x: number; y: number; pageId: string} | null>(null);
     const [pagesMenu, setPagesMenu] = useState<{x: number; y: number} | null>(null);
+    const [savedDocumentsOpen, setSavedDocumentsOpen] = useState(false);
     const selectedAsset = doc.images.find(image => image.id === selectedAssetId);
+    const saveDocument = () => {
+        const url = URL.createObjectURL(new Blob([store.toJSON()], {type: 'application/json'}));
+        const safeTitle = doc.title.trim().replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').replace(/\s+/g, ' ').replace(/\.+$/g, '') || 'Untitled';
+        const link = document.createElement('a'); link.href = url; link.download = `${safeTitle}.json`; link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+    const saveToBrowser = () => {
+        try {
+            const json = store.toJSON();
+            const records = readSavedDocuments();
+            const id = activeTab.savedDocumentId ?? crypto.randomUUID();
+            const prior = records.find(record => record.id === id);
+            const record: SavedDocumentRecord = {id, name: prior?.name ?? (doc.title.trim() || 'Untitled'), savedAt: new Date().toISOString(), json};
+            writeSavedDocuments([...records.filter(item => item.id !== id), record]);
+            setWorkspace(current => ({...current, tabs: current.tabs.map(tab => tab.id === activeTab.id ? {...tab, savedDocumentId: id, savedJson: json} : tab)}));
+            setError('');
+        } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save to browser storage'); }
+    };
     useEffect(() => {
         const keydown = (event: KeyboardEvent) => {
             if (event.target instanceof HTMLElement && (event.target.matches('input, textarea, select') || event.target.isContentEditable)) return;
             if (store.getSnapshot().transactionActive) return;
             const key = event.key.toLowerCase();
+            if ((event.metaKey || event.ctrlKey) && !event.altKey && key === 'o') {
+                event.preventDefault();
+                if (!store.getSnapshot().transactionActive) {
+                    if (event.shiftKey) setSavedDocumentsOpen(true);
+                    else file.current?.click();
+                }
+                return;
+            }
+            if ((event.metaKey || event.ctrlKey) && !event.altKey && key === 's') {
+                event.preventDefault();
+                if (!store.getSnapshot().transactionActive) saveToBrowser();
+                return;
+            }
             if (key === 'delete' || key === 'backspace') {
                 if (!store.getSnapshot().selectedIds.length || store.getSnapshot().transactionActive) return;
                 event.preventDefault();
@@ -94,7 +131,7 @@ export default function App() {
         };
         window.addEventListener('keydown', keydown);
         return () => window.removeEventListener('keydown', keydown);
-    }, [store, selectedAssetId, state.selectedIds, doc]);
+    }, [store, selectedAssetId, state.selectedIds, doc, activeTab, workspace]);
     useEffect(() => {
         const close = () => { setContextMenu(null); setPageMenu(null); setPagesMenu(null); };
         window.addEventListener('pointerdown', close);
@@ -104,7 +141,8 @@ export default function App() {
     const getSelected = () => store.getSnapshot().document.shapes.filter(shape => store.getSnapshot().selectedIds.includes(shape.id));
     const copySelection = () => {
         const shapes = getSelected();
-        const ids = new Set(shapes.filter(shape => shape.type === 'pixel-image').map(shape => shape.components.image.imageId));
+        const ids = new Set(shapes.filter((shape): shape is Extract<Shape, {type: 'pixel-image' | 'repeating-image'}> => shape.type === 'pixel-image' || shape.type === 'repeating-image')
+            .map(shape => shape.components.image.imageId));
         setClipboard({shapes: structuredClone(shapes), images: structuredClone(store.getSnapshot().document.images.filter(image => ids.has(image.id)))});
     };
     const deleteSelection = () => {
@@ -155,14 +193,11 @@ export default function App() {
     return <div className="main-layout">
         <nav className="menubar full-span">
             <DropdownMenu title="File">
-                <button disabled={state.transactionActive} onClick={() => file.current?.click()}>Load file</button>
+                <button disabled={state.transactionActive} onClick={() => setSavedDocumentsOpen(true)}>Open from Browser <span className="menu-shortcut">⌘⇧O / Ctrl+Shift+O</span></button>
+                <button disabled={state.transactionActive} onClick={saveToBrowser}>Save to Browser <span className="menu-shortcut">⌘S / Ctrl+S</span></button>
+                <button disabled={state.transactionActive} onClick={() => file.current?.click()}>Load JSON file</button>
                 <button disabled={state.transactionActive} onClick={() => openDocument(emptyDocument())}>New Document</button>
-                <button disabled={state.transactionActive} onClick={() => {
-                    const url = URL.createObjectURL(new Blob([store.toJSON()], {type: 'application/json'}));
-                    const safeTitle = doc.title.trim().replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').replace(/\s+/g, ' ').replace(/\.+$/g, '') || 'Untitled';
-                    const link = document.createElement('a'); link.href = url; link.download = `${safeTitle}.json`; link.click();
-                    setTimeout(() => URL.revokeObjectURL(url), 1000);
-                }}>Save JSON</button>
+                <button disabled={state.transactionActive} onClick={saveDocument}>Export JSON</button>
             </DropdownMenu>
             <DropdownMenu title="Edit">
                 <button disabled={!state.selectedIds.length || state.transactionActive} onClick={duplicateSelection}>Duplicate <span className="menu-shortcut">⌘D / Ctrl+D</span></button>
@@ -186,6 +221,7 @@ export default function App() {
                 store.addShape(shape); store.select(shape.id);
             }}>New Circle</button>
             <button disabled={state.transactionActive} onClick={() => setImageDialog({kind: 'create'})}>New Pixel Image</button>
+            <button disabled={state.transactionActive || !doc.images.length} onClick={() => setRepeatingImageDialog(true)}>New Repeating Image</button>
             <button disabled={state.transactionActive} onClick={() => setImageDialog({kind: 'import'})}>Import PNG</button>
             </DropdownMenu>}
             <ul><li>{undo}</li><li>{redo}</li></ul>
@@ -254,7 +290,7 @@ export default function App() {
             <div className="right scroll-container"><PropSheet key={activeTab.id} store={store}/></div>
         </>}
         </div>
-        <div className="statusbar full-span"><span role="alert">{error}</span><span className="spacer"/><label>Scroll to pan; Ctrl/⌘+scroll to zoom; Space or middle-drag to pan. Shift-click toggles selection; drag empty canvas to select. Drag selected shapes to move; handles resize. Shift-resize images to keep proportions. Double-click a pixel image to edit.</label></div>
+        <div className="statusbar full-span"><span role="alert">{error}</span><span className="spacer"/><label>Scroll to pan; Ctrl/⌘+scroll to zoom; Space or middle-drag to pan. Shift-click toggles selection; drag empty canvas to select. Drag selected shapes to move; Option/Alt-drag to duplicate. Handles resize. Shift-resize images to keep proportions. Double-click a pixel image to edit.</label></div>
         {contextMenu && <div className="shape-context-menu" style={{left: contextMenu.x, top: contextMenu.y}} role="menu" onContextMenu={event => event.preventDefault()} onPointerDown={event => event.stopPropagation()}>
             {selectedUngrouped && <button role="menuitem" onClick={() => { groupSelection(); setContextMenu(null); }}>Group</button>}
             {selectedGrouped && <button role="menuitem" onClick={() => { ungroupSelection(); setContextMenu(null); }}>Ungroup</button>}
@@ -270,6 +306,7 @@ export default function App() {
             <button role="menuitem" onClick={() => createPageRect(pageMenu.pageId)}>New Rectangle</button>
             <button role="menuitem" onClick={() => createPageCircle(pageMenu.pageId)}>New Circle</button>
             <button role="menuitem" onClick={() => { store.selectPage(pageMenu.pageId); setPageMenu(null); setImageDialog({kind: 'create'}); }}>New Pixel Image</button>
+            <button role="menuitem" disabled={!doc.images.length} onClick={() => { store.selectPage(pageMenu.pageId); setPageMenu(null); setRepeatingImageDialog(true); }}>New Repeating Image</button>
             <button role="menuitem" onClick={() => { store.selectPage(pageMenu.pageId); setPageMenu(null); setImageDialog({kind: 'import'}); }}>Import PNG</button>
         </div>}
         {pagesMenu && <div className="shape-context-menu" style={{left: pagesMenu.x, top: pagesMenu.y}} role="menu" aria-label="Pages actions" onContextMenu={event => event.preventDefault()} onPointerDown={event => event.stopPropagation()}>
@@ -278,5 +315,21 @@ export default function App() {
         {imageDialog?.kind === 'import' && <ImportPixelImage store={store} onClose={() => setImageDialog(null)}/>}
         {imageDialog?.kind === 'create' && <NewPixelImage store={store} onClose={() => setImageDialog(null)} onCreated={imageId => setImageDialog({kind: 'edit', imageId})}/>}
         {imageDialog?.kind === 'edit' && <PixelImageEditor key={imageDialog.imageId} store={store} imageId={imageDialog.imageId} source={imageDialog.source} onClose={() => setImageDialog(null)}/>}
+        {repeatingImageDialog && <NewRepeatingImage store={store} onClose={() => setRepeatingImageDialog(false)}/>}
+        {savedDocumentsOpen && <SavedDocumentsDialog onClose={() => setSavedDocumentsOpen(false)} onChanged={records => {
+            const remaining = new Set(records.map(record => record.id));
+            setWorkspace(current => ({...current, tabs: current.tabs.map(tab => tab.savedDocumentId && !remaining.has(tab.savedDocumentId)
+                ? {...tab, savedDocumentId: null, savedJson: null} : tab)}));
+            setError('');
+        }}
+            onOpen={record => {
+                try {
+                    const tab = makeTab(deserializeDocument(record.json), record.id, record.json);
+                    finishEditing();
+                    setWorkspace(current => ({tabs: [...current.tabs, tab], activeId: tab.id}));
+                    setSavedDocumentsOpen(false); setError('');
+                }
+                catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to open saved document'); }
+            }}/>}
     </div>;
 }

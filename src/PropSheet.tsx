@@ -61,6 +61,10 @@ export default function PropSheet({store}: {store: EditorStore}) {
                 (c, value) => { if (c.kind === 'rounded-corner-component' || c.kind === 'circle-like-component') c.radius = Number(value); }, 'number', true)}
             {comp.kind === 'circle-like-component' && (['x', 'y'] as const).map(name => field(key, `Center ${name}`, c => c.kind === 'circle-like-component' ? c.center[name] : '',
                 (c, value) => { if (c.kind === 'circle-like-component') c.center[name] = Number(value); }))}
+            {comp.kind === 'pixel-image-reference' && (['x', 'y', 'width', 'height'] as const).map(name => field(key, `Source ${name}`, c => c.kind === 'pixel-image-reference' ? c.source[name] : '',
+                (c, value) => { if (c.kind === 'pixel-image-reference') c.source[name] = Math.round(Number(value)); }, 'number', name === 'width' || name === 'height'))}
+            {comp.kind === 'pattern-size-component' && (['width', 'height'] as const).map(name => field(key, `Repeat ${name}`, c => c.kind === 'pattern-size-component' ? c[name] : '',
+                (c, value) => { if (c.kind === 'pattern-size-component') c[name] = Math.max(1, Math.round(Number(value))); }, 'number', true))}
         </div></details>)}
     </div>;
 }

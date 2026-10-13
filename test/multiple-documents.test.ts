@@ -19,7 +19,7 @@ describe('independent document stores', () => {
 
         a.select(rectangle.id);
         a.updateShape(rectangle.id, shape => {
-            if (shape.type !== 'pixel-image') shape.components.fill.fill.color = '#abcdef';
+            if (shape.type === 'rectangle' || shape.type === 'circle' || shape.type === 'oval') shape.components.fill.fill.color = '#abcdef';
             if (shape.type === 'rectangle') shape.components.rect.bounds.x = 500;
         });
         a.removeShape(circle.id);
