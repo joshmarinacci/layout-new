@@ -52,6 +52,7 @@ export default function PropSheet({store}: {store: EditorStore}) {
         {common.map(([key, comp]) => <details open key={key}><summary>{key}</summary><div className="prop-sheet-panel">
             {comp.kind === 'resizable-bounds-component' && (['x', 'y', 'width', 'height'] as const).map(name => field(key, name,
                 c => c.kind === 'resizable-bounds-component' ? c.bounds[name] : '', (c, value) => { if (c.kind === 'resizable-bounds-component') c.bounds[name] = Number(value); }, 'number', name === 'width' || name === 'height'))}
+            {comp.kind === 'vector-network' && <p>{comp.points.length} points · {comp.segments.length} segments · {comp.regions.length} regions. Double-click the shape or choose Edit Vector to edit paths and fills.</p>}
             {comp.kind === 'fill-component' && field(key, 'Fill color', c => c.kind === 'fill-component' ? c.fill.color : '',
                 (c, value) => { if (c.kind === 'fill-component') c.fill.color = value; }, 'color')}
             {comp.kind === 'stroke-component' && <>

@@ -1,3 +1,4 @@
+import {makeVector} from './vectorNetworks';
 import {useEffect, useRef, useState, type MouseEvent} from 'react';
 import TreeView from './TreeView';
 import PropSheet from './PropSheet';
@@ -68,8 +69,14 @@ export default function App() {
     const [leftPanelVisible, setLeftPanelVisible] = useState(true);
     const [rightPanelVisible, setRightPanelVisible] = useState(true);
     const [imageDialog, setImageDialog] = useState<{kind: 'create' | 'import'} | {kind: 'edit'; imageId: string; source?: Bounds; palettePosition?: {x: number; y: number}; imageScreenRect?: Bounds} | null>(null);
-    const [pixelEditor, setPixelEditor] = useState<PixelEditorController | null>(null);
     const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+    const [vectorId, setVectorId] = useState<string | null>(null);
+    useEffect(() => { setVectorId(null); setImageDialog(null); setPixelEditor(null); }, [store, state.selectedPageId]);
+    useEffect(() => { if (vectorId && (!doc.shapes.some(s => s.id === vectorId) || !state.selectedIds.includes(vectorId) || selectedAssetId)) setVectorId(null); }, [doc, state.selectedIds, vectorId, selectedAssetId]);
+    const createVector = (pageId = state.selectedPageId) => {
+        store.selectPage(pageId); const shape = makeVector(); store.addShape(shape); store.select(shape.id); setImageDialog(null); setPixelEditor(null); setVectorId(shape.id); setPageMenu(null);
+    };
+    const [pixelEditor, setPixelEditor] = useState<PixelEditorController | null>(null);
     const [repeatingImageDialog, setRepeatingImageDialog] = useState(false);
     const [clipboard, setClipboard] = useState<{shapes: Shape[]; images: PixelImageData[]}>({shapes: [], images: []});
     const [contextMenu, setContextMenu] = useState<{x: number; y: number} | null>(null);
@@ -119,6 +126,7 @@ export default function App() {
                 if (!store.getSnapshot().transactionActive) saveToBrowser();
                 return;
             }
+            if (vectorId && (key === 'delete' || key === 'backspace' || ((event.metaKey || event.ctrlKey) && ['d', 'x', 'c', 'v'].includes(key)))) return;
             if (key === 'delete' || key === 'backspace') {
                 if (!store.getSnapshot().selectedIds.length || store.getSnapshot().transactionActive) return;
                 event.preventDefault();
@@ -140,7 +148,7 @@ export default function App() {
         };
         window.addEventListener('keydown', keydown);
         return () => window.removeEventListener('keydown', keydown);
-    }, [store, selectedAssetId, state.selectedIds, doc, activeTab, workspace, imageDialog, pixelEditor]);
+    }, [store, selectedAssetId, state.selectedIds, doc, activeTab, workspace, imageDialog, pixelEditor, vectorId]);
     useEffect(() => {
         const close = () => { setContextMenu(null); setPageMenu(null); setPagesMenu(null); };
         window.addEventListener('pointerdown', close);
@@ -221,6 +229,7 @@ export default function App() {
                 <button disabled={doc.pages.length <= 1 || state.transactionActive} onClick={() => store.deletePage(state.selectedPageId)}>Delete Page</button>
             </DropdownMenu>
             {!selectedAsset && <DropdownMenu title="Shape">
+            <button disabled={state.transactionActive} onClick={() => createVector()}>New Vector Network</button>
             <button disabled={state.transactionActive} onClick={() => {
                 const shape = makeRect('rect', {x: 50, y: 250, width: 50, height: 50});
                 store.addShape(shape); store.select(shape.id);
@@ -275,6 +284,7 @@ export default function App() {
                 <button aria-label="Zoom in" title="Zoom in" disabled={canvasZoom >= 4} onClick={() => setCanvasZoom(value => Math.min(4, value * 1.25))}>+</button>
                 <button onClick={() => setCanvasZoom(1)}>Reset zoom</button>
             </div>}
+            {!selectedAsset && selectedShapes.length === 1 && selected?.type === 'vector' && <button disabled={state.transactionActive} onClick={() => { setImageDialog(null); setPixelEditor(null); setVectorId(selected.id); }}>Edit Vector</button>}
             {!selectedAsset && selectedShapes.length === 1 && selected?.type === 'pixel-image' && <>
                 <button disabled={state.transactionActive} onClick={() => setImageDialog({kind: 'edit', imageId: selected.components.image.imageId, source: selected.components.image.source})}>Edit Pixels</button>
                 <button disabled={state.transactionActive} onClick={() => store.select(store.linkImageShape(selected.id))}>Linked Copy</button>
@@ -293,7 +303,7 @@ export default function App() {
             onReorderPage={(id, targetId, position) => store.reorderPage(id, targetId, position)}
             onReorderShape={(pageId, id, targetId, position) => store.reorderShapes(pageId, id, targetId, position)}/></div>
         {selectedAsset ? <div className="asset-center scroll-container"><PixelAssetView store={store} image={selectedAsset} onBack={() => setSelectedAssetId(null)}/></div> : <>
-            <div className={`center${imageDialog?.kind === 'edit' ? ' pixel-edit-active' : ''}`}><VisualEditor key={activeTab.id} store={store} zoom={canvasZoom} onZoomChange={setCanvasZoom} pixelEditor={pixelEditor} onEditImage={(reference, palettePosition, imageScreenRect) => setImageDialog({kind: 'edit', imageId: reference.imageId, source: reference.source, palettePosition, imageScreenRect})} onShapeContextMenu={showShapeContextMenu} onCanvasContextMenu={event => {
+            <div className={`center${imageDialog?.kind === 'edit' ? ' pixel-edit-active' : ''}`}><VisualEditor key={activeTab.id} store={store} zoom={canvasZoom} onZoomChange={setCanvasZoom} vectorId={vectorId} onEditVector={setVectorId} pixelEditor={pixelEditor} onEditImage={(reference, palettePosition, imageScreenRect) => { setVectorId(null); setImageDialog({kind: 'edit', imageId: reference.imageId, source: reference.source, palettePosition, imageScreenRect}); }} onShapeContextMenu={showShapeContextMenu} onCanvasContextMenu={event => {
                 event.preventDefault();
                 setContextMenu(null);
                 setPageMenu({x: event.clientX, y: event.clientY, pageId: state.selectedPageId});
@@ -301,7 +311,7 @@ export default function App() {
             <div className="right scroll-container"><PropSheet key={activeTab.id} store={store}/></div>
         </>}
         </div>
-        <div className="statusbar full-span"><span role="alert">{error}</span><span className="spacer"/><label>Scroll to pan; Ctrl/⌘+scroll to zoom; Space or middle-drag to pan. Shift-click toggles selection; drag empty canvas to select. Drag selected shapes to move; Option/Alt-drag to duplicate. Handles resize. Shift-resize images to keep proportions. Double-click a pixel image to edit.</label></div>
+        <div className="statusbar full-span"><span role="alert">{error}</span><span className="spacer"/><label>Scroll to pan; Ctrl/⌘+scroll to zoom; Space or middle-drag to pan. Shift-click toggles selection; drag empty canvas to select. Drag selected shapes to move; Option/Alt-drag to duplicate. Handles resize. Shift-resize images to keep proportions. Double-click a pixel image or vector network to edit.</label></div>
         {contextMenu && <div className="shape-context-menu" style={{left: contextMenu.x, top: contextMenu.y}} role="menu" onContextMenu={event => event.preventDefault()} onPointerDown={event => event.stopPropagation()}>
             {selectedUngrouped && <button role="menuitem" onClick={() => { groupSelection(); setContextMenu(null); }}>Group</button>}
             {selectedGrouped && <button role="menuitem" onClick={() => { ungroupSelection(); setContextMenu(null); }}>Ungroup</button>}
@@ -316,6 +326,7 @@ export default function App() {
             <button role="menuitem" disabled={doc.pages.length <= 1} onClick={() => { store.deletePage(pageMenu.pageId); setPageMenu(null); }}>Delete Page</button>
             <button role="menuitem" onClick={() => createPageRect(pageMenu.pageId)}>New Rectangle</button>
             <button role="menuitem" onClick={() => createPageCircle(pageMenu.pageId)}>New Circle</button>
+            <button role="menuitem" onClick={() => createVector(pageMenu.pageId)}>New Vector Network</button>
             <button role="menuitem" onClick={() => { store.selectPage(pageMenu.pageId); setPageMenu(null); setImageDialog({kind: 'create'}); }}>New Pixel Image</button>
             <button role="menuitem" disabled={!doc.images.length} onClick={() => { store.selectPage(pageMenu.pageId); setPageMenu(null); setRepeatingImageDialog(true); }}>New Repeating Image</button>
             <button role="menuitem" onClick={() => { store.selectPage(pageMenu.pageId); setPageMenu(null); setImageDialog({kind: 'import'}); }}>Import PNG</button>

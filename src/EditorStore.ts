@@ -1,3 +1,5 @@
+import {reconcileRegions} from './vectorNetworks';
+import type {VectorNetwork} from './types';
 import {applyPatches, enablePatches, freeze, produceWithPatches, type Draft, type Patch} from 'immer';
 import type {Document, Shape, PixelImageData} from './types';
 import {convertImportedPixels, type DecodedPixels, type TileSize} from './pngImport';
@@ -15,7 +17,7 @@ export interface EditorSnapshot {
     readonly transactionActive: boolean;
     readonly selectedPageId: string;
 }
-export const emptyDocument = (): Document => ({version: 4, images: [], title: 'Untitled', shapes: [], pages: [{id: 'page_1', name: 'Page 1', groups: []}]});
+export const emptyDocument = (): Document => ({version: 5, images: [], title: 'Untitled', shapes: [], pages: [{id: 'page_1', name: 'Page 1', groups: []}]});
 
 export class EditorStore {
     private document: Document;
@@ -184,6 +186,8 @@ export class EditorStore {
                 copy.components.image.imageId = newId;
                 copy.components.rect.bounds.x += 20;
                 copy.components.rect.bounds.y += 20;
+            } else if (copy.type === 'vector') {
+                copy.components.network.origin.x += 20; copy.components.network.origin.y += 20;
             } else if (copy.type === 'circle') {
                 copy.components.circle.center.x += 20;
                 copy.components.circle.center.y += 20;
@@ -221,7 +225,8 @@ export class EditorStore {
                 if (!mapped) throw new Error('Clipboard is missing a pixel image asset');
                 copy.components.image.imageId = mapped;
             }
-            if (copy.type === 'circle') { copy.components.circle.center.x += 20; copy.components.circle.center.y += 20; }
+            if (copy.type === 'vector') { copy.components.network.origin.x += 20; copy.components.network.origin.y += 20; }
+            else if (copy.type === 'circle') { copy.components.circle.center.x += 20; copy.components.circle.center.y += 20; }
             else if (copy.type === 'rectangle') { copy.components.rect.bounds.x += 20; copy.components.rect.bounds.y += 20; }
             else if (copy.type === 'oval') { copy.components.oval.bounds.x += 20; copy.components.oval.bounds.y += 20; }
             else { copy.components.rect.bounds.x += 20; copy.components.rect.bounds.y += 20; }
@@ -238,6 +243,16 @@ export class EditorStore {
             if (!shape) throw new Error('Unknown shape');
             recipe(shape);
             if (shape.id !== id) throw new Error('Shape IDs cannot be edited');
+        });
+    }
+    updateVector(id: string, recipe: (network: VectorNetwork) => void, baseline?: VectorNetwork) {
+        const shape = this.document.shapes.find(s => s.id === id);
+        if (shape?.type !== 'vector') throw new Error('Expected a vector shape');
+        const before = baseline ?? shape.components.network;
+        this.updateShape(id, draft => {
+            if (draft.type !== 'vector') return;
+            recipe(draft.components.network);
+            reconcileRegions(draft.components.network, before);
         });
     }
     createPixelImage(width: number, height: number, palette: readonly string[]) {
@@ -296,6 +311,10 @@ export class EditorStore {
             const index = draft.shapes.findIndex(s => s.id === id);
             if (index < 0) throw new Error('Unknown shape');
             draft.shapes.splice(index, 1);
+            for (const page of draft.pages) page.groups = page.groups.flatMap(group => {
+                const shapeIds = group.shapeIds.filter(member => member !== id);
+                return shapeIds.length ? [{...group, shapeIds}] : [];
+            });
         });
     }
     beginTransaction(label: string) {
@@ -309,6 +328,7 @@ export class EditorStore {
         // Reconcile once against the baseline: bounded by changed shapes/images, not pointer events.
         const [next, patches, inversePatches] = produceWithPatches(transaction.before, draft => {
             draft.title = final.title;
+            if (JSON.stringify(transaction.before.pages) !== JSON.stringify(final.pages)) draft.pages = final.pages;
             draft.images.length = final.images.length;
             final.images.forEach((image, i) => {
                 if (JSON.stringify(transaction.before.images[i]) !== JSON.stringify(image)) draft.images[i] = image;

@@ -1,3 +1,6 @@
+import {useVectorEditor} from './VectorEditor';
+import {drawVector, vectorBounds, vectorHit, resizeVector} from './vectorNetworks';
+import type {VectorNetwork} from './types';
 import {useEffect, useRef, useState, type MouseEvent, type PointerEvent} from 'react';
 import type {Bounds, Shape, CircleLikeComponent, PixelImageReferenceComponent, PixelImageData} from './types';
 import type {EditorStore} from './EditorStore';
@@ -8,6 +11,7 @@ import type {PixelEditorController} from './PixelImageEditor';
 
 export function selectionBounds(shape: Shape): Bounds {
     switch (shape.type) {
+        case 'vector': return vectorBounds(shape.components.network);
         case 'pixel-image': return shape.components.rect.bounds;
         case 'repeating-image': return shape.components.rect.bounds;
         case 'rectangle': return shape.components.rect.bounds;
@@ -16,14 +20,16 @@ export function selectionBounds(shape: Shape): Bounds {
     }
 }
 const clampZoom = (zoom: number) => Math.max(0.25, Math.min(4, zoom));
-export default function VisualEditor({store, onEditImage, onShapeContextMenu, onCanvasContextMenu, zoom, onZoomChange, pixelEditor}: {store: EditorStore; onEditImage: (reference: PixelImageReferenceComponent, position: {x: number; y: number}, imageRect: Bounds) => void; onShapeContextMenu: (event: MouseEvent<HTMLCanvasElement>, shape: Shape) => void; onCanvasContextMenu: (event: MouseEvent<HTMLCanvasElement>) => void; zoom: number; onZoomChange: (zoom: number) => void; pixelEditor?: PixelEditorController | null}) {
+export default function VisualEditor({store, onEditImage, onShapeContextMenu, onCanvasContextMenu, zoom, onZoomChange, pixelEditor, vectorId, onEditVector}: {store: EditorStore; onEditImage: (reference: PixelImageReferenceComponent, position: {x: number; y: number}, imageRect: Bounds) => void; onShapeContextMenu: (event: MouseEvent<HTMLCanvasElement>, shape: Shape) => void; onCanvasContextMenu: (event: MouseEvent<HTMLCanvasElement>) => void; zoom: number; onZoomChange: (zoom: number) => void; pixelEditor?: PixelEditorController | null; vectorId: string | null; onEditVector: (id: string | null) => void}) {
     const state = useEditorStore(store);
+    const vectorShape = state.document.shapes.find(s => s.id === vectorId && s.type === 'vector' && s.pageId === state.selectedPageId);
+    const vector = useVectorEditor(store, vectorShape?.type === 'vector' ? vectorShape : undefined, zoom, () => onEditVector(null));
     const ref = useRef<HTMLCanvasElement>(null);
     const viewport = useRef<HTMLDivElement>(null);
     const spacePan = useRef(false);
     const bitmaps = useRef(new WeakMap<PixelImageData, HTMLCanvasElement>());
     const pixelTargetId = useRef<string | null>(null);
-    const gesture = useRef<{kind: 'move' | 'resize' | 'marquee' | 'pan'; ids: string[]; pointer: number; x: number; y: number; bounds: Bounds[]; circles?: Map<string, CircleLikeComponent>; additive?: boolean; scrollX?: number; scrollY?: number; duplicate?: boolean; duplicateStarted?: boolean} | null>(null);
+    const gesture = useRef<{kind: 'move' | 'resize' | 'marquee' | 'pan'; ids: string[]; pointer: number; x: number; y: number; bounds: Bounds[]; vectors?: Map<string, VectorNetwork>; circles?: Map<string, CircleLikeComponent>; additive?: boolean; scrollX?: number; scrollY?: number; duplicate?: boolean; duplicateStarted?: boolean} | null>(null);
     const [marquee, setMarquee] = useState<Bounds | null>(null);
     useEffect(() => {
         const canvas = ref.current; const ctx = canvas?.getContext('2d'); if (!ctx || !canvas) return;
@@ -45,7 +51,7 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
         ctx.imageSmoothingEnabled = false;
         state.document.shapes.filter(shape => shape.pageId === state.selectedPageId).forEach(shape => {
             const b = selectionBounds(shape);
-            if (shape.type === 'pixel-image') {
+            if (shape.type === 'vector') { drawVector(ctx, shape); } else if (shape.type === 'pixel-image') {
                 const bitmap = images.get(shape.components.image.imageId);
                 if (bitmap) {
                     const region = shape.components.image.source ?? {x: 0, y: 0, width: bitmap.width, height: bitmap.height};
@@ -80,13 +86,13 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
                 ctx.lineWidth = shape.components.stroke.width; ctx.strokeStyle = shape.components.stroke.color;
                 if (ctx.lineWidth > 0 && shape.components.stroke.width > 0) ctx.stroke();
             }
-            if (state.selectedIds.includes(shape.id) && !pixelEditor) {
+            if (state.selectedIds.includes(shape.id) && !pixelEditor && !vectorShape) {
                 ctx.strokeStyle = 'yellow'; ctx.lineWidth = 2 / zoom; ctx.strokeRect(b.x, b.y, b.width, b.height);
                 if (shape.id === state.selectedId && shape.type === 'circle') {
                     ctx.fillStyle = 'yellow';
                     circleHandles(shape.components.circle).forEach(handle => ctx.fillRect(handle.x - 5 / zoom, handle.y - 5 / zoom, 10 / zoom, 10 / zoom));
                 }
-                if (shape.id === state.selectedId && (shape.type === 'rectangle' || shape.type === 'pixel-image' || shape.type === 'repeating-image')) { ctx.fillStyle = 'yellow'; ctx.fillRect(b.x + b.width - 5 / zoom, b.y + b.height - 5 / zoom, 10 / zoom, 10 / zoom); }
+                if (shape.id === state.selectedId && (shape.type === 'vector' || shape.type === 'rectangle' || shape.type === 'pixel-image' || shape.type === 'repeating-image')) { ctx.fillStyle = 'yellow'; ctx.fillRect(b.x + b.width - 5 / zoom, b.y + b.height - 5 / zoom, 10 / zoom, 10 / zoom); }
             }
             if (pixelEditor?.imageId === (shape.type === 'pixel-image' ? shape.components.image.imageId : '') && pixelEditor.grid) {
                 const editingImage = pixelEditor.image;
@@ -98,8 +104,9 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
                 }
             }
         });
+        vector.draw(ctx);
         if (marquee) { ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#f0df00'; ctx.fillStyle = '#f0df0030'; ctx.lineWidth = 1; ctx.fillRect(marquee.x, marquee.y, marquee.width, marquee.height); ctx.strokeRect(marquee.x, marquee.y, marquee.width, marquee.height); ctx.restore(); }
-    }, [state.document, state.selectedId, state.selectedIds, state.selectedPageId, marquee, zoom, pixelEditor]);
+    }, [state.document, state.selectedId, state.selectedIds, state.selectedPageId, marquee, zoom, pixelEditor, vector]);
     useEffect(() => () => { if (gesture.current) { gesture.current = null; if (store.getSnapshot().transactionActive) store.cancelTransaction(); } }, [store]);
     const point = (event: PointerEvent<HTMLCanvasElement>) => {
         const rect = event.currentTarget.getBoundingClientRect();
@@ -141,9 +148,11 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
     <canvas aria-label="Drawing canvas" tabIndex={0} ref={ref} width={1024 * zoom * (window.devicePixelRatio || 1)} height={1024 * zoom * (window.devicePixelRatio || 1)} style={{width: 1024 * zoom, height: 1024 * zoom, touchAction: 'none'}}
         onContextMenu={event => {
             event.preventDefault();
+            if (vectorShape) return;
             const rect = event.currentTarget.getBoundingClientRect();
             const p = {x: (event.clientX - rect.left) / zoom, y: (event.clientY - rect.top) / zoom};
             const shape = [...state.document.shapes].reverse().filter(item => item.pageId === state.selectedPageId).find(item => {
+                if (item.type === 'vector') return vectorHit(item, p, 8 / zoom);
                 if (item.type === 'circle') return circleContains(item.components.circle, p);
                 const b = selectionBounds(item);
                 return p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + b.height;
@@ -158,14 +167,16 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
             else onCanvasContextMenu(event);
         }}
         onDoubleClick={event => {
-            if (pixelEditor) return;
+            if (pixelEditor || vectorShape) return;
             const rect = event.currentTarget.getBoundingClientRect();
             const p = {x: (event.clientX - rect.left) / zoom, y: (event.clientY - rect.top) / zoom};
-            const shape = [...store.getSnapshot().document.shapes].reverse().find(s => {
+            const shape = [...store.getSnapshot().document.shapes].reverse().filter(s => s.pageId === state.selectedPageId).find(s => {
+                if (s.type === 'vector') return vectorHit(s, p, 8 / zoom);
                 if (s.type === 'circle') return circleContains(s.components.circle, p);
                 const b = selectionBounds(s);
                 return p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + b.height;
             });
+            if (shape?.type === 'vector') { finish(false); store.select(shape.id); onEditVector(shape.id); return; }
             if (shape?.type === 'pixel-image') {
                 finish(false);
                 const view = viewport.current;
@@ -180,7 +191,7 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
                 onEditImage(shape.components.image, position, {x: bounds.x * zoom, y: bounds.y * zoom, width: bounds.width * zoom, height: bounds.height * zoom});
             }
         }}
-        onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); finish(true); } }}
+        onKeyDown={event => { if (event.key === 'Enter' && !vectorShape) { const s = state.document.shapes.find(s => s.id === state.selectedId); if (s?.type === 'vector') { event.preventDefault(); onEditVector(s.id); } } if (event.key === 'Escape') { event.preventDefault(); finish(true); } }}
         onKeyDownCapture={event => { if (event.code === 'Space') { spacePan.current = true; event.preventDefault(); } }}
         onKeyUpCapture={event => { if (event.code === 'Space') spacePan.current = false; }}
         onPointerDown={event => {
@@ -197,6 +208,7 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
             if (event.button !== 0) return;
             event.preventDefault();
             event.currentTarget.focus({preventScroll: true});
+            if (vectorShape) { vector.pointerDown(point(event), event.pointerId, event.shiftKey); if (vector.active(event.pointerId)) event.currentTarget.setPointerCapture(event.pointerId); return; }
             if (pixelEditor) {
                 if (store.getSnapshot().transactionActive) return;
                 const p = point(event);
@@ -216,9 +228,10 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
             const circleHandle = selected?.type === 'circle' && circleHandles(selected.components.circle)
                 .some(handle => Math.abs(p.x - handle.x) <= hitTolerance && Math.abs(p.y - handle.y) <= hitTolerance);
             const selectedBounds = selected ? selectionBounds(selected) : null;
-            const boxHandle = (selected?.type === 'rectangle' || selected?.type === 'pixel-image' || selected?.type === 'repeating-image') && selectedBounds &&
+            const boxHandle = (selected?.type === 'vector' || selected?.type === 'rectangle' || selected?.type === 'pixel-image' || selected?.type === 'repeating-image') && selectedBounds &&
                 Math.abs(p.x - selectedBounds.x - selectedBounds.width) <= hitTolerance && Math.abs(p.y - selectedBounds.y - selectedBounds.height) <= hitTolerance;
             const shape = circleHandle || boxHandle ? selected : [...state.document.shapes].reverse().filter(s => s.pageId === state.selectedPageId).find(s => {
+                if (s.type === 'vector') return vectorHit(s, p, 8 / zoom);
                 if (s.type === 'circle') return circleContains(s.components.circle, p);
                 const b = selectionBounds(s);
                 return p.x >= b.x && p.x <= b.x + b.width && p.y >= b.y && p.y <= b.y + b.height;
@@ -248,10 +261,12 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
                 : targets;
             gesture.current = {kind: resize ? 'resize' : 'move', ids: gestureTargets.map(target => target.id), pointer: event.pointerId, ...p,
                 bounds: gestureTargets.map(selectionBounds),
+                vectors: new Map(gestureTargets.flatMap(t => t.type === 'vector' ? [[t.id, t.components.network] as const] : [])),
                 circles: new Map(gestureTargets.flatMap(target => target.type === 'circle' ? [[target.id, target.components.circle] as const] : []))};
             event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={event => {
+            if (vectorShape && gesture.current?.kind !== 'pan') { vector.pointerMove(point(event), event.pointerId); return; }
             if (pixelEditor?.isActive(event.pointerId)) {
                 const pointOnCanvas = point(event);
                 const shape = state.document.shapes.find(item => item.id === pixelTargetId.current);
@@ -267,6 +282,12 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
             if (g.kind === 'marquee') { setMarquee({x: Math.min(g.x, p.x), y: Math.min(g.y, p.y), width: Math.abs(dx), height: Math.abs(dy)}); return; }
             g.ids.forEach((id, index) => store.updateShape(id, shape => {
                 const bounds = g.bounds[index];
+                const network = g.vectors?.get(id);
+                if (shape.type === 'vector' && network) {
+                    if (g.kind === 'resize') resizeVector(shape.components.network, network, bounds.width + dx, bounds.height + dy);
+                    else shape.components.network.origin = {x: network.origin.x + dx, y: network.origin.y + dy};
+                    return;
+                }
                 const circle = g.circles?.get(id);
                 if (shape.type === 'circle' && circle) {
                     shape.components.circle = dragCircle(circle, g, p, g.kind === 'resize' && g.ids.length === 1);
@@ -278,6 +299,7 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
             }));
         }}
         onPointerUp={event => {
+            if (vector.active(event.pointerId)) { vector.pointerUp(point(event), event.pointerId); if (ref.current?.hasPointerCapture(event.pointerId)) ref.current.releasePointerCapture(event.pointerId); return; }
             if (pixelEditor?.isActive(event.pointerId)) {
                 const pointOnCanvas = point(event);
                 const shape = state.document.shapes.find(item => item.id === pixelTargetId.current);
@@ -299,6 +321,6 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
             gesture.current = null;
             if (ref.current?.hasPointerCapture(event.pointerId)) ref.current.releasePointerCapture(event.pointerId);
         }}
-        onPointerCancel={event => { pixelEditor?.cancel(); finish(true); }} onLostPointerCapture={() => { pixelEditor?.cancel(); finish(true); }} onBlur={() => { pixelEditor?.cancel(); finish(true); }}/ >;
-    </div>;
+        onPointerCancel={event => { pixelEditor?.cancel(); vector.cancel(); finish(true); }} onLostPointerCapture={() => { pixelEditor?.cancel(); vector.cancel(); finish(true); }} onBlur={() => { pixelEditor?.cancel(); vector.cancel(); finish(true); }}/>
+    {vector.palette}</div>;
 }

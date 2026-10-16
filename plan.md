@@ -104,3 +104,18 @@ Strict TypeScript, production build, and whitespace checks pass. Tests and brows
 Made the document, Shapes, and Assets tree nodes collapsible, with nested structure prepared for future group and page nodes. JSON saves now use a filesystem-safe document title as the filename and fall back to `Untitled.json` for blank titles.
 
 Strict TypeScript, production build, and whitespace checks pass. No tests were run for this increment.
+
+
+## Vector networks — 2026-10-16, implemented on codex/vector-networks
+
+1. Added a version-5 serializable graph model: stable local point/segment IDs, cubic controls, smooth segment pairs, region boundary spans and independent fills.
+2. Added pure geometry helpers and planar region discovery, including branches, crossings, nested holes, cubic subdivision, bounds, hit testing and transformations.
+3. Added fill reconciliation for movement, region splitting/merging, opened boundaries, and gesture cancellation.
+4. Integrated store transactions, schema migration/validation, independent duplication/paste, page/group behavior, and history.
+5. Added canvas rendering, shape movement/resizing, and double-click/Enter/Edit Vector entry.
+6. Added the floating vector palette with Pen, Select, Curve, Insert point, Join crossing, Connect/Merge, Smooth pair/Corner, deletion, region fill, stroke, undo/redo and Done.
+7. Added model tests, the runnable JSON example, and `docs/vector-networks.md`. Browser checks and numerical limits are recorded in that guide.
+
+Deferred extensions: gradients, SVG import/export, inter-shape boolean operations, variable-width strokes, and primitive-to-network conversion.
+
+Vector network validation: 109 tests pass across eight files; strict TypeScript, production build, and Git whitespace checks pass. Browser verification covers drawing, independent fills, holes, double-click editing, curve handles, undo/redo, JSON loading, and zoom. See the guide for the remaining verification boundaries.
