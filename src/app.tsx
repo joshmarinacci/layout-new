@@ -206,10 +206,12 @@ export default function App() {
     return <div className="main-layout">
         <nav className="menubar full-span">
             <DropdownMenu title="File">
-                <MenuItem disabled={state.transactionActive} onClick={() => setSavedDocumentsOpen(true)} label="Open from Browser" shortcut="⌘⇧O / Ctrl+Shift+O"/>
-                <MenuItem disabled={state.transactionActive} onClick={saveToBrowser} label="Save to Browser" shortcut="⌘S / Ctrl+S"/>
-                <button disabled={state.transactionActive} onClick={() => file.current?.click()}>Load JSON file</button>
                 <button disabled={state.transactionActive} onClick={() => openDocument(emptyDocument())}>New Document</button>
+                <hr className="menu-separator" aria-hidden="true"/>
+                <MenuItem disabled={state.transactionActive} onClick={() => setSavedDocumentsOpen(true)} label="Open from Browser" shortcut="⌘⇧O / Ctrl+Shift+O"/>
+                <button disabled={state.transactionActive} onClick={() => file.current?.click()}>Load JSON file</button>
+                <hr className="menu-separator" aria-hidden="true"/>
+                <MenuItem disabled={state.transactionActive} onClick={saveToBrowser} label="Save to Browser" shortcut="⌘S / Ctrl+S"/>
                 <button disabled={state.transactionActive} onClick={saveDocument}>Export JSON</button>
             </DropdownMenu>
             <DropdownMenu title="Edit">
