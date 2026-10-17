@@ -1,3 +1,4 @@
+import {SelectControl} from './ui/controls';
 import {useState} from 'react';
 import type {EditorStore} from './EditorStore';
 import {EditorDialog} from './EditorDialog';
@@ -15,9 +16,9 @@ export function NewRepeatingImage({store, onClose}: {store: EditorStore; onClose
                 {x: 50, y: 50, width: 320, height: 240}, `${image.name} pattern`);
             store.addShape(shape); store.select(shape.id); onClose();
         }}>
-            <label>Image asset<select autoFocus value={imageId} onChange={event => setImageId(event.target.value)}>
+            <label>Image asset<SelectControl autoFocus value={imageId} onChange={event => setImageId(event.target.value)}>
                 {images.map(item => <option key={item.id} value={item.id}>{item.name} ({item.width} × {item.height})</option>)}
-            </select></label>
+            </SelectControl></label>
             {image && <p>Uses the full {image.width} × {image.height} asset as the initial tile. Adjust its source rectangle and repeat size in the property sheet after creation.</p>}
             <button type="submit" disabled={!image}>Create repeating image</button>
         </form>}

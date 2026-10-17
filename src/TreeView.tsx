@@ -1,3 +1,4 @@
+import {ChevronDown, ChevronRight, File, Folder, Layers, Square} from 'lucide-react';
 import {Children, useState, type DragEvent, type MouseEvent, type ReactNode} from 'react';
 import type {DrawDocument, PixelImageData, Shape} from './types';
 
@@ -21,10 +22,10 @@ function TreeNode({label, depth, defaultExpanded = true, selected, onSelect, onC
     return <li className="tree-node" aria-expanded={hasChildren ? expanded : undefined}>
         <div className={cls({'tree-row': true, selected: !!selected, 'drop-before': dropPosition === 'before', 'drop-after': dropPosition === 'after'})} style={{paddingLeft: `${depth * 0.9}rem`}}>
             {hasChildren ? <button className="tree-disclosure" aria-label={`${expanded ? 'Collapse' : 'Expand'} ${label}`}
-                aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? '▾' : '▸'}</button> : <span className="tree-disclosure-spacer"/>}
+                aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>{expanded ? <ChevronDown aria-hidden="true"/> : <ChevronRight aria-hidden="true"/>}</button> : <span className="tree-disclosure-spacer"/>}
             <button className="tree-label" aria-current={selected ? 'true' : undefined} onClick={onSelect} onContextMenu={onContextMenu}
                 onDoubleClick={() => { if (!onRename) return; const name = window.prompt('Group name', label); if (name?.trim()) onRename(name.trim()); }}
-                draggable={draggable} onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop}>{label}</button>
+                draggable={draggable} onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop}>{hasChildren ? <Folder aria-hidden="true"/> : depth === 0 ? <File aria-hidden="true"/> : depth < 3 ? <Layers aria-hidden="true"/> : <Square aria-hidden="true"/>}<span>{label}</span></button>
         </div>
         {hasChildren && expanded && <ul>{children}</ul>}
     </li>;

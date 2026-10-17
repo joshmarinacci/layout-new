@@ -1,3 +1,4 @@
+import {PropertySection} from './ui/controls';
 import type {Draft} from 'immer';
 import type {Shape, ShapeComponent} from './types';
 import type {EditorStore} from './EditorStore';
@@ -29,7 +30,7 @@ function componentFor(shape: Draft<Shape>, key: string): Draft<ShapeComponent> {
 export default function PropSheet({store}: {store: EditorStore}) {
     const state = useEditorStore(store);
     const shapes = state.document.shapes.filter(shape => state.selectedIds.includes(shape.id));
-    if (!shapes.length) return <div className="prop-sheet">nothing selected</div>;
+    if (!shapes.length) return <div className="prop-sheet empty-state">Select an object to edit its properties.</div>;
     const common = Object.entries(shapes[0].components).filter(([key, component]) => shapes.every(shape => {
         const entry = Object.entries(shape.components).find(([name]) => name === key);
         return entry?.[1].kind === component.kind;
@@ -45,11 +46,11 @@ export default function PropSheet({store}: {store: EditorStore}) {
         <Field key={`${key}.${title}`} store={store} title={title} value={fieldValue(key, read)} type={type} nonnegative={nonnegative}
             update={value => update(key, component => write(component, value))}/>;
     return <div className="prop-sheet">
-        <details open><summary>info</summary><div>
+        <PropertySection title="General">
             {shapes.length === 1 ? <><NameField store={store} label="Shape name" value={shapes[0].name} rename={name => store.renameShape(shapes[0].id, name)}/>
-                <div>{shapes[0].type}</div><small>{shapes[0].id}</small></> : <div>{shapes.length} objects selected</div>}
-        </div></details>
-        {common.map(([key, comp]) => <details open key={key}><summary>{key}</summary><div className="prop-sheet-panel">
+                <div className="shape-type" title={shapes[0].id}>{shapes[0].type}</div></> : <div>{shapes.length} objects selected</div>}
+        </PropertySection>
+        {common.map(([key, comp]) => <PropertySection key={key} title={({rect: "Position & size", oval: "Position & size", circle: "Circle", fill: "Fill", stroke: "Stroke", cornerRadius: "Corners", image: "Image source", pattern: "Pattern"} as Record<string, string>)[key] ?? key}>
             {comp.kind === 'resizable-bounds-component' && (['x', 'y', 'width', 'height'] as const).map(name => field(key, name,
                 c => c.kind === 'resizable-bounds-component' ? c.bounds[name] : '', (c, value) => { if (c.kind === 'resizable-bounds-component') c.bounds[name] = Number(value); }, 'number', name === 'width' || name === 'height'))}
             {comp.kind === 'fill-component' && field(key, 'Fill color', c => c.kind === 'fill-component' ? c.fill.color : '',
@@ -65,6 +66,6 @@ export default function PropSheet({store}: {store: EditorStore}) {
                 (c, value) => { if (c.kind === 'pixel-image-reference') c.source[name] = Math.round(Number(value)); }, 'number', name === 'width' || name === 'height'))}
             {comp.kind === 'pattern-size-component' && (['width', 'height'] as const).map(name => field(key, `Repeat ${name}`, c => c.kind === 'pattern-size-component' ? c[name] : '',
                 (c, value) => { if (c.kind === 'pattern-size-component') c[name] = Math.max(1, Math.round(Number(value))); }, 'number', true))}
-        </div></details>)}
+        </PropertySection>)}
     </div>;
 }

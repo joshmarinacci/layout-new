@@ -11,7 +11,7 @@ export function NameField({store, label, value, rename}: {
             event.currentTarget.blur();
         }
     };
-    return <label className="name-field">{label}<input aria-label={label} value={value}
+    return <label className="name-field"><span>{label}</span><input aria-label={label} value={value}
         onFocus={() => store.beginTransaction('Rename item')}
         onChange={event => rename(event.target.value)}
         onKeyDown={keyDown}

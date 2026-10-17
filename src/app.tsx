@@ -1,3 +1,6 @@
+import {Undo2, Redo2, ZoomIn, ZoomOut, Maximize2, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, SunMoon, Trash2} from 'lucide-react';
+import {IconButton, ToolbarGroup, MenuItem, SelectControl} from './ui/controls';
+import {useTheme} from './ui/theme';
 import {useEffect, useRef, useState, type MouseEvent} from 'react';
 import TreeView from './TreeView';
 import PropSheet from './PropSheet';
@@ -32,6 +35,7 @@ function DocumentTabButton({tab, active, activate}: {tab: DocumentTab; active: b
 }
 
 export default function App() {
+    const [theme, setTheme] = useTheme();
     const [workspace, setWorkspace] = useState(() => {
         const tab = makeTab(makeExampleDocument());
         return {tabs: [tab], activeId: tab.id};
@@ -197,23 +201,23 @@ export default function App() {
         const shape = makeCircle('Circle', {x: 100, y: 100}, 40);
         store.addShape(shape); store.select(shape.id); setPageMenu(null);
     };
-    const undo = <button disabled={!state.canUndo} onClick={() => store.undo()}>Undo</button>;
-    const redo = <button disabled={!state.canRedo} onClick={() => store.redo()}>Redo</button>;
+    const undo = <IconButton label="Undo" icon={Undo2} disabled={!state.canUndo} onClick={() => store.undo()}/>;
+    const redo = <IconButton label="Redo" icon={Redo2} disabled={!state.canRedo} onClick={() => store.redo()}/>;
     return <div className="main-layout">
         <nav className="menubar full-span">
             <DropdownMenu title="File">
-                <button disabled={state.transactionActive} onClick={() => setSavedDocumentsOpen(true)}>Open from Browser <span className="menu-shortcut">⌘⇧O / Ctrl+Shift+O</span></button>
-                <button disabled={state.transactionActive} onClick={saveToBrowser}>Save to Browser <span className="menu-shortcut">⌘S / Ctrl+S</span></button>
+                <MenuItem disabled={state.transactionActive} onClick={() => setSavedDocumentsOpen(true)} label="Open from Browser" shortcut="⌘⇧O / Ctrl+Shift+O"/>
+                <MenuItem disabled={state.transactionActive} onClick={saveToBrowser} label="Save to Browser" shortcut="⌘S / Ctrl+S"/>
                 <button disabled={state.transactionActive} onClick={() => file.current?.click()}>Load JSON file</button>
                 <button disabled={state.transactionActive} onClick={() => openDocument(emptyDocument())}>New Document</button>
                 <button disabled={state.transactionActive} onClick={saveDocument}>Export JSON</button>
             </DropdownMenu>
             <DropdownMenu title="Edit">
-                <button disabled={!state.selectedIds.length || state.transactionActive} onClick={duplicateSelection}>Duplicate <span className="menu-shortcut">⌘D / Ctrl+D</span></button>
+                <MenuItem disabled={!state.selectedIds.length || state.transactionActive} onClick={duplicateSelection} label="Duplicate" shortcut="⌘D / Ctrl+D"/>
                 <button disabled={!state.selectedIds.length || state.transactionActive} onClick={deleteSelection}>Delete</button>
-                <button disabled={!state.selectedIds.length || state.transactionActive} onClick={() => { copySelection(); deleteSelection(); }}>Cut <span className="menu-shortcut">⌘X / Ctrl+X</span></button>
-                <button disabled={!state.selectedIds.length || state.transactionActive} onClick={copySelection}>Copy <span className="menu-shortcut">⌘C / Ctrl+C</span></button>
-                <button disabled={!clipboard.shapes.length || state.transactionActive} onClick={pasteSelection}>Paste <span className="menu-shortcut">⌘V / Ctrl+V</span></button>
+                <MenuItem disabled={!state.selectedIds.length || state.transactionActive} onClick={() => { copySelection(); deleteSelection(); }} label="Cut" shortcut="⌘X / Ctrl+X"/>
+                <MenuItem disabled={!state.selectedIds.length || state.transactionActive} onClick={copySelection} label="Copy" shortcut="⌘C / Ctrl+C"/>
+                <MenuItem disabled={!clipboard.shapes.length || state.transactionActive} onClick={pasteSelection} label="Paste" shortcut="⌘V / Ctrl+V"/>
             </DropdownMenu>
             <DropdownMenu title="Page">
                 <button disabled={state.transactionActive} onClick={() => store.createPage()}>New Page</button>
@@ -233,7 +237,11 @@ export default function App() {
             <button disabled={state.transactionActive || !doc.images.length} onClick={() => setRepeatingImageDialog(true)}>New Repeating Image</button>
             <button disabled={state.transactionActive} onClick={() => setImageDialog({kind: 'import'})}>Import PNG</button>
             </DropdownMenu>}
-            <ul><li>{undo}</li><li>{redo}</li></ul>
+            <ToolbarGroup label="History">{undo}{redo}</ToolbarGroup>
+            <span className="spacer"/>
+            <DropdownMenu title="Appearance" icon={SunMoon}>
+                {(['system', 'light', 'dark'] as const).map(value => <MenuItem key={value} label={`${theme === value ? '✓ ' : ''}${value === 'system' ? 'System theme' : value === 'light' ? 'Light theme' : 'Dark theme'}`} onClick={() => setTheme(value)}/>)}
+            </DropdownMenu>
             <input hidden ref={file} type="file" accept=".json,application/json" onChange={async event => {
                 const chosen = event.target.files?.[0]; event.target.value = '';
                 if (!chosen) return;
@@ -263,26 +271,24 @@ export default function App() {
                 onBlur={() => { if (store.getSnapshot().transactionActive) store.commitTransaction(); }}
                 onKeyDown={event => { if (event.key === 'Escape') { store.cancelTransaction(); event.currentTarget.blur(); } if (event.key === 'Enter') event.currentTarget.blur(); }}
                 onChange={event => store.setTitle(event.target.value)}/>
-            <label className="page-picker">Page <select aria-label="Current page" value={state.selectedPageId} onChange={event => store.selectPage(event.target.value)}>
+            <label className="page-picker">Page <SelectControl aria-label="Current page" value={state.selectedPageId} onChange={event => store.selectPage(event.target.value)}>
                 {doc.pages.map(page => <option key={page.id} value={page.id}>{page.name}</option>)}
-            </select></label>
-            <button aria-pressed={leftPanelVisible} aria-label={leftPanelVisible ? 'Hide tree panel' : 'Show tree panel'} title={leftPanelVisible ? 'Hide tree panel' : 'Show tree panel'} onClick={() => setLeftPanelVisible(value => !value)}>{leftPanelVisible ? 'Hide Tree' : 'Show Tree'}</button>
-            <button aria-pressed={rightPanelVisible} aria-label={rightPanelVisible ? 'Hide properties panel' : 'Show properties panel'} title={rightPanelVisible ? 'Hide properties panel' : 'Show properties panel'} onClick={() => setRightPanelVisible(value => !value)}>{rightPanelVisible ? 'Hide properties' : 'Show properties'}</button>
+            </SelectControl></label>
             {selectedAsset && <button onClick={() => setSelectedAssetId(null)}>Back to canvas</button>}
             {!selectedAsset && <div className="canvas-zoom-controls" role="group" aria-label="Canvas zoom controls">
-                <button aria-label="Zoom out" title="Zoom out" disabled={canvasZoom <= 0.25} onClick={() => setCanvasZoom(value => Math.max(0.25, value / 1.25))}>−</button>
+                <IconButton label="Zoom out" icon={ZoomOut} disabled={canvasZoom <= 0.25} onClick={() => setCanvasZoom(value => Math.max(0.25, value / 1.25))}/>
                 <span aria-live="polite">{Math.round(canvasZoom * 100)}%</span>
-                <button aria-label="Zoom in" title="Zoom in" disabled={canvasZoom >= 4} onClick={() => setCanvasZoom(value => Math.min(4, value * 1.25))}>+</button>
-                <button onClick={() => setCanvasZoom(1)}>Reset zoom</button>
+                <IconButton label="Zoom in" icon={ZoomIn} disabled={canvasZoom >= 4} onClick={() => setCanvasZoom(value => Math.min(4, value * 1.25))}/>
+                <IconButton label="Reset zoom" icon={Maximize2} onClick={() => setCanvasZoom(1)}/>
             </div>}
             {!selectedAsset && selectedShapes.length === 1 && selected?.type === 'pixel-image' && <>
                 <button disabled={state.transactionActive} onClick={() => setImageDialog({kind: 'edit', imageId: selected.components.image.imageId, source: selected.components.image.source})}>Edit Pixels</button>
                 <button disabled={state.transactionActive} onClick={() => store.select(store.linkImageShape(selected.id))}>Linked Copy</button>
             </>}
-            {!selectedAsset && <button disabled={!selectedShapes.length || state.transactionActive} onClick={deleteSelection}>Delete</button>}
-            {undo}{redo}
+            {!selectedAsset && <IconButton label="Delete selected shapes" icon={Trash2} disabled={!selectedShapes.length || state.transactionActive} onClick={deleteSelection}/>}
+
         </div>
-        <div className="left scroll-container"><TreeView document={doc} selectedIds={state.selectedIds} selectedAssetId={selectedAssetId}
+        <div className="left scroll-container"><h2 className="panel-heading">Layers &amp; assets</h2><TreeView document={doc} selectedIds={state.selectedIds} selectedAssetId={selectedAssetId}
             onSelect={(shape, additive) => { setSelectedAssetId(null); additive ? store.toggleSelection(shape.id) : store.select(shape.id); }}
             onSelectAsset={image => { finishEditing(); store.select(null); setSelectedAssetId(image.id); }}
             onShapeContextMenu={(event, shape) => showShapeContextMenu(event, shape)} selectedPageId={state.selectedPageId}
@@ -298,10 +304,15 @@ export default function App() {
                 setContextMenu(null);
                 setPageMenu({x: event.clientX, y: event.clientY, pageId: state.selectedPageId});
             }}/>{imageDialog?.kind === 'edit' && <PixelImageEditor key={imageDialog.imageId} store={store} imageId={imageDialog.imageId} source={imageDialog.source} initialPosition={imageDialog.palettePosition} imageScreenRect={imageDialog.imageScreenRect} onController={setPixelEditor} onClose={() => { setImageDialog(null); setPixelEditor(null); }}/>}</div>
-            <div className="right scroll-container"><PropSheet key={activeTab.id} store={store}/></div>
+            <div className="right scroll-container"><h2 className="panel-heading">Properties</h2><PropSheet key={activeTab.id} store={store}/></div>
         </>}
         </div>
-        <div className="statusbar full-span"><span role="alert">{error}</span><span className="spacer"/><label>Scroll to pan; Ctrl/⌘+scroll to zoom; Space or middle-drag to pan. Shift-click toggles selection; drag empty canvas to select. Drag selected shapes to move; Option/Alt-drag to duplicate. Handles resize. Shift-resize images to keep proportions. Double-click a pixel image to edit.</label></div>
+        <footer className="statusbar full-span">
+            <IconButton label={leftPanelVisible ? 'Hide tree panel' : 'Show tree panel'} icon={leftPanelVisible ? PanelLeftClose : PanelLeftOpen} aria-pressed={leftPanelVisible} onClick={() => setLeftPanelVisible(value => !value)}/>
+            <span role="alert">{error}</span>
+            <span className="status-hint" title="Scroll to pan · Ctrl/⌘+scroll to zoom · Space-drag to pan · Shift-click to select multiple · Alt-drag to duplicate · Double-click images to edit pixels">Scroll to pan · Ctrl/⌘+scroll to zoom · Shift-click for multiple selection · Double-click images to edit</span>
+            <IconButton label={rightPanelVisible ? 'Hide properties panel' : 'Show properties panel'} icon={rightPanelVisible ? PanelRightClose : PanelRightOpen} aria-pressed={rightPanelVisible} onClick={() => setRightPanelVisible(value => !value)}/>
+        </footer>
         {contextMenu && <div className="shape-context-menu" style={{left: contextMenu.x, top: contextMenu.y}} role="menu" onContextMenu={event => event.preventDefault()} onPointerDown={event => event.stopPropagation()}>
             {selectedUngrouped && <button role="menuitem" onClick={() => { groupSelection(); setContextMenu(null); }}>Group</button>}
             {selectedGrouped && <button role="menuitem" onClick={() => { ungroupSelection(); setContextMenu(null); }}>Ungroup</button>}

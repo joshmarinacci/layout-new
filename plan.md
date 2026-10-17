@@ -104,3 +104,10 @@ Strict TypeScript, production build, and whitespace checks pass. Tests and brows
 Made the document, Shapes, and Assets tree nodes collapsible, with nested structure prepared for future group and page nodes. JSON saves now use a filesystem-safe document title as the filename and fall back to `Untitled.json` for blank titles.
 
 Strict TypeScript, production build, and whitespace checks pass. No tests were run for this increment.
+
+
+## Mockup style adaptation — 2026-10-17
+
+Implemented on `new-style`, branched from the checked-out `main`. Adapted `layout-mockup` styling and common controls into the live editor: neutral light/dark themes, blue collapsible property headers, compact toolbars, shortcut menu rows, layer icons, native selects, dialogs, pixel palette, and canvas grid. Added reusable controls under `src/ui`, a persistent System/Light/Dark appearance selector, keyboard menu navigation, and reduced-motion support. Document and history APIs remain unchanged; the separate vector-network branch is not merged by this work.
+
+Validation: 88 model tests, TypeScript, production build, and whitespace checks pass. Browser checks covered themes, property editing/undo, image size/palette selection and creation, inline palette rendering, and keyboard menus. No commit made.

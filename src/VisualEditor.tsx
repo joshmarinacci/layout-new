@@ -31,7 +31,7 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
         const resolution = 1024 * zoom * pixelRatio;
         if (canvas.width !== resolution || canvas.height !== resolution) { canvas.width = resolution; canvas.height = resolution; }
         ctx.setTransform(zoom * pixelRatio, 0, 0, zoom * pixelRatio, 0, 0);
-        ctx.fillStyle = '#333'; ctx.fillRect(0, 0, 1024, 1024);
+        ctx.clearRect(0, 0, 1024, 1024);
         const images = new Map(state.document.images.map(image => {
             const cached = bitmaps.current.get(image);
             if (cached) return [image.id, cached];
@@ -81,12 +81,12 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
                 if (ctx.lineWidth > 0 && shape.components.stroke.width > 0) ctx.stroke();
             }
             if (state.selectedIds.includes(shape.id) && !pixelEditor) {
-                ctx.strokeStyle = 'yellow'; ctx.lineWidth = 2 / zoom; ctx.strokeRect(b.x, b.y, b.width, b.height);
+                ctx.strokeStyle = '#1684e8'; ctx.lineWidth = 2 / zoom; ctx.strokeRect(b.x, b.y, b.width, b.height);
                 if (shape.id === state.selectedId && shape.type === 'circle') {
-                    ctx.fillStyle = 'yellow';
+                    ctx.fillStyle = '#1684e8';
                     circleHandles(shape.components.circle).forEach(handle => ctx.fillRect(handle.x - 5 / zoom, handle.y - 5 / zoom, 10 / zoom, 10 / zoom));
                 }
-                if (shape.id === state.selectedId && (shape.type === 'rectangle' || shape.type === 'pixel-image' || shape.type === 'repeating-image')) { ctx.fillStyle = 'yellow'; ctx.fillRect(b.x + b.width - 5 / zoom, b.y + b.height - 5 / zoom, 10 / zoom, 10 / zoom); }
+                if (shape.id === state.selectedId && (shape.type === 'rectangle' || shape.type === 'pixel-image' || shape.type === 'repeating-image')) { ctx.fillStyle = '#1684e8'; ctx.fillRect(b.x + b.width - 5 / zoom, b.y + b.height - 5 / zoom, 10 / zoom, 10 / zoom); }
             }
             if (pixelEditor?.imageId === (shape.type === 'pixel-image' ? shape.components.image.imageId : '') && pixelEditor.grid) {
                 const editingImage = pixelEditor.image;
@@ -98,7 +98,7 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
                 }
             }
         });
-        if (marquee) { ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#f0df00'; ctx.fillStyle = '#f0df0030'; ctx.lineWidth = 1; ctx.fillRect(marquee.x, marquee.y, marquee.width, marquee.height); ctx.strokeRect(marquee.x, marquee.y, marquee.width, marquee.height); ctx.restore(); }
+        if (marquee) { ctx.save(); ctx.setLineDash([6, 4]); ctx.strokeStyle = '#1684e8'; ctx.fillStyle = '#1684e830'; ctx.lineWidth = 1; ctx.fillRect(marquee.x, marquee.y, marquee.width, marquee.height); ctx.strokeRect(marquee.x, marquee.y, marquee.width, marquee.height); ctx.restore(); }
     }, [state.document, state.selectedId, state.selectedIds, state.selectedPageId, marquee, zoom, pixelEditor]);
     useEffect(() => () => { if (gesture.current) { gesture.current = null; if (store.getSnapshot().transactionActive) store.cancelTransaction(); } }, [store]);
     const point = (event: PointerEvent<HTMLCanvasElement>) => {
@@ -138,7 +138,7 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
         return () => element.removeEventListener('wheel', handleWheel);
     }, [zoom, onZoomChange]);
     return <div className="canvas-viewport" ref={viewport}>
-    <canvas aria-label="Drawing canvas" tabIndex={0} ref={ref} width={1024 * zoom * (window.devicePixelRatio || 1)} height={1024 * zoom * (window.devicePixelRatio || 1)} style={{width: 1024 * zoom, height: 1024 * zoom, touchAction: 'none'}}
+    <canvas aria-label="Drawing canvas" tabIndex={0} ref={ref} width={1024 * zoom * (window.devicePixelRatio || 1)} height={1024 * zoom * (window.devicePixelRatio || 1)} style={{width: 1024 * zoom, height: 1024 * zoom, backgroundSize: `${64 * zoom}px ${64 * zoom}px`, touchAction: 'none'}}
         onContextMenu={event => {
             event.preventDefault();
             const rect = event.currentTarget.getBoundingClientRect();
@@ -299,6 +299,6 @@ export default function VisualEditor({store, onEditImage, onShapeContextMenu, on
             gesture.current = null;
             if (ref.current?.hasPointerCapture(event.pointerId)) ref.current.releasePointerCapture(event.pointerId);
         }}
-        onPointerCancel={event => { pixelEditor?.cancel(); finish(true); }} onLostPointerCapture={() => { pixelEditor?.cancel(); finish(true); }} onBlur={() => { pixelEditor?.cancel(); finish(true); }}/ >;
+        onPointerCancel={event => { pixelEditor?.cancel(); finish(true); }} onLostPointerCapture={() => { pixelEditor?.cancel(); finish(true); }} onBlur={() => { pixelEditor?.cancel(); finish(true); }}/>
     </div>;
 }

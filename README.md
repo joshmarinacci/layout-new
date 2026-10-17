@@ -80,3 +80,14 @@ Twenty-eight pixel-image and migration tests cover shared references, independen
 Next steps include oval creation/interactions and rounded-corner rendering. Custom palettes, pixel-resolution changes, and unused-image cleanup are outside the current pixel-art scope.
 
 Seven image-resize tests cover free and constrained resizing, shrinking and minimum bounds, modifier changes, zero-size bounds, and undo/redo without changing shared pixels. The creation UI offers square presets; the model still supports existing 1–256 pixel dimensions.
+
+
+## Editor appearance and shared controls
+
+The interface adapts the adjacent `layout-mockup` project's neutral panels, blue property-section headers, compact icon toolbars, menu shortcut columns, tree icons, select controls, dialogs, canvas grid, and transitions. The working editor's document model, history, selection, and pixel editing remain in place.
+
+Use **Appearance** to choose System, Light, or Dark. The preference is stored locally in `layout-editor-theme`, separately from document data. The bottom-left and bottom-right icons toggle the layer tree and property panel. Property sections collapse individually. Menus support Up/Down, Home/End, Escape, and normal Tab navigation; icon buttons have accessible names and tooltips. Animation respects reduced-motion preferences.
+
+Shared UI code lives in `src/ui/`: `controls.tsx` provides `IconButton`, `ToolbarGroup`, `MenuItem`, `PropertySection`, and `SelectControl`; `theme.css` defines color and sizing tokens; `theme.ts` persists the appearance choice; `animations.css` adapts the mockup transitions. `src/styles.css` contains base control styling and `src/app.css` contains editor layouts. Select controls use native HTML selects for keyboard and platform behavior. The mockup is not a runtime dependency.
+
+Validation for this styling update: all 88 model tests, TypeScript, production build, and whitespace checks pass. Browser checks covered light/dark appearance, shape properties, image creation with size/palette selection, the inline pixel palette, undo, and keyboard menu opening/dismissal. This is not a full browser regression or native desktop audit.

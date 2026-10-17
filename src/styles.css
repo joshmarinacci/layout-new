@@ -1,0 +1,21 @@
+@import './ui/theme.css';
+@import './ui/animations.css';
+/* Reset and basic controls adapted from layout-mockup. */
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; width: 100%; height: 100%; }
+body { font: 14px/1.4 system-ui, sans-serif; color: var(--panel-text); background: var(--panel-background); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; margin: 0; padding: 6px 10px; min-height: 30px; border: 1px solid var(--panel-border-color); border-radius: 2px; background: var(--panel-background); cursor: pointer; }
+button:hover:not(:disabled) { background: var(--background-color-hover); }
+button:disabled { color: var(--text-disabled-color); cursor: default; }
+input, select, textarea { min-width: 0; padding: 4px 6px; border: 1px solid var(--panel-border-color); border-radius: 2px; background: var(--control-background); }
+input[type=color] { width: 100%; height: 30px; padding: 2px; cursor: pointer; }
+input[type=checkbox] { accent-color: var(--selected-background-color); }
+:focus-visible { outline: 2px solid var(--selection-stroke); outline-offset: 2px; }
+button.ghost { border-color: transparent; background: transparent; }
+button.primary, button[type=submit] { background: var(--primary-background-color); color: var(--primary-text-color); border-color: var(--primary-border-color); }
+button.primary:hover, button[type=submit]:hover { background: var(--primary-background-color-hover); }
+.lucide { width: 18px; height: 18px; flex-shrink: 0; stroke-width: 1.6; }
+.icon-button { width: 32px; height: 32px; flex: 0 0 32px; padding: 5px; }
+.icon-button .lucide { width: 20px; height: 20px; }
+kbd { font: 11px ui-monospace, monospace; color: var(--muted-text); white-space: nowrap; }
