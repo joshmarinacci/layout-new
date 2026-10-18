@@ -1,3 +1,6 @@
 node_modules
 dist/
 .idea/
+# Tauri
+src-tauri/target/
+src-tauri/gen/

@@ -7,12 +7,14 @@
   "type": "module",
   "main": "index.js",
   "dependencies": {
+    "@tauri-apps/api": "^2.12.4",
     "immer": "^11.1.21",
     "lucide-react": "^0.525.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.12.3",
     "@types/node": "^26.6.2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
@@ -26,6 +28,7 @@
     "check": "tsc",
     "build": "npm run check && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "tauri": "tauri"
   }
 }
