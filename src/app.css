@@ -726,29 +726,28 @@
     position: absolute;
     z-index: 15;
     width: min(430px, calc(100% - 24px));
-    padding: 10px;
-    background: #202832;
-    color: #eee;
-    border: 1px solid #64809a;
-    border-radius: 8px;
+    /*padding: 10px;*/
+    background-color: var(--panel-background);
+    color: var(--panel-text);
+    border: var(--panel-border-width) solid var(--panel-border-color);
+    padding: 1rem;
+    border-radius: 0.5rem;
     box-shadow: 0 6px 24px #0008;
-    font-size: 12px;
+    /*font-size: 12px;*/
     max-height: calc(100% - 24px);
     overflow: auto;
-}
-
-.vector-palette header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: move;
-    touch-action: none;
-    gap: 12px;
-}
-
-.vector-palette p {
-    margin: 8px 0;
-    line-height: 1.4;
+    header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: move;
+        touch-action: none;
+        gap: 12px;
+    }
+    p {
+        margin: 8px 0;
+        line-height: 1.4;
+    }
 }
 
 .vector-tools {
@@ -757,10 +756,6 @@
     align-items: center;
     gap: 5px;
     margin-top: 8px;
-}
-
-.vector-tools button {
-    min-height: 30px;
 }
 
 .vector-tools button[aria-pressed=true] {
