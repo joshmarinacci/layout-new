@@ -1,5 +1,6 @@
-import type {DrawDocument, RectangleShape, CircleShape} from "./types";
-export function makeExampleDocument():DrawDocument {
+import type {CircleShape, DrawDocument, RectangleShape} from "./types";
+
+export function makeExampleDocument(): DrawDocument {
     const rect: RectangleShape = {
         id: "rect_1",
         pageId: 'page_1',
@@ -34,16 +35,16 @@ export function makeExampleDocument():DrawDocument {
         }
     }
     const circle: CircleShape = {
-        id:'circle_1',
+        id: 'circle_1',
         pageId: 'page_1',
-        type:'circle',
-        name:'circle',
+        type: 'circle',
+        name: 'circle',
         components: {
             fill: {
                 kind: 'fill-component',
                 fill: {
                     kind: 'solid',
-                    color:'#0000ff',
+                    color: '#0000ff',
                 }
             },
             circle: {
@@ -51,7 +52,7 @@ export function makeExampleDocument():DrawDocument {
                 radius: 30,
                 center: {
                     x: 200,
-                    y:200,
+                    y: 200,
                 }
             },
             stroke: {
@@ -63,7 +64,7 @@ export function makeExampleDocument():DrawDocument {
     }
     return {
         version: 5, images: [], pages: [{id: 'page_1', name: 'Page 1', groups: []}],
-        title:'test doc',
+        title: 'test doc',
         shapes: [rect, circle],
     }
 }

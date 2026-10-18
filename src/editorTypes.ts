@@ -1,6 +1,6 @@
 export type Tool = "select" | "rectangle" | "pan";
 export type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
-import type {Shape, DrawDocument, Bounds} from "./types";
+import type {Bounds, DrawDocument, Shape} from "./types";
 
 
 export type ActionIconName =
