@@ -111,3 +111,18 @@ Strict TypeScript, production build, and whitespace checks pass. No tests were r
 Implemented on `new-style`, branched from the checked-out `main`. Adapted `layout-mockup` styling and common controls into the live editor: neutral light/dark themes, blue collapsible property headers, compact toolbars, shortcut menu rows, layer icons, native selects, dialogs, pixel palette, and canvas grid. Added reusable controls under `src/ui`, a persistent System/Light/Dark appearance selector, keyboard menu navigation, and reduced-motion support. Document and history APIs remain unchanged; the separate vector-network branch is not merged by this work.
 
 Validation: 88 model tests, TypeScript, production build, and whitespace checks pass. Browser checks covered themes, property editing/undo, image size/palette selection and creation, inline palette rendering, and keyboard menus. No commit made.
+
+
+## Vector networks — 2026-10-16, implemented on codex/vector-networks
+
+1. Added a version-5 serializable graph model: stable local point/segment IDs, cubic controls, smooth segment pairs, region boundary spans and independent fills.
+2. Added pure geometry helpers and planar region discovery, including branches, crossings, nested holes, cubic subdivision, bounds, hit testing and transformations.
+3. Added fill reconciliation for movement, region splitting/merging, opened boundaries, and gesture cancellation.
+4. Integrated store transactions, schema migration/validation, independent duplication/paste, page/group behavior, and history.
+5. Added canvas rendering, shape movement/resizing, and double-click/Enter/Edit Vector entry.
+6. Added the floating vector palette with Pen, Select, Curve, Insert point, Join crossing, Connect/Merge, Smooth pair/Corner, deletion, region fill, stroke, undo/redo and Done.
+7. Added model tests, the runnable JSON example, and `docs/vector-networks.md`. Browser checks and numerical limits are recorded in that guide.
+
+Deferred extensions: gradients, SVG import/export, inter-shape boolean operations, variable-width strokes, and primitive-to-network conversion.
+
+Vector network validation: 109 tests pass across eight files; strict TypeScript, production build, and Git whitespace checks pass. Browser verification covers drawing, independent fills, holes, double-click editing, curve handles, undo/redo, JSON loading, and zoom. See the guide for the remaining verification boundaries.

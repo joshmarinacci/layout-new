@@ -53,7 +53,7 @@ export interface ImageAsset {
 
 /* ========== components ========= */
 
-export type ShapeComponent = ResizableBoundsComponent | FillComponent | RoundedCornerComponent | StrokeComponent | CircleLikeComponent | PixelImageReferenceComponent | PatternSizeComponent;
+export type ShapeComponent = VectorNetwork | ResizableBoundsComponent | FillComponent | RoundedCornerComponent | StrokeComponent | CircleLikeComponent | PixelImageReferenceComponent | PatternSizeComponent;
 
 export interface ResizableBoundsComponent {
     kind: 'resizable-bounds-component'
@@ -162,7 +162,7 @@ export interface RepeatingImageShape extends BaseShape {
 
 /* ========== document ======== */
 
-export type Shape = RectangleShape | CircleShape | OvalShape | PixelImageShape | RepeatingImageShape;
+export type Shape = VectorShape | RectangleShape | CircleShape | OvalShape | PixelImageShape | RepeatingImageShape;
 
 export interface ShapeGroup {
     id: string;
@@ -177,7 +177,7 @@ export interface Page {
 }
 
 export interface Document {
-    version: 4
+    version: 5
     title: string
     shapes: Shape[];
     images: PixelImageData[];
@@ -185,3 +185,17 @@ export interface Document {
 }
 
 export type DrawDocument = Document;
+
+/** Points and controls are local to origin. IDs are scoped to this network. */
+export interface VectorPoint extends Point { id: string }
+export interface VectorSegment { id: string; a: string; b: string; c1: Point | null; c2: Point | null }
+export interface VectorSpan { segment: string; from: number; to: number }
+export interface VectorRegion { key: string; loops: VectorSpan[][]; fill: string | null }
+export interface VectorNetwork {
+    kind: 'vector-network'; origin: Point; points: VectorPoint[]; segments: VectorSegment[]; regions: VectorRegion[];
+    smooth: {point: string; segments: [string, string]}[];
+}
+export interface VectorShape extends BaseShape {
+    type: 'vector';
+    components: {network: VectorNetwork; stroke: StrokeComponent};
+}

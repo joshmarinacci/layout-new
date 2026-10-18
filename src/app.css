@@ -120,3 +120,16 @@
     .number-input input { grid-column: 1; }
     .number-input .title, .prop-sheet .name-field > span { text-align: left; }
 }
+
+.vector-palette { position: absolute; z-index: 15; width: min(430px, calc(100% - 24px)); padding: 10px; background: #202832; color: #eee; border: 1px solid #64809a; border-radius: 8px; box-shadow: 0 6px 24px #0008; font-size: 12px; max-height: calc(100% - 24px); overflow: auto; }
+.vector-palette header { display: flex; justify-content: space-between; align-items: center; cursor: move; touch-action: none; gap: 12px; }
+.vector-palette p { margin: 8px 0; line-height: 1.4; }
+.vector-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 8px; }
+.vector-tools button { min-height: 30px; }
+.vector-tools button[aria-pressed=true] { background: #246ca4; color: white; }
+.vector-tools label { display: flex; align-items: center; gap: 4px; }
+.vector-tools input[type=color] { width: 32px; height: 28px; padding: 1px; }
+.vector-tools input[type=number] { width: 55px; }
+.center { position: relative; }
+.vector-palette { box-sizing: border-box; }
+.vector-tools .vector-hex { width: 72px; }

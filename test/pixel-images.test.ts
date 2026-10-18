@@ -195,7 +195,7 @@ describe('document migration', () => {
         const legacy = {version: 0, title: current.title, shapes: current.shapes};
         const migrated = deserializeDocument(JSON.stringify(legacy));
         expect(migrated.shapes.map(shape => shape.id)).toEqual(current.shapes.map(shape => shape.id));
-        expect(JSON.parse(serializeDocument(migrated)).version).toBe(4);
+        expect(JSON.parse(serializeDocument(migrated)).version).toBe(5);
     });
     it('rejects unknown versions, unknown legacy fields, and image shapes in legacy documents', () => {
         const {store} = setup();
