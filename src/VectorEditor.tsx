@@ -33,6 +33,15 @@ type Gesture = {
     additive?: boolean
 };
 
+const COLORS = {
+    WHITE:'#ffffff',
+    LIGHT_GRAY: '#bbbbbb',
+    RED:'#ff0000',
+    SELECTED_VECTOR:'red',
+    UNSELECTED_VECTOR:'blue',
+    SELECTED_LINE: 'red',
+    UNSELECTED_LINE: 'black'
+}
 export function useVectorEditor(store: EditorStore, shape: VectorShape | undefined, zoom: number, onClose: () => void) {
     const [tool, setTool] = useState<Tool>('select'), [color, setColor] = useState('#4f9fff'), [erase, setErase] = useState(false);
     const [colorText, setColorText] = useState('#4f9fff');
@@ -335,7 +344,7 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
                 regionPath(n, face.loops, ctx);
                 ctx.fillStyle = erase ? '#ff776655' : color + '66';
                 ctx.fill('evenodd');
-                ctx.strokeStyle = '#ffffff';
+                ctx.strokeStyle = 'magenta'
                 ctx.stroke();
             }
         }
@@ -344,7 +353,7 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
             ctx.beginPath();
             ctx.moveTo(c[0].x, c[0].y);
             ctx.bezierCurveTo(c[1].x, c[1].y, c[2].x, c[2].y, c[3].x, c[3].y);
-            ctx.strokeStyle = segments.includes(s.id) ? '#ffe168' : '#69c8ff';
+            ctx.strokeStyle = segments.includes(s.id) ? COLORS.SELECTED_LINE : COLORS.UNSELECTED_LINE// '#ffe168' : '#69c8ff';
             ctx.lineWidth = (segments.includes(s.id) ? 3 : 1) / zoom;
             ctx.stroke();
             if (segments.includes(s.id) || points.includes(s.a) || points.includes(s.b)) for (const [handle, end] of [[s.c1, c[0]], [s.c2, c[3]]]) if (handle && end) {
@@ -352,17 +361,18 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
                 ctx.moveTo(end.x, end.y);
                 ctx.lineTo(handle.x, handle.y);
                 ctx.lineWidth = 1 / zoom;
-                ctx.strokeStyle = '#bbbbbb';
+                ctx.strokeStyle = COLORS.LIGHT_GRAY;
                 ctx.stroke();
                 ctx.beginPath();
                 ctx.arc(handle.x, handle.y, 4 / zoom, 0, Math.PI * 2);
-                ctx.fillStyle = '#ffffff';
+                ctx.fillStyle = 'green'//COLORS.WHITE
                 ctx.fill();
                 ctx.stroke();
             }
         }
         for (const p of n.points) {
-            ctx.fillStyle = points.includes(p.id) ? '#ffe168' : '#ffffff';
+            ctx.fillStyle = points.includes(p.id) ? COLORS.SELECTED_VECTOR : COLORS.UNSELECTED_VECTOR// '#ffe168' :
+                // '#ffffff';
             ctx.fillRect(p.x - 4 / zoom, p.y - 4 / zoom, 8 / zoom, 8 / zoom);
         }
         if (pen && hover && tool === 'pen') {
@@ -372,7 +382,7 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
                 ctx.setLineDash([4 / zoom, 4 / zoom]);
                 ctx.moveTo(p.x, p.y);
                 ctx.lineTo(hover.x, hover.y);
-                ctx.strokeStyle = '#69c8ff';
+                ctx.strokeStyle = COLORS.RED// '#69c8ff';
                 ctx.stroke();
                 ctx.setLineDash([]);
             }
