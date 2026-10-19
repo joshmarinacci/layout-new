@@ -1,13 +1,11 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {shortcutLabel} from './keybindings';
-import type {Command} from "./commands";
-import {type EditorSnapshot, type EditorStore} from "./EditorStore";
+import type {Command, CommandContext} from "./commands";
 
-export function CommandPalette({commands, onClose, store, state}: {
+export function CommandPalette({commands, onClose, ctx}: {
     commands: Command[],
     onClose: () => void,
-    store: EditorStore,
-    state: EditorSnapshot
+    ctx: CommandContext,
 }) {
     const [query, setQuery] = useState('');
     const [activeIndex, setActiveIndex] = useState(0);
@@ -15,15 +13,15 @@ export function CommandPalette({commands, onClose, store, state}: {
     const matches = useMemo(() => {
         const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
         return commands
-            .filter(command => command.enabled && command.enabled(store,state))
+            .filter(command => command.enabled && command.enabled(ctx))
             .map(command => ({
-            command,
-            score: terms.reduce((score, term) => {
-                const name = command.title.toLowerCase();
-                const haystack = `${name} ${command.description} ${(command.keywords ?? []).join(' ')}`.toLowerCase();
-                return score + (name === term ? 8 : name.startsWith(term) ? 5 : name.includes(term) ? 3 : haystack.includes(term) ? 1 : -100);
-            }, 0)
-        })).filter(item => item.score >= 0)
+                command,
+                score: terms.reduce((score, term) => {
+                    const name = command.title.toLowerCase();
+                    const haystack = `${name} ${command.description} ${(command.keywords ?? []).join(' ')}`.toLowerCase();
+                    return score + (name === term ? 8 : name.startsWith(term) ? 5 : name.includes(term) ? 3 : haystack.includes(term) ? 1 : -100);
+                }, 0)
+            })).filter(item => item.score >= 0)
             .sort((a, b) => b.score - a.score || a.command.title.localeCompare(b.command.title))
             .map(item => item.command);
     }, [commands, query]);
@@ -38,7 +36,7 @@ export function CommandPalette({commands, onClose, store, state}: {
     const run = (command?: Command) => {
         if (!command) return;
         onClose();
-        command.run(store,state);
+        command.run(ctx);
     };
 
     return <div className="command-palette-backdrop" onPointerDown={event => {

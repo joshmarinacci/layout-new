@@ -23,7 +23,7 @@ import {DropdownMenu} from './DropdownMenu';
 import {CommandPalette} from './CommandPalette';
 import {keybindings, matchesKeybinding} from './keybindings';
 import {EditorDialog} from './EditorDialog';
-import {type EditorSnapshot, EditorStore, emptyDocument} from './EditorStore';
+import {emptyDocument} from './EditorStore';
 import {makeExampleDocument} from './exampleDocument';
 import {ImportPixelImage} from './ImportPixelImage';
 import {NewPixelImage} from './NewPixelImage';
@@ -58,27 +58,17 @@ import VisualEditor from './VisualEditor';
 import './app.css';
 import {
     type Command,
+    type CommandContext,
+    type DocumentTab,
+    makeTab,
     NewCircleCommand,
     NewPageCommand,
     NewRectCommand,
-    UndoCommand
+    RedoCommand,
+    UndoCommand,
+    type Workspace
 } from "./commands";
 
-interface DocumentTab {
-    id: string;
-    store: EditorStore;
-    savedDocumentId: string | null;
-    savedJson: string | null
-}
-
-function makeTab(document: DrawingDocument, savedDocumentId: string | null = null, savedJson: string | null = null): DocumentTab {
-    return {
-        id: crypto.randomUUID(),
-        store: new EditorStore(document),
-        savedDocumentId,
-        savedJson
-    };
-}
 
 function DocumentTabButton({tab, active, activate, onContextMenu}: {
     tab: DocumentTab;
@@ -97,19 +87,18 @@ function DocumentTabButton({tab, active, activate, onContextMenu}: {
     </button>;
 }
 
-function StoreActionButton({command, disabled, store, state}: {
+function StoreActionButton({command, disabled, ctx}: {
     command: Command,
     disabled: boolean,
-    store: EditorStore,
-    state: EditorSnapshot
+    ctx: CommandContext
 }) {
     return <button disabled={disabled}
-                   onClick={() => command.run(store, state)}>{command.title}</button>
+                   onClick={() => command.run(ctx)}>{command.title}</button>
 }
 
 export default function App() {
     const [theme, setTheme] = useTheme();
-    const [workspace, setWorkspace] = useState(() => {
+    const [workspace, setWorkspace] = useState<Workspace>(() => {
         const tab = makeTab(makeExampleDocument());
         return {tabs: [tab], activeId: tab.id};
     });
@@ -207,6 +196,15 @@ export default function App() {
     const [savedDocumentsOpen, setSavedDocumentsOpen] = useState(false);
     const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
     const selectedAsset = doc.images.find(image => image.id === selectedAssetId);
+
+    const ctx: CommandContext = {
+        store: store,
+        state: state,
+        workspace: workspace,
+        setWorkspace: setWorkspace,
+        finishEditing: finishEditing
+    }
+
     const saveDocument = () => {
         const url = URL.createObjectURL(new Blob([store.toJSON()], {type: 'application/json'}));
         const safeTitle = doc.title.trim().replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').replace(/\s+/g, ' ').replace(/\.+$/g, '') || 'Untitled';
@@ -294,9 +292,9 @@ export default function App() {
             const boundCommand = keybindings.find(binding => binding.commandId !== 'open-palette' && matchesKeybinding(event, binding));
             if (boundCommand) {
                 const command = commands.find(item => item.id === boundCommand.commandId);
-                if (command && command.enabled && command.enabled(store, state)) {
+                if (command && command.enabled && command.enabled(ctx)) {
                     event.preventDefault();
-                    command.run(store, state);
+                    command.run(ctx);
                     return;
                 }
             }
@@ -415,7 +413,7 @@ export default function App() {
             title: isTauri() ? 'Save Document' : 'Save to Browser',
             description: 'Save the current document',
             keywords: ['file'],
-            enabled: (_store, state) => !state.transactionActive,
+            enabled: (ctx) => !ctx.state.transactionActive,
             run: () => {
                 void saveToBrowser();
             }
@@ -426,43 +424,37 @@ export default function App() {
             description: 'Download the document as a JSON file',
             keywords: ['save', 'download', 'file'],
             run: saveDocument,
-            enabled: (store, state) => true
+            enabled: (ctx) => true
         },
         {
             id: 'new-document',
             title: 'New Document',
             description: 'Create a blank document',
             keywords: ['file', 'create'],
-            enabled: (store, state) => !state.transactionActive,
+            enabled: (ctx) => !state.transactionActive,
             run: () => openDocument(emptyDocument())
         },
         NewPageCommand,
         NewRectCommand,
-        {
-            id: 'new-circle',
-            title: 'New Circle',
-            description: 'Add a circle to the current page',
-            keywords: ['shape', 'oval', 'create'],
-            enabled: (store, state) => !selectedAssetId && !state.transactionActive,
-            run: (store, state) => NewCircleCommand.run(store, state)
-        },
+        NewCircleCommand,
         {
             id: 'duplicate',
             title: 'Duplicate Selection',
             description: 'Make a copy of selected shapes',
             keywords: ['copy'],
-            enabled: (store, state) => !!state.selectedIds.length && !state.transactionActive,
-            run: (store, state) => duplicate_selection.perform(store, getSelected())
+            enabled: ctx => !!state.selectedIds.length && !state.transactionActive,
+            run: ctx => duplicate_selection.perform(store, getSelected())
         },
         {
             id: 'delete',
             title: 'Delete Selection',
             description: 'Remove selected shapes',
             keywords: ['remove'],
-            enabled: (store, state) => !!state.selectedIds.length && !state.transactionActive,
-            run: (store, state) => delete_selection.perform(store, getSelected())
+            enabled: ctx => !!state.selectedIds.length && !state.transactionActive,
+            run: ctx => delete_selection.perform(store, getSelected())
         },
         UndoCommand,
+        RedoCommand,
         ...([
             ['left', 'Align Left', 'Align selected shapes to their left edges'],
             ['center', 'Align Horizontal Center', 'Align selected shapes by horizontal center'],
@@ -477,8 +469,8 @@ export default function App() {
             title,
             description,
             keywords: ['align', 'alignment', 'distribute'],
-            enabled: (store: EditorStore, state: EditorSnapshot) => !selectedAssetId && !state.transactionActive && selectedShapes.length >= (alignment.startsWith('distribute') ? 3 : 2),
-            run: () => applyAlignment(alignment)
+            enabled: (ctx) => !selectedAssetId && !ctx.state.transactionActive && selectedShapes.length >= (alignment.startsWith('distribute') ? 3 : 2),
+            run: (ctx) => applyAlignment(alignment)
         } as Command))
     ];
     const nativeMenuAction = useRef<(id: string) => void>(() => {
@@ -502,10 +494,10 @@ export default function App() {
                 saveDocument();
                 break;
             case 'undo':
-                store.undo();
+                UndoCommand.run(ctx);
                 break;
             case 'redo':
-                store.redo();
+                RedoCommand.run(ctx);
                 break;
             case 'duplicate':
                 if (store.getSnapshot().selectedIds.length) duplicate_selection.perform(store, getSelected());
@@ -526,7 +518,7 @@ export default function App() {
                 pasteSelection();
                 break;
             case 'new-page':
-                NewPageCommand.run(store, state);
+                NewPageCommand.run(ctx);
                 break;
             case 'rename-page':
                 renamePage(store.getSnapshot().selectedPageId);
@@ -538,10 +530,10 @@ export default function App() {
                 if (!selectedAssetId) createVector();
                 break;
             case 'new-rectangle':
-                if (!selectedAssetId) NewRectCommand.run(store, state)
+                if (!selectedAssetId) NewRectCommand.run(ctx)
                 break;
             case 'new-circle':
-                if (!selectedAssetId) NewCircleCommand.run(store, state);
+                if (!selectedAssetId) NewCircleCommand.run(ctx);
                 break;
             case 'new-pixel-image':
                 if (!selectedAssetId) setImageDialog({kind: 'create'});
@@ -645,10 +637,9 @@ export default function App() {
                     onClick={() => setRightPanelVisible(value => !value)}/>
             </DropdownMenu>
             <DropdownMenu title="Page">
-                <StoreActionButton command={NewPageCommand}
-                                   disabled={state.transactionActive}
-                                   state={state}
-                                   store={store}/>
+                <StoreActionButton command={NewPageCommand} ctx={ctx}
+                                   disabled={state.transactionActive}/>
+
                 <button disabled={state.transactionActive}
                         onClick={() => renamePage(state.selectedPageId)}>Rename
                     Page
@@ -664,14 +655,12 @@ export default function App() {
                         onClick={() => createVector()}>New Vector
                     Network
                 </button>
-                <StoreActionButton command={NewRectCommand}
+                <StoreActionButton command={NewRectCommand} ctx={ctx}
                                    disabled={state.transactionActive}
-                                   state={state}
-                                   store={store}/>
+                />
                 <StoreActionButton command={NewCircleCommand}
                                    disabled={state.transactionActive}
-                                   store={store}
-                                   state={state}
+                                   ctx={ctx}
                 />
                 <button disabled={state.transactionActive}
                         onClick={() => setImageDialog({kind: 'create'})}>New
@@ -1025,7 +1014,7 @@ export default function App() {
             </button>
             <button role="menuitem" disabled={state.transactionActive}
                     onClick={() => {
-                        NewPageCommand.run(store, state);
+                        NewPageCommand.run(ctx);
                         setDocumentMenu(null);
                     }}>New Page
             </button>
@@ -1084,7 +1073,7 @@ export default function App() {
                  onContextMenu={event => event.preventDefault()}
                  onPointerDown={event => event.stopPropagation()}>
                 <button role="menuitem" onClick={() => {
-                    NewPageCommand.run(store, state)
+                    NewPageCommand.run(ctx)
                     setPagesMenu(null);
                 }}>{NewPageCommand.title}</button>
             </div>}
@@ -1177,8 +1166,7 @@ export default function App() {
                                       }
                                   }}/>}
         {commandPaletteOpen && <CommandPalette commands={commands}
-                                               store={store}
-                                               state={state}
+                                               ctx={ctx}
                                                onClose={() => setCommandPaletteOpen(false)}/>}
     </div>;
 }

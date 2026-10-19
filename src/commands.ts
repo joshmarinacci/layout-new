@@ -1,5 +1,28 @@
-import type {EditorSnapshot, EditorStore} from "./EditorStore";
+import {type EditorSnapshot, EditorStore} from "./EditorStore";
 import {makeCircle, makeRect} from "./reducer";
+
+
+import type {Document as DrawingDocument} from './types';
+
+export interface DocumentTab {
+    id: string;
+    store: EditorStore;
+    savedDocumentId: string | null;
+    savedJson: string | null
+}
+
+export type Workspace = {
+    tabs: DocumentTab[]
+    activeId: string
+}
+
+export type CommandContext = {
+    store: EditorStore,
+    state: EditorSnapshot,
+    finishEditing: () => void,
+    workspace: Workspace,
+    setWorkspace: (workspace: Workspace) => void
+}
 
 export type CommandId =
     | 'undo' | 'redo'
@@ -19,58 +42,69 @@ export interface Command {
     description: string;
     shortcut?: string;
     keywords?: string[];
-    enabled: (store: EditorStore, state: EditorSnapshot) => boolean
-    run: (store: EditorStore, state: EditorSnapshot) => void;
+    enabled: (ctx: CommandContext) => boolean
+    run: (ctx: CommandContext) => void;
 }
 
 export const UndoCommand: Command = {
     id: 'undo',
     title: 'Undo',
     description: 'Undo the last change',
-    enabled: (store, state) => state.canUndo,
-    run: (store, state) => store.undo()
+    enabled: (ctx) => ctx.state.canUndo,
+    run: ctx => ctx.store.undo()
 }
 export const RedoCommand: Command = {
     id: 'redo',
     title: 'Redo',
     description: 'Redo the last undone change',
-    enabled: (store, state) => state.canRedo,
-    run: (store, state) => store.redo()
+    enabled: ctx => ctx.state.canRedo,
+    run: ctx => ctx.store.redo()
 }
-
 
 export const NewRectCommand: Command = {
     id: 'new-rectangle',
     title: 'New Rectangle xx',
     description: 'Add a rectangle to the current page',
     keywords: ['shape', 'rect', 'create'],
-    // enabled: (store, state) => !selectedAssetId && !state.transactionActive,
-    enabled: (store, state) => !state.transactionActive,
-    run: store => {
+    // enabled: ctx => !selectedAssetId && !state.transactionActive,
+    enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => {
         const shape = makeRect('rect', {x: 50, y: 250, width: 50, height: 50});
-        store.addShape(shape);
-        store.select(shape.id);
-    }
-}
-
-export const NewPageCommand: Command = {
-    id: 'new-page',
-    title: 'New Page',
-    description: 'add a new page to the current document',
-    enabled: (store, state) => !state.transactionActive,
-    run: (store: EditorStore) => {
-        store.createPage();
+        ctx.store.addShape(shape);
+        ctx.store.select(shape.id);
     }
 }
 
 export const NewCircleCommand: Command = {
     id: 'new-circle',
-    title: 'New Circle x',
-    description: 'Create a new circle',
-    enabled: (store, state) => !state.transactionActive,
-    run: store => {
+    title: 'New Circle',
+    description: 'Add a circle to the current page',
+    keywords: ['shape', 'oval', 'create'],
+    enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => {
         const shape = makeCircle('circle', {x: 100, y: 300}, 40);
-        store.addShape(shape);
-        store.select(shape.id);
+        ctx.store.addShape(shape);
+        ctx.store.select(shape.id);
     }
+}
+// enabled: ctx => !selectedAssetId && !state.transactionActive,
+
+export const NewPageCommand: Command = {
+    id: 'new-page',
+    title: 'New Page',
+    description: 'add a new page to the current document',
+    enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => {
+        ctx.store.createPage();
+    }
+}
+
+
+export function makeTab(document: DrawingDocument, savedDocumentId: string | null = null, savedJson: string | null = null): DocumentTab {
+    return {
+        id: crypto.randomUUID(),
+        store: new EditorStore(document),
+        savedDocumentId,
+        savedJson
+    };
 }
