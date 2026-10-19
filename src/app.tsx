@@ -56,7 +56,7 @@ import {
     NewDocumentCommand,
     NewPageCommand,
     NewRectCommand,
-    OpenCommandPaletteCommand,
+    ShowCommandPaletteCommand,
     openDocument,
     RedoCommand,
     SelectionCopyCommand,
@@ -253,7 +253,7 @@ export default function App() {
         const keydown = (event: KeyboardEvent) => {
             if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'ui-show-command-palette')!)) {
                 event.preventDefault();
-                OpenCommandPaletteCommand.run(ctx)
+                ShowCommandPaletteCommand.run(ctx)
                 return;
             }
             if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'ui-toggle-left-sidebar')!)) {
@@ -415,10 +415,18 @@ export default function App() {
         NewPageCommand,
         NewRectCommand,
         NewCircleCommand,
+        SelectionGroupCommand,
+        SelectionUngroupCommand,
         SelectionDuplicateCommand,
         SelectionDeleteCommand,
+        SelectionCutCommand,
+        SelectionCopyCommand,
+        SelectionPasteCommand,
         UndoCommand,
         RedoCommand,
+        ShowCommandPaletteCommand,
+        ToggleLeftSidebar,
+        ToggleRightSidebar,
         ...([
             ['left', 'Align Left', 'Align selected shapes to their left edges'],
             ['center', 'Align Horizontal Center', 'Align selected shapes by horizontal center'],
@@ -567,7 +575,7 @@ export default function App() {
                 <CommandMenuItem ctx={ctx} command={SelectionPasteCommand}/>
             </DropdownMenu>
             <DropdownMenu title="View">
-                <CommandMenuItem ctx={ctx} command={OpenCommandPaletteCommand}/>
+                <CommandMenuItem ctx={ctx} command={ShowCommandPaletteCommand}/>
                 <hr className="menu-separator" aria-hidden="true"/>
                 <CommandMenuItem ctx={ctx} command={ToggleLeftSidebar}/>
                 <CommandMenuItem ctx={ctx} command={ToggleRightSidebar}/>

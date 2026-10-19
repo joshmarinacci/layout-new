@@ -224,7 +224,7 @@ export const SelectionPasteCommand: Command = {
     }
 }
 
-export const OpenCommandPaletteCommand: Command = {
+export const ShowCommandPaletteCommand: Command = {
     id: 'ui-show-command-palette',
     title: 'Show Command Palette',
     description: 'show the command palette',
