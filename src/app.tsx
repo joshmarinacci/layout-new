@@ -15,19 +15,15 @@ import {type MouseEvent, useEffect, useRef, useState} from 'react';
 import {isTauri} from '@tauri-apps/api/core';
 import {listen} from '@tauri-apps/api/event';
 import {
-    create_new_page,
     delete_selection,
     duplicate_selection,
-    new_circle,
-    new_rect,
     page_menu_actions,
-    type StoreAction
 } from "./actions";
 import {DropdownMenu} from './DropdownMenu';
 import {CommandPalette} from './CommandPalette';
 import {keybindings, matchesKeybinding} from './keybindings';
 import {EditorDialog} from './EditorDialog';
-import {EditorStore, emptyDocument} from './EditorStore';
+import {type EditorSnapshot, EditorStore, emptyDocument} from './EditorStore';
 import {makeExampleDocument} from './exampleDocument';
 import {ImportPixelImage} from './ImportPixelImage';
 import {NewPixelImage} from './NewPixelImage';
@@ -60,7 +56,13 @@ import {useEditorStore} from './useEditorStore';
 import {makeVector} from './vectorNetworks';
 import VisualEditor from './VisualEditor';
 import './app.css';
-import type {Command} from "./commands";
+import {
+    type Command,
+    NewCircleCommand,
+    NewPageCommand,
+    NewRectCommand,
+    UndoCommand
+} from "./commands";
 
 interface DocumentTab {
     id: string;
@@ -95,13 +97,14 @@ function DocumentTabButton({tab, active, activate, onContextMenu}: {
     </button>;
 }
 
-function StoreActionButton({action, disabled, store}: {
-    action: StoreAction,
+function StoreActionButton({command, disabled, store, state}: {
+    command: Command,
     disabled: boolean,
-    store: EditorStore
+    store: EditorStore,
+    state: EditorSnapshot
 }) {
     return <button disabled={disabled}
-                   onClick={() => action.perform(store)}>{action.title}</button>
+                   onClick={() => command.run(store, state)}>{command.title}</button>
 }
 
 export default function App() {
@@ -291,9 +294,9 @@ export default function App() {
             const boundCommand = keybindings.find(binding => binding.commandId !== 'open-palette' && matchesKeybinding(event, binding));
             if (boundCommand) {
                 const command = commands.find(item => item.id === boundCommand.commandId);
-                if (command?.enabled !== false) {
+                if (command && command.enabled && command.enabled(store, state)) {
                     event.preventDefault();
-                    command?.run();
+                    command.run(store, state);
                     return;
                 }
             }
@@ -409,91 +412,73 @@ export default function App() {
     const commands: Command[] = [
         {
             id: 'save',
-            name: isTauri() ? 'Save Document' : 'Save to Browser',
+            title: isTauri() ? 'Save Document' : 'Save to Browser',
             description: 'Save the current document',
             keywords: ['file'],
-            enabled: !state.transactionActive,
+            enabled: (_store, state) => !state.transactionActive,
             run: () => {
                 void saveToBrowser();
             }
         },
         {
             id: 'export-json',
-            name: 'Export JSON',
+            title: 'Export JSON',
             description: 'Download the document as a JSON file',
             keywords: ['save', 'download', 'file'],
             run: saveDocument
         },
         {
             id: 'new-document',
-            name: 'New Document',
+            title: 'New Document',
             description: 'Create a blank document',
             keywords: ['file', 'create'],
-            enabled: !state.transactionActive,
+            enabled: (store, state) => !state.transactionActive,
             run: () => openDocument(emptyDocument())
         },
-        {
-            id: 'new-page',
-            name: 'New Page',
-            description: 'Add a page to the current document',
-            keywords: ['create'],
-            enabled: !state.transactionActive,
-            run: () => create_new_page.perform(store)
-        },
-        {
-            id: 'new-rectangle',
-            name: 'New Rectangle',
-            description: 'Add a rectangle to the current page',
-            keywords: ['shape', 'rect', 'create'],
-            enabled: !selectedAssetId && !state.transactionActive,
-            run: () => new_rect.perform(store)
-        },
+        NewPageCommand,
+        NewRectCommand,
         {
             id: 'new-circle',
-            name: 'New Circle',
+            title: 'New Circle',
             description: 'Add a circle to the current page',
             keywords: ['shape', 'oval', 'create'],
-            enabled: !selectedAssetId && !state.transactionActive,
-            run: () => new_circle.perform(store)
+            enabled: (store, state) => !selectedAssetId && !state.transactionActive,
+            run: (store, state) => NewCircleCommand.run(store, state)
         },
         {
             id: 'duplicate',
-            name: 'Duplicate Selection',
+            title: 'Duplicate Selection',
             description: 'Make a copy of selected shapes',
             keywords: ['copy'],
-            enabled: !!state.selectedIds.length && !state.transactionActive,
-            run: () => duplicate_selection.perform(store, getSelected())
+            enabled: (store, state) => !!state.selectedIds.length && !state.transactionActive,
+            run: (store, state) => duplicate_selection.perform(store, getSelected())
         },
         {
             id: 'delete',
-            name: 'Delete Selection',
+            title: 'Delete Selection',
             description: 'Remove selected shapes',
             keywords: ['remove'],
-            enabled: !!state.selectedIds.length && !state.transactionActive,
-            run: () => delete_selection.perform(store, getSelected())
+            enabled: (store, state) => !!state.selectedIds.length && !state.transactionActive,
+            run: (store, state) => delete_selection.perform(store, getSelected())
         },
-        {
-            id: 'undo',
-            name: 'Undo',
-            description: 'Undo the last change',
-            enabled: state.canUndo,
-            run: () => store.undo()
-        },
-        {
-            id: 'redo',
-            name: 'Redo',
-            description: 'Redo the last undone change',
-            enabled: state.canRedo,
-            run: () => store.redo()
-        },
-        ...([['left', 'Align Left', 'Align selected shapes to their left edges'], ['center', 'Align Horizontal Center', 'Align selected shapes by horizontal center'], ['right', 'Align Right', 'Align selected shapes to their right edges'], ['top', 'Align Top', 'Align selected shapes to their top edges'], ['middle', 'Align Vertical Middle', 'Align selected shapes by vertical middle'], ['bottom', 'Align Bottom', 'Align selected shapes to their bottom edges'], ['distribute-horizontal', 'Distribute Horizontally', 'Space three or more shapes evenly across'], ['distribute-vertical', 'Distribute Vertically', 'Space three or more shapes evenly down']] as const).map(([alignment, name, description]) => ({
+        UndoCommand,
+        ...([
+            ['left', 'Align Left', 'Align selected shapes to their left edges'],
+            ['center', 'Align Horizontal Center', 'Align selected shapes by horizontal center'],
+            ['right', 'Align Right', 'Align selected shapes to their right edges'],
+            ['top', 'Align Top', 'Align selected shapes to their top edges'],
+            ['middle', 'Align Vertical Middle', 'Align selected shapes by vertical middle'],
+            ['bottom', 'Align Bottom', 'Align selected shapes to their bottom edges'],
+            ['distribute-horizontal', 'Distribute Horizontally', 'Space three or more shapes evenly across'],
+            ['distribute-vertical', 'Distribute Vertically', 'Space three or more shapes evenly down']
+        ] as const).map(([alignment, name, description]) => ({
             id: `align-${alignment}`,
             name,
             description,
             keywords: ['align', 'alignment', 'distribute'],
-            enabled: !selectedAssetId && !state.transactionActive && selectedShapes.length >= (alignment.startsWith('distribute') ? 3 : 2),
+            enabled: (store: EditorStore, state: EditorSnapshot) => !selectedAssetId && !state.transactionActive && selectedShapes.length >= (alignment.startsWith('distribute') ? 3 : 2),
             run: () => applyAlignment(alignment)
-        }))
+        } as Command))
     ];
     const nativeMenuAction = useRef<(id: string) => void>(() => {
     });
@@ -540,7 +525,7 @@ export default function App() {
                 pasteSelection();
                 break;
             case 'new-page':
-                create_new_page.perform(store);
+                NewPageCommand.run(store, state);
                 break;
             case 'rename-page':
                 renamePage(store.getSnapshot().selectedPageId);
@@ -552,10 +537,10 @@ export default function App() {
                 if (!selectedAssetId) createVector();
                 break;
             case 'new-rectangle':
-                if (!selectedAssetId) new_rect.perform(store);
+                if (!selectedAssetId) NewRectCommand.run(store, state)
                 break;
             case 'new-circle':
-                if (!selectedAssetId) new_circle.perform(store);
+                if (!selectedAssetId) NewCircleCommand.run(store, state);
                 break;
             case 'new-pixel-image':
                 if (!selectedAssetId) setImageDialog({kind: 'create'});
@@ -659,8 +644,9 @@ export default function App() {
                     onClick={() => setRightPanelVisible(value => !value)}/>
             </DropdownMenu>
             <DropdownMenu title="Page">
-                <StoreActionButton action={create_new_page}
+                <StoreActionButton command={NewPageCommand}
                                    disabled={state.transactionActive}
+                                   state={state}
                                    store={store}/>
                 <button disabled={state.transactionActive}
                         onClick={() => renamePage(state.selectedPageId)}>Rename
@@ -677,12 +663,15 @@ export default function App() {
                         onClick={() => createVector()}>New Vector
                     Network
                 </button>
-                <StoreActionButton action={new_rect}
+                <StoreActionButton command={NewRectCommand}
                                    disabled={state.transactionActive}
+                                   state={state}
                                    store={store}/>
-                <StoreActionButton action={new_circle}
+                <StoreActionButton command={NewCircleCommand}
                                    disabled={state.transactionActive}
-                                   store={store}/>
+                                   store={store}
+                                   state={state}
+                />
                 <button disabled={state.transactionActive}
                         onClick={() => setImageDialog({kind: 'create'})}>New
                     Pixel Image
@@ -1035,7 +1024,7 @@ export default function App() {
             </button>
             <button role="menuitem" disabled={state.transactionActive}
                     onClick={() => {
-                        create_new_page.perform(store);
+                        NewPageCommand.run(store, state);
                         setDocumentMenu(null);
                     }}>New Page
             </button>
@@ -1094,9 +1083,9 @@ export default function App() {
                  onContextMenu={event => event.preventDefault()}
                  onPointerDown={event => event.stopPropagation()}>
                 <button role="menuitem" onClick={() => {
-                    create_new_page.perform(store)
+                    NewPageCommand.run(store, state)
                     setPagesMenu(null);
-                }}>{create_new_page.title}</button>
+                }}>{NewPageCommand.title}</button>
             </div>}
         {renamePageDialog && <EditorDialog title="Rename Page"
                                            onClose={() => setRenamePageDialog(null)}>
@@ -1187,6 +1176,8 @@ export default function App() {
                                       }
                                   }}/>}
         {commandPaletteOpen && <CommandPalette commands={commands}
+                                               store={store}
+                                               state={state}
                                                onClose={() => setCommandPaletteOpen(false)}/>}
     </div>;
 }

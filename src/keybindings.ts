@@ -1,5 +1,7 @@
+import type {CommandId} from "./commands";
+
 export type Keybinding = {
-    commandId: string;
+    commandId: CommandId;
     key: string;
     mac?: string;
     other?: string;

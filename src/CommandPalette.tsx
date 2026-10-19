@@ -1,25 +1,30 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {shortcutLabel} from './keybindings';
 import type {Command} from "./commands";
+import {type EditorSnapshot, type EditorStore} from "./EditorStore";
 
-export function CommandPalette({commands, onClose}: {
-    commands: Command[];
-    onClose: () => void
+export function CommandPalette({commands, onClose, store, state}: {
+    commands: Command[],
+    onClose: () => void,
+    store: EditorStore,
+    state: EditorSnapshot
 }) {
     const [query, setQuery] = useState('');
     const [activeIndex, setActiveIndex] = useState(0);
     const input = useRef<HTMLInputElement>(null);
     const matches = useMemo(() => {
         const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-        return commands.filter(command => command.enabled !== false).map(command => ({
+        return commands
+            .filter(command => command.enabled && command.enabled(store,state))
+            .map(command => ({
             command,
             score: terms.reduce((score, term) => {
-                const name = command.name.toLowerCase();
+                const name = command.title.toLowerCase();
                 const haystack = `${name} ${command.description} ${(command.keywords ?? []).join(' ')}`.toLowerCase();
                 return score + (name === term ? 8 : name.startsWith(term) ? 5 : name.includes(term) ? 3 : haystack.includes(term) ? 1 : -100);
             }, 0)
         })).filter(item => item.score >= 0)
-            .sort((a, b) => b.score - a.score || a.command.name.localeCompare(b.command.name))
+            .sort((a, b) => b.score - a.score || a.command.title.localeCompare(b.command.title))
             .map(item => item.command);
     }, [commands, query]);
 
@@ -33,7 +38,7 @@ export function CommandPalette({commands, onClose}: {
     const run = (command?: Command) => {
         if (!command) return;
         onClose();
-        command.run();
+        command.run(store,state);
     };
 
     return <div className="command-palette-backdrop" onPointerDown={event => {
@@ -71,7 +76,7 @@ export function CommandPalette({commands, onClose}: {
                         onPointerMove={() => setActiveIndex(index)}
                         onClick={() => run(command)}>
                         <span
-                            className="command-result-copy"><strong>{command.name}</strong><small>{command.description}</small></span>
+                            className="command-result-copy"><strong>{command.title}</strong><small>{command.description}</small></span>
                         {(shortcutLabel(command.id) ?? command.shortcut) &&
                             <kbd>{shortcutLabel(command.id) ?? command.shortcut}</kbd>}
                     </button>) :
