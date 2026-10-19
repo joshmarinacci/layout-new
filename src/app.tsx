@@ -36,6 +36,7 @@ import PropSheet from './PropSheet';
 import {readSavedDocuments, type SavedDocumentRecord, writeSavedDocuments} from './savedDocuments';
 import {SavedDocumentsDialog} from './SavedDocumentsDialog';
 import {deserializeDocument} from './serialization';
+import {shapeAlignmentOffsets, translateShape, type ShapeAlignment} from './shapeAlignment';
 import TreeView from './TreeView';
 import type {Bounds, Document as DrawingDocument, PixelImageData, Shape} from './types';
 import {IconButton, MenuItem, ToolbarGroup} from './ui/controls';
@@ -316,6 +317,18 @@ export default function App() {
         const page = doc.pages.find(item => item.id === pageId);
         if (page) setRenamePageDialog({pageId, name: page.name});
     };
+    const applyAlignment = (alignment: ShapeAlignment) => {
+        if (selectedShapes.length < 2) return;
+        const offsets = shapeAlignmentOffsets(selectedShapes, alignment);
+        const selectedIds = new Set(offsets.keys());
+        store.edit('Align shapes', draft => {
+            for (const shape of draft.shapes) {
+                if (!selectedIds.has(shape.id)) continue;
+                const offset = offsets.get(shape.id)!;
+                if (offset.x || offset.y) translateShape(shape, offset.x, offset.y);
+            }
+        });
+    };
     const nativeMenuAction = useRef<(id: string) => void>(() => {});
     nativeMenuAction.current = id => {
         if (store.getSnapshot().transactionActive) return;
@@ -429,6 +442,19 @@ export default function App() {
                 <button disabled={state.transactionActive}
                         onClick={() => setImageDialog({kind: 'import'})}>Import PNG
                 </button>
+            </DropdownMenu>}
+            {!selectedAsset && selectedShapes.length > 1 && <DropdownMenu title="Align">
+                <MenuItem label="Align Left" onClick={() => applyAlignment('left')}/>
+                <MenuItem label="Align Horizontal Center" onClick={() => applyAlignment('center')}/>
+                <MenuItem label="Align Right" onClick={() => applyAlignment('right')}/>
+                <MenuItem label="Align Top" onClick={() => applyAlignment('top')}/>
+                <MenuItem label="Align Vertical Middle" onClick={() => applyAlignment('middle')}/>
+                <MenuItem label="Align Bottom" onClick={() => applyAlignment('bottom')}/>
+                <hr className="menu-separator" aria-hidden="true"/>
+                <MenuItem label="Distribute Horizontally" disabled={selectedShapes.length < 3}
+                          onClick={() => applyAlignment('distribute-horizontal')}/>
+                <MenuItem label="Distribute Vertically" disabled={selectedShapes.length < 3}
+                          onClick={() => applyAlignment('distribute-vertical')}/>
             </DropdownMenu>}
             <ToolbarGroup label="History">{undo}{redo}</ToolbarGroup>
             <span className="spacer"/>
@@ -652,6 +678,18 @@ export default function App() {
                     setContextMenu(null);
                 }}>Paste
                 </button>
+                {selectedShapes.length > 1 && <>
+                    <hr className="menu-separator" aria-hidden="true"/>
+                    <button role="menuitem" onClick={() => { applyAlignment('left'); setContextMenu(null); }}>Align Left</button>
+                    <button role="menuitem" onClick={() => { applyAlignment('center'); setContextMenu(null); }}>Align Horizontal Center</button>
+                    <button role="menuitem" onClick={() => { applyAlignment('right'); setContextMenu(null); }}>Align Right</button>
+                    <button role="menuitem" onClick={() => { applyAlignment('top'); setContextMenu(null); }}>Align Top</button>
+                    <button role="menuitem" onClick={() => { applyAlignment('middle'); setContextMenu(null); }}>Align Vertical Middle</button>
+                    <button role="menuitem" onClick={() => { applyAlignment('bottom'); setContextMenu(null); }}>Align Bottom</button>
+                    <hr className="menu-separator" aria-hidden="true"/>
+                    <button role="menuitem" disabled={selectedShapes.length < 3} onClick={() => { applyAlignment('distribute-horizontal'); setContextMenu(null); }}>Distribute Horizontally</button>
+                    <button role="menuitem" disabled={selectedShapes.length < 3} onClick={() => { applyAlignment('distribute-vertical'); setContextMenu(null); }}>Distribute Vertically</button>
+                </>}
             </div>}
         {documentMenu && <div className="shape-context-menu" style={{left: documentMenu.x, top: documentMenu.y}}
                               role="menu" aria-label="Document actions"
