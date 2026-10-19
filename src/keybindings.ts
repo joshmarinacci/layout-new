@@ -12,8 +12,18 @@ export type Keybinding = {
 export const keybindings: Keybinding[] = [
     {commandId: 'new-document', key: 'cmd-n', mac: '⌘N', other: 'Ctrl+N'},
     {commandId: 'save', key: 'cmd-s', mac: '⌘S', other: 'Ctrl+S'},
-    {commandId: 'selection-duplicate', key: 'cmd-d', mac: '⌘D', other: 'Ctrl+D'},
-    {commandId: 'delete', key: 'delete', mac: 'Delete', other: 'Delete'},
+    {
+        commandId: 'selection-duplicate',
+        key: 'cmd-d',
+        mac: '⌘D',
+        other: 'Ctrl+D'
+    },
+    {
+        commandId: 'selection-delete',
+        key: 'delete',
+        mac: 'Delete',
+        other: 'Delete'
+    },
     {commandId: 'undo', key: 'cmd-z', mac: '⌘Z', other: 'Ctrl+Z'},
     {commandId: 'redo', key: 'cmd-shift-z', mac: '⌘⇧Z', other: 'Ctrl+Shift+Z'},
     {

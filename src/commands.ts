@@ -2,7 +2,7 @@ import {type EditorSnapshot, EditorStore, emptyDocument} from "./EditorStore";
 import {makeCircle, makeRect} from "./reducer";
 
 
-import type {Document, Document as DrawingDocument} from './types';
+import type {Document as DrawingDocument, PixelImageData, Shape} from './types';
 
 export interface DocumentTab {
     id: string;
@@ -15,28 +15,51 @@ export type Workspace = {
     tabs: DocumentTab[]
     activeId: string
 }
+export type ClipboardState = {
+    shapes: Shape[]
+    images: PixelImageData[]
+}
 
-type WorkspaceSetter = (workspace: Workspace) => Workspace
+type Setter<W> = (w: W) => W
+
 export type CommandContext = {
     store: EditorStore,
     state: EditorSnapshot,
     finishEditing: () => void,
     workspace: Workspace,
-    setWorkspace: (s: Workspace | WorkspaceSetter) => void,
+    setWorkspace: (s: Workspace | Setter<Workspace>) => void,
+    clipboard: ClipboardState,
+    setClipboard: (s: ClipboardState | Setter<ClipboardState>) => void
 }
 
 export type CommandId =
-    | 'undo' | 'redo'
-    | 'new-document' | 'save' | 'export-json'
+    | 'undo'
+    | 'redo'
+    | 'new-document'
+    | 'save'
+    | 'export-json'
     | 'new-page'
-    | 'new-rectangle' | 'new-circle'
-    | 'group-selection' | 'ungroup-selection' | 'selection-duplicate'
-    | 'align-left' | 'align-center' | 'align-right'
-    | 'align-top' | 'align-middle' | 'align-bottom'
-    | 'align-distribute-vertical' | 'align-distribute-horizontal'
-    | 'delete'
+    | 'new-rectangle'
+    | 'new-circle'
+
+    | 'selection-group'
+    | 'selection-ungroup'
+    | 'selection-duplicate'
+    | 'selection-delete'
+    | 'selection-copy'
+
+    | 'align-left'
+    | 'align-center'
+    | 'align-right'
+    | 'align-top'
+    | 'align-middle'
+    | 'align-bottom'
+    | 'align-distribute-vertical'
+    | 'align-distribute-horizontal'
+
     | 'open-palette'
-    | 'toggle-right-sidebar' | 'toggle-left-sidebar'
+    | 'toggle-right-sidebar'
+    | 'toggle-left-sidebar'
 
 export interface Command {
     id: CommandId;
@@ -56,7 +79,6 @@ export const NewDocumentCommand: Command = {
     enabled: (ctx) => !ctx.state.transactionActive,
     run: (ctx) => openDocument(ctx, emptyDocument())
 }
-
 
 export const UndoCommand: Command = {
     id: 'undo',
@@ -86,7 +108,6 @@ export const NewRectCommand: Command = {
         ctx.store.select(shape.id);
     }
 }
-
 export const NewCircleCommand: Command = {
     id: 'new-circle',
     title: 'New Circle',
@@ -99,7 +120,6 @@ export const NewCircleCommand: Command = {
         ctx.store.select(shape.id);
     }
 }
-
 export const NewPageCommand: Command = {
     id: 'new-page',
     title: 'New Page',
@@ -110,8 +130,8 @@ export const NewPageCommand: Command = {
     }
 }
 
-export const GroupSelectionCommand: Command = {
-    id: 'group-selection',
+export const SelectionGroupCommand: Command = {
+    id: 'selection-group',
     title: 'group selection',
     description: 'group the selection',
     enabled: () => true,
@@ -121,8 +141,8 @@ export const GroupSelectionCommand: Command = {
         ctx.store.createGroup(ctx.state.selectedPageId, shapes.map(shape => shape.id), `Group ${ctx.state.document.pages.flatMap(page => page.groups).length + 1}`);
     }
 }
-export const UngroupSelectionCommand: Command = {
-    id: 'ungroup-selection',
+export const SelectionUngroupCommand: Command = {
+    id: 'selection-ungroup',
     title: 'Ungroup selection',
     description: 'ungroup the selection',
     enabled: () => true,
@@ -130,7 +150,7 @@ export const UngroupSelectionCommand: Command = {
         ctx.store.ungroupSelection(getSelected(ctx.store).map(shape => shape.id));
     }
 }
-export const DuplicateSelectionCommand: Command = {
+export const SelectionDuplicateCommand: Command = {
     id: 'selection-duplicate',
     title: 'Duplicate Selection',
     description: 'Make a copy of selected shapes',
@@ -143,8 +163,8 @@ export const DuplicateSelectionCommand: Command = {
         }
     }
 }
-export const DeleteSelectionCommand: Command = {
-    id: 'delete',
+export const SelectionDeleteCommand: Command = {
+    id: 'selection-delete',
     title: 'Delete Selection',
     description: 'Remove selected shapes',
     keywords: ['remove'],
@@ -156,6 +176,24 @@ export const DeleteSelectionCommand: Command = {
         shapes.forEach(shape => ctx.store.removeShape(shape.id));
         ctx.store.commitTransaction();
         ctx.store.select(null);
+    }
+}
+
+export const SelectionCopyCommand: Command = {
+    id: 'selection-copy',
+    title: 'Copy Selection',
+    description: 'Copy Selected shapes',
+    enabled: (ctx) => ctx.store.getSnapshot().selectedIds.length > 0,
+    run: (ctx) => {
+        const shapes = getSelected(ctx.store);
+        const ids = new Set(shapes.filter((shape): shape is Extract<Shape, {
+            type: 'pixel-image' | 'repeating-image'
+        }> => shape.type === 'pixel-image' || shape.type === 'repeating-image')
+            .map(shape => shape.components.image.imageId));
+        ctx.setClipboard({
+            shapes: structuredClone(shapes),
+            images: structuredClone(ctx.store.getSnapshot().document.images.filter(image => ids.has(image.id)))
+        });
     }
 }
 

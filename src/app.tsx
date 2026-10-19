@@ -39,7 +39,7 @@ import {
     translateShape
 } from './shapeAlignment';
 import TreeView from './TreeView';
-import type {Bounds, PixelImageData, Shape} from './types';
+import type {Bounds, Shape} from './types';
 import {IconButton, MenuItem, ToolbarGroup} from './ui/controls';
 import {useTheme} from './ui/theme';
 import {useEditorStore} from './useEditorStore';
@@ -47,12 +47,10 @@ import {makeVector} from './vectorNetworks';
 import VisualEditor from './VisualEditor';
 import './app.css';
 import {
+    type ClipboardState,
     type Command,
     type CommandContext,
-    DeleteSelectionCommand,
     type DocumentTab,
-    DuplicateSelectionCommand,
-    GroupSelectionCommand,
     makeTab,
     NewCircleCommand,
     NewDocumentCommand,
@@ -60,8 +58,12 @@ import {
     NewRectCommand,
     openDocument,
     RedoCommand,
+    SelectionCopyCommand,
+    SelectionDeleteCommand,
+    SelectionDuplicateCommand,
+    SelectionGroupCommand,
+    SelectionUngroupCommand,
     UndoCommand,
-    UngroupSelectionCommand,
     type Workspace
 } from "./commands";
 
@@ -83,12 +85,11 @@ function DocumentTabButton({tab, active, activate, onContextMenu}: {
     </button>;
 }
 
-function StoreActionButton({command, disabled, ctx}: {
+function CommandButton({command, ctx}: {
     command: Command,
-    disabled: boolean,
     ctx: CommandContext
 }) {
-    return <button disabled={disabled}
+    return <button disabled={!command.enabled(ctx)}
                    onClick={() => command.run(ctx)}>{command.title}</button>
 }
 
@@ -162,10 +163,10 @@ export default function App() {
     };
     const [pixelEditor, setPixelEditor] = useState<PixelEditorController | null>(null);
     const [repeatingImageDialog, setRepeatingImageDialog] = useState(false);
-    const [clipboard, setClipboard] = useState<{
-        shapes: Shape[];
-        images: PixelImageData[]
-    }>({shapes: [], images: []});
+    const [clipboard, setClipboard] = useState<ClipboardState>({
+        shapes: [],
+        images: []
+    });
     const [contextMenu, setContextMenu] = useState<{
         x: number;
         y: number
@@ -193,11 +194,11 @@ export default function App() {
     const selectedAsset = doc.images.find(image => image.id === selectedAssetId);
 
     const ctx: CommandContext = {
-        store: store,
-        state: state,
-        workspace: workspace,
-        setWorkspace: setWorkspace,
-        finishEditing: finishEditing
+        store,
+        state,
+        workspace, setWorkspace,
+        finishEditing,
+        clipboard, setClipboard,
     }
 
     const saveDocument = () => {
@@ -311,16 +312,16 @@ export default function App() {
             if (key === 'delete' || key === 'backspace') {
                 if (!store.getSnapshot().selectedIds.length || store.getSnapshot().transactionActive) return;
                 event.preventDefault();
-                DeleteSelectionCommand.run(ctx)
+                SelectionDeleteCommand.run(ctx)
                 return;
             }
             if ((event.metaKey || event.ctrlKey) && !event.altKey && ['d', 'x', 'c', 'v'].includes(key)) {
                 event.preventDefault();
-                if (key === 'd') DuplicateSelectionCommand.run(ctx)
-                if (key === 'c') copySelection();
+                if (key === 'd') SelectionDuplicateCommand.run(ctx)
+                if (key === 'c') SelectionCopyCommand.run(ctx)
                 if (key === 'x') {
-                    copySelection();
-                    DeleteSelectionCommand.run(ctx)
+                    SelectionCopyCommand.run(ctx)
+                    SelectionDeleteCommand.run(ctx)
                 }
                 if (key === 'v') pasteSelection();
                 return;
@@ -347,18 +348,6 @@ export default function App() {
             window.removeEventListener('blur', close);
         };
     }, []);
-    const getSelected = () => store.getSnapshot().document.shapes.filter(shape => store.getSnapshot().selectedIds.includes(shape.id));
-    const copySelection = () => {
-        const shapes = getSelected();
-        const ids = new Set(shapes.filter((shape): shape is Extract<Shape, {
-            type: 'pixel-image' | 'repeating-image'
-        }> => shape.type === 'pixel-image' || shape.type === 'repeating-image')
-            .map(shape => shape.components.image.imageId));
-        setClipboard({
-            shapes: structuredClone(shapes),
-            images: structuredClone(store.getSnapshot().document.images.filter(image => ids.has(image.id)))
-        });
-    };
     const pasteSelection = () => {
         if (clipboard.shapes.length) store.pasteShapes(clipboard.shapes, clipboard.images);
     };
@@ -419,8 +408,8 @@ export default function App() {
         NewPageCommand,
         NewRectCommand,
         NewCircleCommand,
-        DuplicateSelectionCommand,
-        DeleteSelectionCommand,
+        SelectionDuplicateCommand,
+        SelectionDeleteCommand,
         UndoCommand,
         RedoCommand,
         ...([
@@ -468,19 +457,19 @@ export default function App() {
                 RedoCommand.run(ctx);
                 break;
             case 'duplicate':
-                if (store.getSnapshot().selectedIds.length) DuplicateSelectionCommand.run(ctx)
+                if (store.getSnapshot().selectedIds.length) SelectionDuplicateCommand.run(ctx)
                 break;
             case 'delete':
-                if (store.getSnapshot().selectedIds.length) DeleteSelectionCommand.run(ctx)
+                if (store.getSnapshot().selectedIds.length) SelectionDeleteCommand.run(ctx)
                 break;
             case 'cut':
                 if (store.getSnapshot().selectedIds.length) {
-                    copySelection();
-                    DeleteSelectionCommand.run(ctx)
+                    SelectionCopyCommand.run(ctx)
+                    SelectionDeleteCommand.run(ctx)
                 }
                 break;
             case 'copy':
-                copySelection();
+                SelectionCopyCommand.run(ctx)
                 break;
             case 'paste':
                 pasteSelection();
@@ -564,18 +553,15 @@ export default function App() {
                 </button>
             </DropdownMenu>
             <DropdownMenu title="Edit">
-                <CommandMenuItem ctx={ctx} command={DuplicateSelectionCommand}/>
-                <CommandMenuItem ctx={ctx} command={DeleteSelectionCommand}/>
+                <CommandMenuItem ctx={ctx} command={SelectionDuplicateCommand}/>
+                <CommandMenuItem ctx={ctx} command={SelectionDeleteCommand}/>
                 <MenuItem
                     disabled={!state.selectedIds.length || state.transactionActive}
                     onClick={() => {
-                        copySelection();
-                        DeleteSelectionCommand.run(ctx)
+                        SelectionCopyCommand.run(ctx);
+                        SelectionDeleteCommand.run(ctx)
                     }} label="Cut" shortcut="⌘X / Ctrl+X"/>
-                <MenuItem
-                    disabled={!state.selectedIds.length || state.transactionActive}
-                    onClick={copySelection} label="Copy"
-                    shortcut="⌘C / Ctrl+C"/>
+                <CommandMenuItem command={SelectionCopyCommand} ctx={ctx}/>
                 <MenuItem
                     disabled={!clipboard.shapes.length || state.transactionActive}
                     onClick={pasteSelection} label="Paste"
@@ -596,9 +582,7 @@ export default function App() {
                     onClick={() => setRightPanelVisible(value => !value)}/>
             </DropdownMenu>
             <DropdownMenu title="Page">
-                <StoreActionButton command={NewPageCommand} ctx={ctx}
-                                   disabled={state.transactionActive}/>
-
+                <CommandButton command={NewPageCommand} ctx={ctx}/>
                 <button disabled={state.transactionActive}
                         onClick={() => renamePage(state.selectedPageId)}>Rename
                     Page
@@ -614,13 +598,8 @@ export default function App() {
                         onClick={() => createVector()}>New Vector
                     Network
                 </button>
-                <StoreActionButton command={NewRectCommand} ctx={ctx}
-                                   disabled={state.transactionActive}
-                />
-                <StoreActionButton command={NewCircleCommand}
-                                   disabled={state.transactionActive}
-                                   ctx={ctx}
-                />
+                <CommandButton ctx={ctx} command={NewRectCommand}/>
+                <CommandButton ctx={ctx} command={NewCircleCommand}/>
                 <button disabled={state.transactionActive}
                         onClick={() => setImageDialog({kind: 'create'})}>New
                     Pixel Image
@@ -748,7 +727,7 @@ export default function App() {
                 {!selectedAsset &&
                     <IconButton label="Delete selected shapes" icon={Trash2}
                                 disabled={!selectedShapes.length || state.transactionActive}
-                                onClick={() => DeleteSelectionCommand.run(ctx)}/>}
+                                onClick={() => SelectionDeleteCommand.run(ctx)}/>}
 
             </div>
             <div className="left scroll-container"><h2
@@ -874,35 +853,35 @@ export default function App() {
                  role="menu" onContextMenu={event => event.preventDefault()}
                  onPointerDown={event => event.stopPropagation()}>
                 {selectedUngrouped && <button role="menuitem" onClick={() => {
-                    GroupSelectionCommand.run(ctx)
+                    SelectionGroupCommand.run(ctx)
                     setContextMenu(null);
                 }}>Group</button>}
                 {selectedGrouped && <button role="menuitem" onClick={() => {
-                    UngroupSelectionCommand.run(ctx)
+                    SelectionUngroupCommand.run(ctx)
                     setContextMenu(null);
                 }}>Ungroup</button>}
                 <button role="menuitem" disabled={!state.selectedIds.length}
                         onClick={() => {
-                            DuplicateSelectionCommand.run(ctx)
+                            SelectionDuplicateCommand.run(ctx)
                             setContextMenu(null);
-                        }}>{DuplicateSelectionCommand.title}</button>
+                        }}>{SelectionDuplicateCommand.title}</button>
                 <button role="menuitem" disabled={!state.selectedIds.length}
                         onClick={() => {
-                            DeleteSelectionCommand.run(ctx)
+                            SelectionDeleteCommand.run(ctx)
                             setContextMenu(null);
                         }}
-                >{DeleteSelectionCommand.title}</button>
+                >{SelectionDeleteCommand.title}</button>
                 <button role="menuitem" disabled={!state.selectedIds.length}
                         onClick={() => {
-                            copySelection();
-                            DeleteSelectionCommand.run(ctx)
+                            SelectionCopyCommand.run(ctx);
+                            SelectionDeleteCommand.run(ctx)
                             setContextMenu(null);
                         }}
                 >Cut
                 </button>
                 <button role="menuitem" disabled={!state.selectedIds.length}
                         onClick={() => {
-                            copySelection();
+                            SelectionCopyCommand.run(ctx);
                             setContextMenu(null);
                         }}>Copy
                 </button>
