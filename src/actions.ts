@@ -1,5 +1,6 @@
 import {type EditorSnapshot, EditorStore} from "./EditorStore";
 import {makeCircle, makeRect} from "./reducer";
+import type {Shape} from "./types";
 
 export interface PageAction {
     title:string
@@ -30,3 +31,29 @@ export const page_menu_actions:PageAction[] = [
     new_page_rectangle,
     new_page_circle
 ]
+
+export interface StoreAction {
+    title:string,
+    perform:(store:EditorStore) => void
+}
+
+export const create_new_page:StoreAction = {
+    title:'New Page',
+    perform:(store:EditorStore) => {
+        store.createPage();
+    }
+}
+
+export interface ShapeAction {
+    title: string
+    perform:(store:EditorStore, shapes:Shape[]) => void
+}
+
+export const duplicate_selection:ShapeAction = {
+    title:'Duplicate x',
+    perform:(store, shapes) => {
+        if(shapes.length) {
+            store.duplicateShapes(shapes.map(shape => shape.id))
+        }
+    }
+}

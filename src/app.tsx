@@ -12,7 +12,7 @@ import {
     ZoomOut
 } from 'lucide-react';
 import {type MouseEvent, useEffect, useRef, useState} from 'react';
-import {page_menu_actions} from "./actions";
+import {create_new_page, duplicate_selection, page_menu_actions, type StoreAction} from "./actions";
 import {DropdownMenu} from './DropdownMenu';
 import {EditorStore, emptyDocument} from './EditorStore';
 import {makeExampleDocument} from './exampleDocument';
@@ -59,6 +59,14 @@ function DocumentTabButton({tab, active, activate}: {
                    title={`${document.title || 'Untitled'}${dirty ? ' — unsaved in browser storage' : ' — saved in browser storage'}`}>
         {document.title || 'Untitled'}{dirty ? ' •' : ''}
     </button>;
+}
+
+function StoreActionButton({action, disabled, store}: {
+    action: StoreAction,
+    disabled: boolean,
+    store: EditorStore
+}) {
+    return <button disabled={disabled} onClick={() => action.perform(store)}>{action.title}</button>
 }
 
 export default function App() {
@@ -220,7 +228,7 @@ export default function App() {
             }
             if ((event.metaKey || event.ctrlKey) && !event.altKey && ['d', 'x', 'c', 'v'].includes(key)) {
                 event.preventDefault();
-                if (key === 'd') duplicateSelection();
+                if (key === 'd') duplicate_selection.perform(store, getSelected())
                 if (key === 'c') copySelection();
                 if (key === 'x') {
                     copySelection();
@@ -269,10 +277,6 @@ export default function App() {
         shapes.forEach(shape => store.removeShape(shape.id));
         store.commitTransaction();
         store.select(null);
-    };
-    const duplicateSelection = () => {
-        const shapes = getSelected();
-        if (shapes.length) store.duplicateShapes(shapes.map(shape => shape.id));
     };
     const pasteSelection = () => {
         if (clipboard.shapes.length) store.pasteShapes(clipboard.shapes, clipboard.images);
@@ -329,7 +333,7 @@ export default function App() {
             </DropdownMenu>
             <DropdownMenu title="Edit">
                 <MenuItem disabled={!state.selectedIds.length || state.transactionActive}
-                          onClick={duplicateSelection} label="Duplicate" shortcut="⌘D / Ctrl+D"/>
+                          onClick={() => duplicate_selection.perform(store, getSelected())} label={duplicate_selection.title} shortcut="⌘D / Ctrl+D"/>
                 <button disabled={!state.selectedIds.length || state.transactionActive}
                         onClick={deleteSelection}>Delete
                 </button>
@@ -344,9 +348,9 @@ export default function App() {
                           onClick={pasteSelection} label="Paste" shortcut="⌘V / Ctrl+V"/>
             </DropdownMenu>
             <DropdownMenu title="Page">
-                <button disabled={state.transactionActive} onClick={() => store.createPage()}>New
-                    Page
-                </button>
+                <StoreActionButton action={create_new_page}
+                                   disabled={state.transactionActive}
+                                   store={store}/>
                 <button disabled={state.transactionActive}
                         onClick={() => renamePage(state.selectedPageId)}>Rename Page
                 </button>
@@ -580,10 +584,9 @@ export default function App() {
                     setContextMenu(null);
                 }}>Ungroup</button>}
                 <button role="menuitem" disabled={!state.selectedIds.length} onClick={() => {
-                    duplicateSelection();
+                    duplicate_selection.perform(store,getSelected())
                     setContextMenu(null);
-                }}>Duplicate
-                </button>
+                }}>{duplicate_selection.title}</button>
                 <button role="menuitem" disabled={!state.selectedIds.length} onClick={() => {
                     deleteSelection();
                     setContextMenu(null);
@@ -655,10 +658,9 @@ export default function App() {
                  onContextMenu={event => event.preventDefault()}
                  onPointerDown={event => event.stopPropagation()}>
                 <button role="menuitem" onClick={() => {
-                    store.createPage();
+                    create_new_page.perform(store)
                     setPagesMenu(null);
-                }}>New Page
-                </button>
+                }}>{create_new_page.title}</button>
             </div>}
         {imageDialog?.kind === 'import' &&
             <ImportPixelImage store={store} onClose={() => setImageDialog(null)}/>}
