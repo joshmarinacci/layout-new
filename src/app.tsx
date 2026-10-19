@@ -38,7 +38,7 @@ import {SavedDocumentsDialog} from './SavedDocumentsDialog';
 import {deserializeDocument} from './serialization';
 import TreeView from './TreeView';
 import type {Bounds, Document as DrawingDocument, PixelImageData, Shape} from './types';
-import {IconButton, MenuItem, SelectControl, ToolbarGroup} from './ui/controls';
+import {IconButton, MenuItem, ToolbarGroup} from './ui/controls';
 import {useTheme} from './ui/theme';
 import {useEditorStore} from './useEditorStore';
 import {makeVector} from './vectorNetworks';
@@ -56,16 +56,17 @@ function makeTab(document: DrawingDocument, savedDocumentId: string | null = nul
     return {id: crypto.randomUUID(), store: new EditorStore(document), savedDocumentId, savedJson};
 }
 
-function DocumentTabButton({tab, active, activate}: {
+function DocumentTabButton({tab, active, activate, onContextMenu}: {
     tab: DocumentTab;
     active: boolean;
     activate: () => void
+    onContextMenu: (event: MouseEvent<HTMLButtonElement>) => void
 }) {
     const {document} = useEditorStore(tab.store);
     const dirty = tab.savedJson !== tab.store.toJSON();
     return <button role="tab" id={`tab-${tab.id}`} aria-selected={active}
                    aria-controls="document-editor"
-                   tabIndex={active ? 0 : -1} onClick={activate}
+                   tabIndex={active ? 0 : -1} onClick={activate} onContextMenu={onContextMenu}
                    title={`${document.title || 'Untitled'}${dirty ? ' — unsaved in browser storage' : ' — saved in browser storage'}`}>
         {document.title || 'Untitled'}{dirty ? ' •' : ''}
     </button>;
@@ -150,9 +151,11 @@ export default function App() {
         images: PixelImageData[]
     }>({shapes: [], images: []});
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+    const [documentMenu, setDocumentMenu] = useState<{ x: number; y: number } | null>(null);
     const [pageMenu, setPageMenu] = useState<{ x: number; y: number; pageId: string } | null>(null);
     const [pagesMenu, setPagesMenu] = useState<{ x: number; y: number } | null>(null);
     const [renamePageDialog, setRenamePageDialog] = useState<{pageId: string; name: string} | null>(null);
+    const [renameDocumentName, setRenameDocumentName] = useState<string | null>(null);
     const [savedDocumentsOpen, setSavedDocumentsOpen] = useState(false);
     const selectedAsset = doc.images.find(image => image.id === selectedAssetId);
     const saveDocument = () => {
@@ -259,6 +262,7 @@ export default function App() {
     useEffect(() => {
         const close = () => {
             setContextMenu(null);
+            setDocumentMenu(null);
             setPageMenu(null);
             setPagesMenu(null);
         };
@@ -296,12 +300,14 @@ export default function App() {
         .some(group => group.shapeIds.includes(shape.id)));
     const showShapeContextMenu = (event: MouseEvent<HTMLElement>, shape: Shape) => {
         event.preventDefault();
+        setDocumentMenu(null);
         const snap = store.getSnapshot();
         if (!snap.selectedIds.includes(shape.id)) store.select(shape.id);
         setContextMenu({x: event.clientX, y: event.clientY});
     };
     const showPageContextMenu = (event: MouseEvent<HTMLElement>, pageId: string) => {
         event.preventDefault();
+        setDocumentMenu(null);
         store.selectPage(pageId);
         setContextMenu(null);
         setPageMenu({x: event.clientX, y: event.clientY, pageId});
@@ -458,31 +464,20 @@ export default function App() {
              }}>
             {workspace.tabs.map(tab => <DocumentTabButton key={tab.id} tab={tab}
                                                           active={tab.id === workspace.activeId}
-                                                          activate={() => activateTab(tab.id)}/>)}
+                                                          activate={() => activateTab(tab.id)}
+                                                          onContextMenu={event => {
+                                                              event.preventDefault();
+                                                              if (tab.id !== workspace.activeId) activateTab(tab.id);
+                                                              setContextMenu(null);
+                                                              setPageMenu(null);
+                                                              setPagesMenu(null);
+                                                              setDocumentMenu({x: event.clientX, y: event.clientY});
+                                                          }}/>)}
         </div>
         <div id="document-editor"
              className={`document-editor full-span${leftPanelVisible ? '' : ' hide-left'}${rightPanelVisible ? '' : ' hide-right'}`}
              role="tabpanel" aria-labelledby={`tab-${activeTab.id}`}>
             <div className="toolbar full-span" key={activeTab.id}>
-                <input aria-label="Document title" value={doc.title}
-                       onFocus={() => store.beginTransaction('Document title')}
-                       onBlur={() => {
-                           if (store.getSnapshot().transactionActive) store.commitTransaction();
-                       }}
-                       onKeyDown={event => {
-                           if (event.key === 'Escape') {
-                               store.cancelTransaction();
-                               event.currentTarget.blur();
-                           }
-                           if (event.key === 'Enter') event.currentTarget.blur();
-                       }}
-                       onChange={event => store.setTitle(event.target.value)}/>
-                <label className="page-picker">Page <SelectControl aria-label="Current page"
-                                                                   value={state.selectedPageId}
-                                                                   onChange={event => store.selectPage(event.target.value)}>
-                    {doc.pages.map(page => <option key={page.id}
-                                                   value={page.id}>{page.name}</option>)}
-                </SelectControl></label>
                 {selectedAsset &&
                     <button onClick={() => setSelectedAssetId(null)}>Back to canvas</button>}
                 {!selectedAsset && <div className="canvas-zoom-controls" role="group"
@@ -522,6 +517,13 @@ export default function App() {
                 className="panel-heading">Layers &amp; assets</h2><TreeView document={doc}
                                                                             selectedIds={state.selectedIds}
                                                                             selectedAssetId={selectedAssetId}
+                                                                            onDocumentContextMenu={event => {
+                                                                                event.preventDefault();
+                                                                                setContextMenu(null);
+                                                                                setPageMenu(null);
+                                                                                setPagesMenu(null);
+                                                                                setDocumentMenu({x: event.clientX, y: event.clientY});
+                                                                            }}
                                                                             onSelect={(shape, additive) => {
                                                                                 setSelectedAssetId(null);
                                                                                 additive ? store.toggleSelection(shape.id) : store.select(shape.id);
@@ -540,6 +542,7 @@ export default function App() {
                                                                             onPageContextMenu={showPageContextMenu}
                                                                             onPagesContextMenu={event => {
                                                                                 event.preventDefault();
+                                                                                setDocumentMenu(null);
                                                                                 setContextMenu(null);
                                                                                 setPageMenu(null);
                                                                                 setPagesMenu({
@@ -650,6 +653,19 @@ export default function App() {
                 }}>Paste
                 </button>
             </div>}
+        {documentMenu && <div className="shape-context-menu" style={{left: documentMenu.x, top: documentMenu.y}}
+                              role="menu" aria-label="Document actions"
+                              onContextMenu={event => event.preventDefault()}
+                              onPointerDown={event => event.stopPropagation()}>
+            <button role="menuitem" onClick={() => {
+                setDocumentMenu(null);
+                setRenameDocumentName(doc.title);
+            }}>Rename Document</button>
+            <button role="menuitem" disabled={state.transactionActive} onClick={() => {
+                create_new_page.perform(store);
+                setDocumentMenu(null);
+            }}>New Page</button>
+        </div>}
         {pageMenu && <div className="shape-context-menu" style={{left: pageMenu.x, top: pageMenu.y}}
                           role="menu" aria-label="Page actions"
                           onContextMenu={event => event.preventDefault()}
@@ -711,11 +727,27 @@ export default function App() {
                 setRenamePageDialog(null);
             }}>
                 <label htmlFor="rename-page-name">Page name</label>
-                <input id="rename-page-name" autoFocus value={renamePageDialog.name}
+                <input id="rename-page-name" autoFocus data-dialog-autofocus value={renamePageDialog.name}
                        onChange={event => setRenamePageDialog(current => current ? {...current, name: event.target.value} : current)}/>
                 <div className="dialog-actions">
                     <button type="button" onClick={() => setRenamePageDialog(null)}>Cancel</button>
                     <button type="submit" disabled={!renamePageDialog.name.trim()}>Rename</button>
+                </div>
+            </form>
+        </EditorDialog>}
+        {renameDocumentName !== null && <EditorDialog title="Rename Document" onClose={() => setRenameDocumentName(null)}>
+            <form className="rename-page-form" onSubmit={event => {
+                event.preventDefault();
+                const name = renameDocumentName.trim();
+                if (name) store.setTitle(name);
+                setRenameDocumentName(null);
+            }}>
+                <label htmlFor="rename-document-name">Document name</label>
+                <input id="rename-document-name" autoFocus data-dialog-autofocus value={renameDocumentName}
+                       onChange={event => setRenameDocumentName(event.target.value)}/>
+                <div className="dialog-actions">
+                    <button type="button" onClick={() => setRenameDocumentName(null)}>Cancel</button>
+                    <button type="submit" disabled={!renameDocumentName.trim()}>Rename</button>
                 </div>
             </form>
         </EditorDialog>}

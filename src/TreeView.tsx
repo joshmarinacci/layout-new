@@ -71,6 +71,7 @@ export default function TreeView(props: {
     onShapeContextMenu: (event: MouseEvent<HTMLButtonElement>, shape: Shape) => void,
     selectedPageId: string,
     onSelectPage: (id: string) => void,
+    onDocumentContextMenu: (event: MouseEvent<HTMLButtonElement>) => void,
     onUngroup: (id: string) => void,
     onRenameGroup: (id: string, name: string) => void,
     onSelectGroup: (ids: string[]) => void,
@@ -122,7 +123,7 @@ export default function TreeView(props: {
         setDropTarget(null);
     };
     return <ul className="tree-view" aria-label="Document contents">
-        <TreeNode label={`Doc: ${doc.title}`} depth={0}>
+        <TreeNode label={`Doc: ${doc.title}`} depth={0} onContextMenu={props.onDocumentContextMenu}>
             <TreeNode label="Pages" depth={1} onContextMenu={props.onPagesContextMenu}>
                 {doc.pages.map(page => <TreeNode key={page.id} label={page.name} depth={2}
                                                  selected={page.id === props.selectedPageId}

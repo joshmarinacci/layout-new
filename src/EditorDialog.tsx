@@ -11,6 +11,7 @@ export function EditorDialog({title, onClose, children}: {
     useEffect(() => {
         const dialog = ref.current!;
         dialog.showModal();
+        dialog.querySelector<HTMLElement>('[data-dialog-autofocus]')?.focus();
         return () => {
             dialog.close();
         };
