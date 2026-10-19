@@ -14,15 +14,36 @@ export const keybindings: Keybinding[] = [
     {commandId: 'delete', key: 'delete', mac: 'Delete', other: 'Delete'},
     {commandId: 'undo', key: 'cmd-z', mac: '⌘Z', other: 'Ctrl+Z'},
     {commandId: 'redo', key: 'cmd-shift-z', mac: '⌘⇧Z', other: 'Ctrl+Shift+Z'},
-    {commandId: 'open-palette', key: 'cmd-shift-p', mac: '⌘⇧P', other: 'Ctrl+Shift+P'},
-    {commandId: 'toggle-left-sidebar', key: 'cmd-shift-b', mac: '⌘⇧B', other: 'Ctrl+Shift+B'},
-    {commandId: 'toggle-right-sidebar', key: 'cmd-shift-alt-b', mac: '⌘⌥⇧B', other: 'Ctrl+Alt+Shift+B'}
+    {
+        commandId: 'open-palette',
+        key: 'cmd-shift-p',
+        mac: '⌘⇧P',
+        other: 'Ctrl+Shift+P'
+    },
+    {
+        commandId: 'toggle-left-sidebar',
+        key: 'cmd-shift-b',
+        mac: '⌘⇧B',
+        other: 'Ctrl+Shift+B'
+    },
+    {
+        commandId: 'toggle-right-sidebar',
+        key: 'cmd-shift-alt-b',
+        mac: '⌘⌥⇧B',
+        other: 'Ctrl+Alt+Shift+B'
+    }
 ];
 
 function parseBinding(binding: Keybinding) {
     const parts = binding.key.toLowerCase().split('-');
     const key = parts.pop()!;
-    return {key, cmd: parts.includes('cmd'), ctrl: parts.includes('ctrl'), shift: parts.includes('shift'), alt: parts.includes('alt')};
+    return {
+        key,
+        cmd: parts.includes('cmd'),
+        ctrl: parts.includes('ctrl'),
+        shift: parts.includes('shift'),
+        alt: parts.includes('alt')
+    };
 }
 
 export function matchesKeybinding(event: KeyboardEvent, binding: Keybinding): boolean {

@@ -24,7 +24,7 @@ import {
     type StoreAction
 } from "./actions";
 import {DropdownMenu} from './DropdownMenu';
-import {CommandPalette, type Command} from './CommandPalette';
+import {CommandPalette} from './CommandPalette';
 import {keybindings, matchesKeybinding} from './keybindings';
 import {EditorDialog} from './EditorDialog';
 import {EditorStore, emptyDocument} from './EditorStore';
@@ -35,18 +35,32 @@ import {NewRepeatingImage} from './NewRepeatingImage';
 import {PixelAssetView} from './PixelAssetView';
 import {type PixelEditorController, PixelImageEditor} from './PixelImageEditor';
 import PropSheet from './PropSheet';
-import {readSavedDocuments, type SavedDocumentRecord, writeSavedDocuments} from './savedDocuments';
+import {
+    readSavedDocuments,
+    type SavedDocumentRecord,
+    writeSavedDocuments
+} from './savedDocuments';
 import {SavedDocumentsDialog} from './SavedDocumentsDialog';
 import {deserializeDocument} from './serialization';
-import {shapeAlignmentOffsets, translateShape, type ShapeAlignment} from './shapeAlignment';
+import {
+    type ShapeAlignment,
+    shapeAlignmentOffsets,
+    translateShape
+} from './shapeAlignment';
 import TreeView from './TreeView';
-import type {Bounds, Document as DrawingDocument, PixelImageData, Shape} from './types';
+import type {
+    Bounds,
+    Document as DrawingDocument,
+    PixelImageData,
+    Shape
+} from './types';
 import {IconButton, MenuItem, ToolbarGroup} from './ui/controls';
 import {useTheme} from './ui/theme';
 import {useEditorStore} from './useEditorStore';
 import {makeVector} from './vectorNetworks';
 import VisualEditor from './VisualEditor';
 import './app.css';
+import type {Command} from "./commands";
 
 interface DocumentTab {
     id: string;
@@ -56,7 +70,12 @@ interface DocumentTab {
 }
 
 function makeTab(document: DrawingDocument, savedDocumentId: string | null = null, savedJson: string | null = null): DocumentTab {
-    return {id: crypto.randomUUID(), store: new EditorStore(document), savedDocumentId, savedJson};
+    return {
+        id: crypto.randomUUID(),
+        store: new EditorStore(document),
+        savedDocumentId,
+        savedJson
+    };
 }
 
 function DocumentTabButton({tab, active, activate, onContextMenu}: {
@@ -69,7 +88,8 @@ function DocumentTabButton({tab, active, activate, onContextMenu}: {
     const dirty = tab.savedJson !== tab.store.toJSON();
     return <button role="tab" id={`tab-${tab.id}`} aria-selected={active}
                    aria-controls="document-editor"
-                   tabIndex={active ? 0 : -1} onClick={activate} onContextMenu={onContextMenu}
+                   tabIndex={active ? 0 : -1} onClick={activate}
+                   onContextMenu={onContextMenu}
                    title={`${document.title || 'Untitled'}${dirty ? ' — unsaved in browser storage' : ' — saved in browser storage'}`}>
         {document.title || 'Untitled'}{dirty ? ' •' : ''}
     </button>;
@@ -80,7 +100,8 @@ function StoreActionButton({action, disabled, store}: {
     disabled: boolean,
     store: EditorStore
 }) {
-    return <button disabled={disabled} onClick={() => action.perform(store)}>{action.title}</button>
+    return <button disabled={disabled}
+                   onClick={() => action.perform(store)}>{action.title}</button>
 }
 
 export default function App() {
@@ -102,7 +123,10 @@ export default function App() {
     const openDocument = (document: DrawingDocument) => {
         const tab = makeTab(document);
         finishEditing();
-        setWorkspace(current => ({tabs: [...current.tabs, tab], activeId: tab.id}));
+        setWorkspace(current => ({
+            tabs: [...current.tabs, tab],
+            activeId: tab.id
+        }));
     };
     const activateTab = (id: string) => {
         if (id === workspace.activeId) return;
@@ -120,7 +144,9 @@ export default function App() {
     const [canvasZoom, setCanvasZoom] = useState(1);
     const [leftPanelVisible, setLeftPanelVisible] = useState(true);
     const [rightPanelVisible, setRightPanelVisible] = useState(true);
-    const [imageDialog, setImageDialog] = useState<{ kind: 'create' | 'import' } | {
+    const [imageDialog, setImageDialog] = useState<{
+        kind: 'create' | 'import'
+    } | {
         kind: 'edit';
         imageId: string;
         source?: Bounds;
@@ -153,11 +179,27 @@ export default function App() {
         shapes: Shape[];
         images: PixelImageData[]
     }>({shapes: [], images: []});
-    const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
-    const [documentMenu, setDocumentMenu] = useState<{ x: number; y: number } | null>(null);
-    const [pageMenu, setPageMenu] = useState<{ x: number; y: number; pageId: string } | null>(null);
-    const [pagesMenu, setPagesMenu] = useState<{ x: number; y: number } | null>(null);
-    const [renamePageDialog, setRenamePageDialog] = useState<{pageId: string; name: string} | null>(null);
+    const [contextMenu, setContextMenu] = useState<{
+        x: number;
+        y: number
+    } | null>(null);
+    const [documentMenu, setDocumentMenu] = useState<{
+        x: number;
+        y: number
+    } | null>(null);
+    const [pageMenu, setPageMenu] = useState<{
+        x: number;
+        y: number;
+        pageId: string
+    } | null>(null);
+    const [pagesMenu, setPagesMenu] = useState<{
+        x: number;
+        y: number
+    } | null>(null);
+    const [renamePageDialog, setRenamePageDialog] = useState<{
+        pageId: string;
+        name: string
+    } | null>(null);
     const [renameDocumentName, setRenameDocumentName] = useState<string | null>(null);
     const [savedDocumentsOpen, setSavedDocumentsOpen] = useState(false);
     const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -215,7 +257,10 @@ export default function App() {
                 return;
             }
             if (commandPaletteOpen) {
-                if (event.key === 'Escape') { event.preventDefault(); setCommandPaletteOpen(false); }
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    setCommandPaletteOpen(false);
+                }
                 return;
             }
             if (event.target instanceof HTMLElement && (event.target.matches('input, textarea, select') || event.target.isContentEditable)) return;
@@ -362,46 +407,174 @@ export default function App() {
         });
     };
     const commands: Command[] = [
-        {id: 'save', name: isTauri() ? 'Save Document' : 'Save to Browser', description: 'Save the current document', keywords: ['file'], enabled: !state.transactionActive, run: () => { void saveToBrowser(); }},
-        {id: 'export-json', name: 'Export JSON', description: 'Download the document as a JSON file', keywords: ['save', 'download', 'file'], run: saveDocument},
-        {id: 'new-document', name: 'New Document', description: 'Create a blank document', keywords: ['file', 'create'], enabled: !state.transactionActive, run: () => openDocument(emptyDocument())},
-        {id: 'new-page', name: 'New Page', description: 'Add a page to the current document', keywords: ['create'], enabled: !state.transactionActive, run: () => create_new_page.perform(store)},
-        {id: 'new-rectangle', name: 'New Rectangle', description: 'Add a rectangle to the current page', keywords: ['shape', 'rect', 'create'], enabled: !selectedAssetId && !state.transactionActive, run: () => new_rect.perform(store)},
-        {id: 'new-circle', name: 'New Circle', description: 'Add a circle to the current page', keywords: ['shape', 'oval', 'create'], enabled: !selectedAssetId && !state.transactionActive, run: () => new_circle.perform(store)},
-        {id: 'duplicate', name: 'Duplicate Selection', description: 'Make a copy of selected shapes', keywords: ['copy'], enabled: !!state.selectedIds.length && !state.transactionActive, run: () => duplicate_selection.perform(store, getSelected())},
-        {id: 'delete', name: 'Delete Selection', description: 'Remove selected shapes', keywords: ['remove'], enabled: !!state.selectedIds.length && !state.transactionActive, run: () => delete_selection.perform(store, getSelected())},
-        {id: 'undo', name: 'Undo', description: 'Undo the last change', enabled: state.canUndo, run: () => store.undo()},
-        {id: 'redo', name: 'Redo', description: 'Redo the last undone change', enabled: state.canRedo, run: () => store.redo()},
-        ...([['left', 'Align Left', 'Align selected shapes to their left edges'], ['center', 'Align Horizontal Center', 'Align selected shapes by horizontal center'], ['right', 'Align Right', 'Align selected shapes to their right edges'], ['top', 'Align Top', 'Align selected shapes to their top edges'], ['middle', 'Align Vertical Middle', 'Align selected shapes by vertical middle'], ['bottom', 'Align Bottom', 'Align selected shapes to their bottom edges'], ['distribute-horizontal', 'Distribute Horizontally', 'Space three or more shapes evenly across'], ['distribute-vertical', 'Distribute Vertically', 'Space three or more shapes evenly down']] as const).map(([alignment, name, description]) => ({id: `align-${alignment}`, name, description, keywords: ['align', 'alignment', 'distribute'], enabled: !selectedAssetId && !state.transactionActive && selectedShapes.length >= (alignment.startsWith('distribute') ? 3 : 2), run: () => applyAlignment(alignment)}))
+        {
+            id: 'save',
+            name: isTauri() ? 'Save Document' : 'Save to Browser',
+            description: 'Save the current document',
+            keywords: ['file'],
+            enabled: !state.transactionActive,
+            run: () => {
+                void saveToBrowser();
+            }
+        },
+        {
+            id: 'export-json',
+            name: 'Export JSON',
+            description: 'Download the document as a JSON file',
+            keywords: ['save', 'download', 'file'],
+            run: saveDocument
+        },
+        {
+            id: 'new-document',
+            name: 'New Document',
+            description: 'Create a blank document',
+            keywords: ['file', 'create'],
+            enabled: !state.transactionActive,
+            run: () => openDocument(emptyDocument())
+        },
+        {
+            id: 'new-page',
+            name: 'New Page',
+            description: 'Add a page to the current document',
+            keywords: ['create'],
+            enabled: !state.transactionActive,
+            run: () => create_new_page.perform(store)
+        },
+        {
+            id: 'new-rectangle',
+            name: 'New Rectangle',
+            description: 'Add a rectangle to the current page',
+            keywords: ['shape', 'rect', 'create'],
+            enabled: !selectedAssetId && !state.transactionActive,
+            run: () => new_rect.perform(store)
+        },
+        {
+            id: 'new-circle',
+            name: 'New Circle',
+            description: 'Add a circle to the current page',
+            keywords: ['shape', 'oval', 'create'],
+            enabled: !selectedAssetId && !state.transactionActive,
+            run: () => new_circle.perform(store)
+        },
+        {
+            id: 'duplicate',
+            name: 'Duplicate Selection',
+            description: 'Make a copy of selected shapes',
+            keywords: ['copy'],
+            enabled: !!state.selectedIds.length && !state.transactionActive,
+            run: () => duplicate_selection.perform(store, getSelected())
+        },
+        {
+            id: 'delete',
+            name: 'Delete Selection',
+            description: 'Remove selected shapes',
+            keywords: ['remove'],
+            enabled: !!state.selectedIds.length && !state.transactionActive,
+            run: () => delete_selection.perform(store, getSelected())
+        },
+        {
+            id: 'undo',
+            name: 'Undo',
+            description: 'Undo the last change',
+            enabled: state.canUndo,
+            run: () => store.undo()
+        },
+        {
+            id: 'redo',
+            name: 'Redo',
+            description: 'Redo the last undone change',
+            enabled: state.canRedo,
+            run: () => store.redo()
+        },
+        ...([['left', 'Align Left', 'Align selected shapes to their left edges'], ['center', 'Align Horizontal Center', 'Align selected shapes by horizontal center'], ['right', 'Align Right', 'Align selected shapes to their right edges'], ['top', 'Align Top', 'Align selected shapes to their top edges'], ['middle', 'Align Vertical Middle', 'Align selected shapes by vertical middle'], ['bottom', 'Align Bottom', 'Align selected shapes to their bottom edges'], ['distribute-horizontal', 'Distribute Horizontally', 'Space three or more shapes evenly across'], ['distribute-vertical', 'Distribute Vertically', 'Space three or more shapes evenly down']] as const).map(([alignment, name, description]) => ({
+            id: `align-${alignment}`,
+            name,
+            description,
+            keywords: ['align', 'alignment', 'distribute'],
+            enabled: !selectedAssetId && !state.transactionActive && selectedShapes.length >= (alignment.startsWith('distribute') ? 3 : 2),
+            run: () => applyAlignment(alignment)
+        }))
     ];
-    const nativeMenuAction = useRef<(id: string) => void>(() => {});
+    const nativeMenuAction = useRef<(id: string) => void>(() => {
+    });
     nativeMenuAction.current = id => {
         if (store.getSnapshot().transactionActive) return;
         switch (id) {
-            case 'new-document': openDocument(emptyDocument()); break;
-            case 'open-saved': setSavedDocumentsOpen(true); break;
-            case 'load-json': file.current?.click(); break;
-            case 'save-document': void saveToBrowser(); break;
-            case 'export-json': saveDocument(); break;
-            case 'undo': store.undo(); break;
-            case 'redo': store.redo(); break;
-            case 'duplicate': if (store.getSnapshot().selectedIds.length) duplicate_selection.perform(store, getSelected()); break;
-            case 'delete': if (store.getSnapshot().selectedIds.length) delete_selection.perform(store, getSelected()); break;
-            case 'cut': if (store.getSnapshot().selectedIds.length) { copySelection(); delete_selection.perform(store, getSelected()); } break;
-            case 'copy': copySelection(); break;
-            case 'paste': pasteSelection(); break;
-            case 'new-page': create_new_page.perform(store); break;
-            case 'rename-page': renamePage(store.getSnapshot().selectedPageId); break;
-            case 'delete-page': if (store.getSnapshot().document.pages.length > 1) store.deletePage(store.getSnapshot().selectedPageId); break;
-            case 'new-vector': if (!selectedAssetId) createVector(); break;
-            case 'new-rectangle': if (!selectedAssetId) new_rect.perform(store); break;
-            case 'new-circle': if (!selectedAssetId) new_circle.perform(store); break;
-            case 'new-pixel-image': if (!selectedAssetId) setImageDialog({kind: 'create'}); break;
-            case 'new-repeating-image': if (!selectedAssetId && doc.images.length) setRepeatingImageDialog(true); break;
-            case 'import-png': if (!selectedAssetId) setImageDialog({kind: 'import'}); break;
-            case 'theme-system': setTheme('system'); break;
-            case 'theme-light': setTheme('light'); break;
-            case 'theme-dark': setTheme('dark'); break;
+            case 'new-document':
+                openDocument(emptyDocument());
+                break;
+            case 'open-saved':
+                setSavedDocumentsOpen(true);
+                break;
+            case 'load-json':
+                file.current?.click();
+                break;
+            case 'save-document':
+                void saveToBrowser();
+                break;
+            case 'export-json':
+                saveDocument();
+                break;
+            case 'undo':
+                store.undo();
+                break;
+            case 'redo':
+                store.redo();
+                break;
+            case 'duplicate':
+                if (store.getSnapshot().selectedIds.length) duplicate_selection.perform(store, getSelected());
+                break;
+            case 'delete':
+                if (store.getSnapshot().selectedIds.length) delete_selection.perform(store, getSelected());
+                break;
+            case 'cut':
+                if (store.getSnapshot().selectedIds.length) {
+                    copySelection();
+                    delete_selection.perform(store, getSelected());
+                }
+                break;
+            case 'copy':
+                copySelection();
+                break;
+            case 'paste':
+                pasteSelection();
+                break;
+            case 'new-page':
+                create_new_page.perform(store);
+                break;
+            case 'rename-page':
+                renamePage(store.getSnapshot().selectedPageId);
+                break;
+            case 'delete-page':
+                if (store.getSnapshot().document.pages.length > 1) store.deletePage(store.getSnapshot().selectedPageId);
+                break;
+            case 'new-vector':
+                if (!selectedAssetId) createVector();
+                break;
+            case 'new-rectangle':
+                if (!selectedAssetId) new_rect.perform(store);
+                break;
+            case 'new-circle':
+                if (!selectedAssetId) new_circle.perform(store);
+                break;
+            case 'new-pixel-image':
+                if (!selectedAssetId) setImageDialog({kind: 'create'});
+                break;
+            case 'new-repeating-image':
+                if (!selectedAssetId && doc.images.length) setRepeatingImageDialog(true);
+                break;
+            case 'import-png':
+                if (!selectedAssetId) setImageDialog({kind: 'import'});
+                break;
+            case 'theme-system':
+                setTheme('system');
+                break;
+            case 'theme-light':
+                setTheme('light');
+                break;
+            case 'theme-dark':
+                setTheme('dark');
+                break;
         }
     };
     useEffect(() => {
@@ -428,97 +601,130 @@ export default function App() {
             <DropdownMenu title="File">
                 <MenuItem disabled={state.transactionActive}
                           onClick={() => openDocument(emptyDocument())}
-                          label="New Document" shortcut={keybindings.find(binding => binding.commandId === 'new-document')?.mac ?? '⌘N'}/>
+                          label="New Document"
+                          shortcut={keybindings.find(binding => binding.commandId === 'new-document')?.mac ?? '⌘N'}/>
                 <hr className="menu-separator" aria-hidden="true"/>
                 <MenuItem disabled={state.transactionActive}
-                          onClick={() => setSavedDocumentsOpen(true)} label={isTauri() ? 'Open Saved Document' : 'Open from Browser'}
+                          onClick={() => setSavedDocumentsOpen(true)}
+                          label={isTauri() ? 'Open Saved Document' : 'Open from Browser'}
                           shortcut="⌘⇧O / Ctrl+Shift+O"/>
                 <button disabled={state.transactionActive}
                         onClick={() => file.current?.click()}>Load JSON file
                 </button>
                 <hr className="menu-separator" aria-hidden="true"/>
-                <MenuItem disabled={state.transactionActive} onClick={() => void saveToBrowser()}
-                          label={isTauri() ? 'Save Document' : 'Save to Browser'} shortcut="⌘S / Ctrl+S"/>
-                <button disabled={state.transactionActive} onClick={saveDocument}>Export JSON
+                <MenuItem disabled={state.transactionActive}
+                          onClick={() => void saveToBrowser()}
+                          label={isTauri() ? 'Save Document' : 'Save to Browser'}
+                          shortcut="⌘S / Ctrl+S"/>
+                <button disabled={state.transactionActive}
+                        onClick={saveDocument}>Export JSON
                 </button>
             </DropdownMenu>
             <DropdownMenu title="Edit">
-                <MenuItem disabled={!state.selectedIds.length || state.transactionActive}
-                          onClick={() => duplicate_selection.perform(store, getSelected())}
-                          label={duplicate_selection.title} shortcut="⌘D / Ctrl+D"/>
-                <button disabled={!state.selectedIds.length || state.transactionActive}
-                        onClick={() => delete_selection.perform(store, getSelected())}
+                <MenuItem
+                    disabled={!state.selectedIds.length || state.transactionActive}
+                    onClick={() => duplicate_selection.perform(store, getSelected())}
+                    label={duplicate_selection.title} shortcut="⌘D / Ctrl+D"/>
+                <button
+                    disabled={!state.selectedIds.length || state.transactionActive}
+                    onClick={() => delete_selection.perform(store, getSelected())}
                 >{delete_selection.title}</button>
-                <MenuItem disabled={!state.selectedIds.length || state.transactionActive}
-                          onClick={() => {
-                              copySelection();
-                              delete_selection.perform(store, getSelected())
-                          }} label="Cut" shortcut="⌘X / Ctrl+X"/>
-                <MenuItem disabled={!state.selectedIds.length || state.transactionActive}
-                          onClick={copySelection} label="Copy" shortcut="⌘C / Ctrl+C"/>
-                <MenuItem disabled={!clipboard.shapes.length || state.transactionActive}
-                          onClick={pasteSelection} label="Paste" shortcut="⌘V / Ctrl+V"/>
+                <MenuItem
+                    disabled={!state.selectedIds.length || state.transactionActive}
+                    onClick={() => {
+                        copySelection();
+                        delete_selection.perform(store, getSelected())
+                    }} label="Cut" shortcut="⌘X / Ctrl+X"/>
+                <MenuItem
+                    disabled={!state.selectedIds.length || state.transactionActive}
+                    onClick={copySelection} label="Copy"
+                    shortcut="⌘C / Ctrl+C"/>
+                <MenuItem
+                    disabled={!clipboard.shapes.length || state.transactionActive}
+                    onClick={pasteSelection} label="Paste"
+                    shortcut="⌘V / Ctrl+V"/>
             </DropdownMenu>
             <DropdownMenu title="View">
                 <MenuItem label="Show Command Palette"
                           shortcut={keybindings.find(binding => binding.commandId === 'open-palette')?.mac ?? '⌘⇧P'}
                           onClick={() => setCommandPaletteOpen(true)}/>
                 <hr className="menu-separator" aria-hidden="true"/>
-                <MenuItem label={`${leftPanelVisible ? '✓ Hide' : 'Show'} Left Sidebar`}
-                          shortcut={keybindings.find(binding => binding.commandId === 'toggle-left-sidebar')?.mac}
-                          onClick={() => setLeftPanelVisible(value => !value)}/>
-                <MenuItem label={`${rightPanelVisible ? '✓ Hide' : 'Show'} Right Sidebar`}
-                          shortcut={keybindings.find(binding => binding.commandId === 'toggle-right-sidebar')?.mac}
-                          onClick={() => setRightPanelVisible(value => !value)}/>
+                <MenuItem
+                    label={`${leftPanelVisible ? '✓ Hide' : 'Show'} Left Sidebar`}
+                    shortcut={keybindings.find(binding => binding.commandId === 'toggle-left-sidebar')?.mac}
+                    onClick={() => setLeftPanelVisible(value => !value)}/>
+                <MenuItem
+                    label={`${rightPanelVisible ? '✓ Hide' : 'Show'} Right Sidebar`}
+                    shortcut={keybindings.find(binding => binding.commandId === 'toggle-right-sidebar')?.mac}
+                    onClick={() => setRightPanelVisible(value => !value)}/>
             </DropdownMenu>
             <DropdownMenu title="Page">
                 <StoreActionButton action={create_new_page}
                                    disabled={state.transactionActive}
                                    store={store}/>
                 <button disabled={state.transactionActive}
-                        onClick={() => renamePage(state.selectedPageId)}>Rename Page
+                        onClick={() => renamePage(state.selectedPageId)}>Rename
+                    Page
                 </button>
-                <button disabled={doc.pages.length <= 1 || state.transactionActive}
-                        onClick={() => store.deletePage(state.selectedPageId)}>Delete Page
+                <button
+                    disabled={doc.pages.length <= 1 || state.transactionActive}
+                    onClick={() => store.deletePage(state.selectedPageId)}>Delete
+                    Page
                 </button>
             </DropdownMenu>
             {!selectedAsset && <DropdownMenu title="Shape">
-                <button disabled={state.transactionActive} onClick={() => createVector()}>New Vector
+                <button disabled={state.transactionActive}
+                        onClick={() => createVector()}>New Vector
                     Network
                 </button>
-                <StoreActionButton action={new_rect} disabled={state.transactionActive}
+                <StoreActionButton action={new_rect}
+                                   disabled={state.transactionActive}
                                    store={store}/>
-                <StoreActionButton action={new_circle} disabled={state.transactionActive}
+                <StoreActionButton action={new_circle}
+                                   disabled={state.transactionActive}
                                    store={store}/>
                 <button disabled={state.transactionActive}
-                        onClick={() => setImageDialog({kind: 'create'})}>New Pixel Image
+                        onClick={() => setImageDialog({kind: 'create'})}>New
+                    Pixel Image
                 </button>
                 <button disabled={state.transactionActive || !doc.images.length}
-                        onClick={() => setRepeatingImageDialog(true)}>New Repeating Image
+                        onClick={() => setRepeatingImageDialog(true)}>New
+                    Repeating Image
                 </button>
                 <button disabled={state.transactionActive}
-                        onClick={() => setImageDialog({kind: 'import'})}>Import PNG
+                        onClick={() => setImageDialog({kind: 'import'})}>Import
+                    PNG
                 </button>
             </DropdownMenu>}
-            {!selectedAsset && selectedShapes.length > 1 && <DropdownMenu title="Align">
-                <MenuItem label="Align Left" onClick={() => applyAlignment('left')}/>
-                <MenuItem label="Align Horizontal Center" onClick={() => applyAlignment('center')}/>
-                <MenuItem label="Align Right" onClick={() => applyAlignment('right')}/>
-                <MenuItem label="Align Top" onClick={() => applyAlignment('top')}/>
-                <MenuItem label="Align Vertical Middle" onClick={() => applyAlignment('middle')}/>
-                <MenuItem label="Align Bottom" onClick={() => applyAlignment('bottom')}/>
-                <hr className="menu-separator" aria-hidden="true"/>
-                <MenuItem label="Distribute Horizontally" disabled={selectedShapes.length < 3}
-                          onClick={() => applyAlignment('distribute-horizontal')}/>
-                <MenuItem label="Distribute Vertically" disabled={selectedShapes.length < 3}
-                          onClick={() => applyAlignment('distribute-vertical')}/>
-            </DropdownMenu>}
+            {!selectedAsset && selectedShapes.length > 1 &&
+                <DropdownMenu title="Align">
+                    <MenuItem label="Align Left"
+                              onClick={() => applyAlignment('left')}/>
+                    <MenuItem label="Align Horizontal Center"
+                              onClick={() => applyAlignment('center')}/>
+                    <MenuItem label="Align Right"
+                              onClick={() => applyAlignment('right')}/>
+                    <MenuItem label="Align Top"
+                              onClick={() => applyAlignment('top')}/>
+                    <MenuItem label="Align Vertical Middle"
+                              onClick={() => applyAlignment('middle')}/>
+                    <MenuItem label="Align Bottom"
+                              onClick={() => applyAlignment('bottom')}/>
+                    <hr className="menu-separator" aria-hidden="true"/>
+                    <MenuItem label="Distribute Horizontally"
+                              disabled={selectedShapes.length < 3}
+                              onClick={() => applyAlignment('distribute-horizontal')}/>
+                    <MenuItem label="Distribute Vertically"
+                              disabled={selectedShapes.length < 3}
+                              onClick={() => applyAlignment('distribute-vertical')}/>
+                </DropdownMenu>}
             <ToolbarGroup label="History">{undo}{redo}</ToolbarGroup>
             <span className="spacer"/>
             <DropdownMenu title="Appearance" icon={SunMoon}>
-                {(['system', 'light', 'dark'] as const).map(value => <MenuItem key={value}
-                                                                               label={`${theme === value ? '✓ ' : ''}${value === 'system' ? 'System theme' : value === 'light' ? 'Light theme' : 'Dark theme'}`}
-                                                                               onClick={() => setTheme(value)}/>)}
+                {(['system', 'light', 'dark'] as const).map(value => <MenuItem
+                    key={value}
+                    label={`${theme === value ? '✓ ' : ''}${value === 'system' ? 'System theme' : value === 'light' ? 'Light theme' : 'Dark theme'}`}
+                    onClick={() => setTheme(value)}/>)}
             </DropdownMenu>
             <input hidden ref={file} type="file" accept=".json,application/json"
                    onChange={async event => {
@@ -533,7 +739,8 @@ export default function App() {
                        }
                    }}/>
         </nav>
-        <div className="document-tabs full-span" role="tablist" aria-label="Open documents"
+        <div className="document-tabs full-span" role="tablist"
+             aria-label="Open documents"
              onKeyDown={event => {
                  const offset = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
                  if (!offset && event.key !== 'Home' && event.key !== 'End') return;
@@ -554,7 +761,10 @@ export default function App() {
                                                               setContextMenu(null);
                                                               setPageMenu(null);
                                                               setPagesMenu(null);
-                                                              setDocumentMenu({x: event.clientX, y: event.clientY});
+                                                              setDocumentMenu({
+                                                                  x: event.clientX,
+                                                                  y: event.clientY
+                                                              });
                                                           }}/>)}
         </div>
         <div id="document-editor"
@@ -562,17 +772,22 @@ export default function App() {
              role="tabpanel" aria-labelledby={`tab-${activeTab.id}`}>
             <div className="toolbar full-span" key={activeTab.id}>
                 {selectedAsset &&
-                    <button onClick={() => setSelectedAssetId(null)}>Back to canvas</button>}
-                {!selectedAsset && <div className="canvas-zoom-controls" role="group"
-                                        aria-label="Canvas zoom controls">
-                    <IconButton label="Zoom out" icon={ZoomOut} disabled={canvasZoom <= 0.25}
-                                onClick={() => setCanvasZoom(value => Math.max(0.25, value / 1.25))}/>
-                    <span aria-live="polite">{Math.round(canvasZoom * 100)}%</span>
-                    <IconButton label="Zoom in" icon={ZoomIn} disabled={canvasZoom >= 4}
-                                onClick={() => setCanvasZoom(value => Math.min(4, value * 1.25))}/>
-                    <IconButton label="Reset zoom" icon={Maximize2}
-                                onClick={() => setCanvasZoom(1)}/>
-                </div>}
+                    <button onClick={() => setSelectedAssetId(null)}>Back to
+                        canvas</button>}
+                {!selectedAsset &&
+                    <div className="canvas-zoom-controls" role="group"
+                         aria-label="Canvas zoom controls">
+                        <IconButton label="Zoom out" icon={ZoomOut}
+                                    disabled={canvasZoom <= 0.25}
+                                    onClick={() => setCanvasZoom(value => Math.max(0.25, value / 1.25))}/>
+                        <span
+                            aria-live="polite">{Math.round(canvasZoom * 100)}%</span>
+                        <IconButton label="Zoom in" icon={ZoomIn}
+                                    disabled={canvasZoom >= 4}
+                                    onClick={() => setCanvasZoom(value => Math.min(4, value * 1.25))}/>
+                        <IconButton label="Reset zoom" icon={Maximize2}
+                                    onClick={() => setCanvasZoom(1)}/>
+                    </div>}
                 {!selectedAsset && selectedShapes.length === 1 && selected?.type === 'vector' &&
                     <button disabled={state.transactionActive} onClick={() => {
                         setImageDialog(null);
@@ -580,72 +795,79 @@ export default function App() {
                         setVectorId(selected.id);
                     }}>Edit Vector</button>}
                 {!selectedAsset && selectedShapes.length === 1 && selected?.type === 'pixel-image' && <>
-                    <button disabled={state.transactionActive} onClick={() => setImageDialog({
-                        kind: 'edit',
-                        imageId: selected.components.image.imageId,
-                        source: selected.components.image.source
-                    })}>Edit Pixels
+                    <button disabled={state.transactionActive}
+                            onClick={() => setImageDialog({
+                                kind: 'edit',
+                                imageId: selected.components.image.imageId,
+                                source: selected.components.image.source
+                            })}>Edit Pixels
                     </button>
                     <button disabled={state.transactionActive}
                             onClick={() => store.select(store.linkImageShape(selected.id))}>Linked
                         Copy
                     </button>
                 </>}
-                {!selectedAsset && <IconButton label="Delete selected shapes" icon={Trash2}
-                                               disabled={!selectedShapes.length || state.transactionActive}
-                                               onClick={() => delete_selection.perform(store, getSelected())}/>}
+                {!selectedAsset &&
+                    <IconButton label="Delete selected shapes" icon={Trash2}
+                                disabled={!selectedShapes.length || state.transactionActive}
+                                onClick={() => delete_selection.perform(store, getSelected())}/>}
 
             </div>
             <div className="left scroll-container"><h2
-                className="panel-heading">Layers &amp; assets</h2><TreeView document={doc}
-                                                                            selectedIds={state.selectedIds}
-                                                                            selectedAssetId={selectedAssetId}
-                                                                            onDocumentContextMenu={event => {
-                                                                                event.preventDefault();
-                                                                                setContextMenu(null);
-                                                                                setPageMenu(null);
-                                                                                setPagesMenu(null);
-                                                                                setDocumentMenu({x: event.clientX, y: event.clientY});
-                                                                            }}
-                                                                            onSelect={(shape, additive) => {
-                                                                                setSelectedAssetId(null);
-                                                                                additive ? store.toggleSelection(shape.id) : store.select(shape.id);
-                                                                            }}
-                                                                            onSelectAsset={image => {
-                                                                                finishEditing();
-                                                                                store.select(null);
-                                                                                setSelectedAssetId(image.id);
-                                                                            }}
-                                                                            onShapeContextMenu={(event, shape) => showShapeContextMenu(event, shape)}
-                                                                            selectedPageId={state.selectedPageId}
-                                                                            onSelectPage={id => store.selectPage(id)}
-                                                                            onUngroup={id => store.ungroup(id)}
-                                                                            onRenameGroup={(id, name) => store.renameGroup(id, name)}
-                                                                            onSelectGroup={ids => store.setSelection(ids)}
-                                                                            onPageContextMenu={showPageContextMenu}
-                                                                            onPagesContextMenu={event => {
-                                                                                event.preventDefault();
-                                                                                setDocumentMenu(null);
-                                                                                setContextMenu(null);
-                                                                                setPageMenu(null);
-                                                                                setPagesMenu({
-                                                                                    x: event.clientX,
-                                                                                    y: event.clientY
-                                                                                });
-                                                                            }}
-                                                                            onReorderPage={(id, targetId, position) => store.reorderPage(id, targetId, position)}
-                                                                            onReorderShape={(pageId, id, targetId, position) => store.reorderShapes(pageId, id, targetId, position)}/>
+                className="panel-heading">Layers &amp; assets</h2><TreeView
+                document={doc}
+                selectedIds={state.selectedIds}
+                selectedAssetId={selectedAssetId}
+                onDocumentContextMenu={event => {
+                    event.preventDefault();
+                    setContextMenu(null);
+                    setPageMenu(null);
+                    setPagesMenu(null);
+                    setDocumentMenu({x: event.clientX, y: event.clientY});
+                }}
+                onSelect={(shape, additive) => {
+                    setSelectedAssetId(null);
+                    additive ? store.toggleSelection(shape.id) : store.select(shape.id);
+                }}
+                onSelectAsset={image => {
+                    finishEditing();
+                    store.select(null);
+                    setSelectedAssetId(image.id);
+                }}
+                onShapeContextMenu={(event, shape) => showShapeContextMenu(event, shape)}
+                selectedPageId={state.selectedPageId}
+                onSelectPage={id => store.selectPage(id)}
+                onUngroup={id => store.ungroup(id)}
+                onRenameGroup={(id, name) => store.renameGroup(id, name)}
+                onSelectGroup={ids => store.setSelection(ids)}
+                onPageContextMenu={showPageContextMenu}
+                onPagesContextMenu={event => {
+                    event.preventDefault();
+                    setDocumentMenu(null);
+                    setContextMenu(null);
+                    setPageMenu(null);
+                    setPagesMenu({
+                        x: event.clientX,
+                        y: event.clientY
+                    });
+                }}
+                onReorderPage={(id, targetId, position) => store.reorderPage(id, targetId, position)}
+                onReorderShape={(pageId, id, targetId, position) => store.reorderShapes(pageId, id, targetId, position)}/>
             </div>
             {selectedAsset ?
-                <div className="asset-center scroll-container"><PixelAssetView store={store}
-                                                                               image={selectedAsset}
-                                                                               onBack={() => setSelectedAssetId(null)}/>
+                <div className="asset-center scroll-container"><PixelAssetView
+                    store={store}
+                    image={selectedAsset}
+                    onBack={() => setSelectedAssetId(null)}/>
                 </div> : <>
                     <div
                         className={`center${imageDialog?.kind === 'edit' ? ' pixel-edit-active' : ''}`}>
-                        <VisualEditor key={activeTab.id} store={store} zoom={canvasZoom}
-                                      onZoomChange={setCanvasZoom} vectorId={vectorId}
-                                      onEditVector={setVectorId} pixelEditor={pixelEditor}
+                        <VisualEditor key={activeTab.id} store={store}
+                                      zoom={canvasZoom}
+                                      onZoomChange={setCanvasZoom}
+                                      vectorId={vectorId}
+                                      onEditVector={setVectorId}
+                                      pixelEditor={pixelEditor}
                                       onEditImage={(reference, palettePosition, imageScreenRect) => {
                                           setVectorId(null);
                                           setImageDialog({
@@ -655,7 +877,8 @@ export default function App() {
                                               palettePosition,
                                               imageScreenRect
                                           });
-                                      }} onShapeContextMenu={showShapeContextMenu}
+                                      }}
+                                      onShapeContextMenu={showShapeContextMenu}
                                       onCanvasContextMenu={event => {
                                           event.preventDefault();
                                           setContextMenu(null);
@@ -665,29 +888,39 @@ export default function App() {
                                               pageId: state.selectedPageId
                                           });
                                       }}/>{imageDialog?.kind === 'edit' &&
-                        <PixelImageEditor key={imageDialog.imageId} store={store}
-                                          imageId={imageDialog.imageId} source={imageDialog.source}
+                        <PixelImageEditor key={imageDialog.imageId}
+                                          store={store}
+                                          imageId={imageDialog.imageId}
+                                          source={imageDialog.source}
                                           initialPosition={imageDialog.palettePosition}
                                           imageScreenRect={imageDialog.imageScreenRect}
-                                          onController={setPixelEditor} onClose={() => {
-                            setImageDialog(null);
-                            setPixelEditor(null);
-                        }}/>}</div>
+                                          onController={setPixelEditor}
+                                          onClose={() => {
+                                              setImageDialog(null);
+                                              setPixelEditor(null);
+                                          }}/>}</div>
                     <div className="right scroll-container"><h2
-                        className="panel-heading">Properties</h2><PropSheet key={activeTab.id}
-                                                                            store={store}/></div>
+                        className="panel-heading">Properties</h2><PropSheet
+                        key={activeTab.id}
+                        store={store}/></div>
                 </>}
         </div>
-        <div className="statusbar full-span"><span role="alert">{error}</span><span
-            className="spacer"/><label>Scroll to pan; Ctrl/⌘+scroll to zoom; Space or middle-drag to
-            pan. Shift-click toggles selection; drag empty canvas to select. Drag selected shapes to
-            move; Option/Alt-drag to duplicate. Handles resize. Shift-resize images to keep
-            proportions. Double-click a pixel image or vector network to edit.</label></div>
+        <div className="statusbar full-span"><span
+            role="alert">{error}</span><span
+            className="spacer"/><label>Scroll to pan; Ctrl/⌘+scroll to zoom;
+            Space or middle-drag to
+            pan. Shift-click toggles selection; drag empty canvas to select.
+            Drag selected shapes to
+            move; Option/Alt-drag to duplicate. Handles resize. Shift-resize
+            images to keep
+            proportions. Double-click a pixel image or vector network to
+            edit.</label></div>
         <footer className="statusbar full-span">
-            <IconButton label={leftPanelVisible ? 'Hide tree panel' : 'Show tree panel'}
-                        icon={leftPanelVisible ? PanelLeftClose : PanelLeftOpen}
-                        aria-pressed={leftPanelVisible}
-                        onClick={() => setLeftPanelVisible(value => !value)}/>
+            <IconButton
+                label={leftPanelVisible ? 'Hide tree panel' : 'Show tree panel'}
+                icon={leftPanelVisible ? PanelLeftClose : PanelLeftOpen}
+                aria-pressed={leftPanelVisible}
+                onClick={() => setLeftPanelVisible(value => !value)}/>
             <span role="alert">{error}</span>
             <span className="status-hint"
                   title="Scroll to pan · Ctrl/⌘+scroll to zoom · Space-drag to pan · Shift-click to select multiple · Alt-drag to duplicate · Double-click images to edit pixels">Scroll to pan · Ctrl/⌘+scroll to zoom · Shift-click for multiple selection · Double-click images to edit</span>
@@ -698,7 +931,8 @@ export default function App() {
                 onClick={() => setRightPanelVisible(value => !value)}/>
         </footer>
         {contextMenu &&
-            <div className="shape-context-menu" style={{left: contextMenu.x, top: contextMenu.y}}
+            <div className="shape-context-menu"
+                 style={{left: contextMenu.x, top: contextMenu.y}}
                  role="menu" onContextMenu={event => event.preventDefault()}
                  onPointerDown={event => event.stopPropagation()}>
                 {selectedUngrouped && <button role="menuitem" onClick={() => {
@@ -709,59 +943,105 @@ export default function App() {
                     ungroupSelection();
                     setContextMenu(null);
                 }}>Ungroup</button>}
-                <button role="menuitem" disabled={!state.selectedIds.length} onClick={() => {
-                    duplicate_selection.perform(store, getSelected())
-                    setContextMenu(null);
-                }}>{duplicate_selection.title}</button>
-                <button role="menuitem" disabled={!state.selectedIds.length} onClick={() => {
-                    delete_selection.perform(store, getSelected())
-                    setContextMenu(null);
-                }}
+                <button role="menuitem" disabled={!state.selectedIds.length}
+                        onClick={() => {
+                            duplicate_selection.perform(store, getSelected())
+                            setContextMenu(null);
+                        }}>{duplicate_selection.title}</button>
+                <button role="menuitem" disabled={!state.selectedIds.length}
+                        onClick={() => {
+                            delete_selection.perform(store, getSelected())
+                            setContextMenu(null);
+                        }}
                 >{delete_selection.title}</button>
-                <button role="menuitem" disabled={!state.selectedIds.length} onClick={() => {
-                    copySelection();
-                    delete_selection.perform(store, getSelected())
-                    setContextMenu(null);
-                }}
+                <button role="menuitem" disabled={!state.selectedIds.length}
+                        onClick={() => {
+                            copySelection();
+                            delete_selection.perform(store, getSelected())
+                            setContextMenu(null);
+                        }}
                 >Cut
                 </button>
-                <button role="menuitem" disabled={!state.selectedIds.length} onClick={() => {
-                    copySelection();
-                    setContextMenu(null);
-                }}>Copy
+                <button role="menuitem" disabled={!state.selectedIds.length}
+                        onClick={() => {
+                            copySelection();
+                            setContextMenu(null);
+                        }}>Copy
                 </button>
-                <button role="menuitem" disabled={!clipboard.shapes.length} onClick={() => {
-                    pasteSelection();
-                    setContextMenu(null);
-                }}>Paste
+                <button role="menuitem" disabled={!clipboard.shapes.length}
+                        onClick={() => {
+                            pasteSelection();
+                            setContextMenu(null);
+                        }}>Paste
                 </button>
                 {selectedShapes.length > 1 && <>
                     <hr className="menu-separator" aria-hidden="true"/>
-                    <button role="menuitem" onClick={() => { applyAlignment('left'); setContextMenu(null); }}>Align Left</button>
-                    <button role="menuitem" onClick={() => { applyAlignment('center'); setContextMenu(null); }}>Align Horizontal Center</button>
-                    <button role="menuitem" onClick={() => { applyAlignment('right'); setContextMenu(null); }}>Align Right</button>
-                    <button role="menuitem" onClick={() => { applyAlignment('top'); setContextMenu(null); }}>Align Top</button>
-                    <button role="menuitem" onClick={() => { applyAlignment('middle'); setContextMenu(null); }}>Align Vertical Middle</button>
-                    <button role="menuitem" onClick={() => { applyAlignment('bottom'); setContextMenu(null); }}>Align Bottom</button>
+                    <button role="menuitem" onClick={() => {
+                        applyAlignment('left');
+                        setContextMenu(null);
+                    }}>Align Left
+                    </button>
+                    <button role="menuitem" onClick={() => {
+                        applyAlignment('center');
+                        setContextMenu(null);
+                    }}>Align Horizontal Center
+                    </button>
+                    <button role="menuitem" onClick={() => {
+                        applyAlignment('right');
+                        setContextMenu(null);
+                    }}>Align Right
+                    </button>
+                    <button role="menuitem" onClick={() => {
+                        applyAlignment('top');
+                        setContextMenu(null);
+                    }}>Align Top
+                    </button>
+                    <button role="menuitem" onClick={() => {
+                        applyAlignment('middle');
+                        setContextMenu(null);
+                    }}>Align Vertical Middle
+                    </button>
+                    <button role="menuitem" onClick={() => {
+                        applyAlignment('bottom');
+                        setContextMenu(null);
+                    }}>Align Bottom
+                    </button>
                     <hr className="menu-separator" aria-hidden="true"/>
-                    <button role="menuitem" disabled={selectedShapes.length < 3} onClick={() => { applyAlignment('distribute-horizontal'); setContextMenu(null); }}>Distribute Horizontally</button>
-                    <button role="menuitem" disabled={selectedShapes.length < 3} onClick={() => { applyAlignment('distribute-vertical'); setContextMenu(null); }}>Distribute Vertically</button>
+                    <button role="menuitem" disabled={selectedShapes.length < 3}
+                            onClick={() => {
+                                applyAlignment('distribute-horizontal');
+                                setContextMenu(null);
+                            }}>Distribute Horizontally
+                    </button>
+                    <button role="menuitem" disabled={selectedShapes.length < 3}
+                            onClick={() => {
+                                applyAlignment('distribute-vertical');
+                                setContextMenu(null);
+                            }}>Distribute Vertically
+                    </button>
                 </>}
             </div>}
-        {documentMenu && <div className="shape-context-menu" style={{left: documentMenu.x, top: documentMenu.y}}
+        {documentMenu && <div className="shape-context-menu" style={{
+            left: documentMenu.x,
+            top: documentMenu.y
+        }}
                               role="menu" aria-label="Document actions"
                               onContextMenu={event => event.preventDefault()}
                               onPointerDown={event => event.stopPropagation()}>
             <button role="menuitem" onClick={() => {
                 setDocumentMenu(null);
                 setRenameDocumentName(doc.title);
-            }}>Rename Document</button>
-            <button role="menuitem" disabled={state.transactionActive} onClick={() => {
-                create_new_page.perform(store);
-                setDocumentMenu(null);
-            }}>New Page</button>
+            }}>Rename Document
+            </button>
+            <button role="menuitem" disabled={state.transactionActive}
+                    onClick={() => {
+                        create_new_page.perform(store);
+                        setDocumentMenu(null);
+                    }}>New Page
+            </button>
         </div>}
-        {pageMenu && <div className="shape-context-menu" style={{left: pageMenu.x, top: pageMenu.y}}
+        {pageMenu && <div className="shape-context-menu"
+                          style={{left: pageMenu.x, top: pageMenu.y}}
                           role="menu" aria-label="Page actions"
                           onContextMenu={event => event.preventDefault()}
                           onPointerDown={event => event.stopPropagation()}>
@@ -770,10 +1050,11 @@ export default function App() {
                 setPageMenu(null);
             }}>Rename Page
             </button>
-            <button role="menuitem" disabled={doc.pages.length <= 1} onClick={() => {
-                store.deletePage(pageMenu.pageId);
-                setPageMenu(null);
-            }}>Delete Page
+            <button role="menuitem" disabled={doc.pages.length <= 1}
+                    onClick={() => {
+                        store.deletePage(pageMenu.pageId);
+                        setPageMenu(null);
+                    }}>Delete Page
             </button>
             {page_menu_actions.map((act, index) => {
                 return <button key={index} onClick={() => {
@@ -782,7 +1063,8 @@ export default function App() {
                 }}
                 >{act.title}</button>
             })}
-            <button role="menuitem" onClick={() => createVector(pageMenu.pageId)}>New Vector
+            <button role="menuitem"
+                    onClick={() => createVector(pageMenu.pageId)}>New Vector
                 Network
             </button>
             <button role="menuitem" onClick={() => {
@@ -791,11 +1073,12 @@ export default function App() {
                 setImageDialog({kind: 'create'});
             }}>New Pixel Image
             </button>
-            <button role="menuitem" disabled={!doc.images.length} onClick={() => {
-                store.selectPage(pageMenu.pageId);
-                setPageMenu(null);
-                setRepeatingImageDialog(true);
-            }}>New Repeating Image
+            <button role="menuitem" disabled={!doc.images.length}
+                    onClick={() => {
+                        store.selectPage(pageMenu.pageId);
+                        setPageMenu(null);
+                        setRepeatingImageDialog(true);
+                    }}>New Repeating Image
             </button>
             <button role="menuitem" onClick={() => {
                 store.selectPage(pageMenu.pageId);
@@ -805,7 +1088,8 @@ export default function App() {
             </button>
         </div>}
         {pagesMenu &&
-            <div className="shape-context-menu" style={{left: pagesMenu.x, top: pagesMenu.y}}
+            <div className="shape-context-menu"
+                 style={{left: pagesMenu.x, top: pagesMenu.y}}
                  role="menu" aria-label="Pages actions"
                  onContextMenu={event => event.preventDefault()}
                  onPointerDown={event => event.stopPropagation()}>
@@ -814,7 +1098,8 @@ export default function App() {
                     setPagesMenu(null);
                 }}>{create_new_page.title}</button>
             </div>}
-        {renamePageDialog && <EditorDialog title="Rename Page" onClose={() => setRenamePageDialog(null)}>
+        {renamePageDialog && <EditorDialog title="Rename Page"
+                                           onClose={() => setRenamePageDialog(null)}>
             <form className="rename-page-form" onSubmit={event => {
                 event.preventDefault();
                 const name = renamePageDialog.name.trim();
@@ -822,15 +1107,24 @@ export default function App() {
                 setRenamePageDialog(null);
             }}>
                 <label htmlFor="rename-page-name">Page name</label>
-                <input id="rename-page-name" autoFocus data-dialog-autofocus value={renamePageDialog.name}
-                       onChange={event => setRenamePageDialog(current => current ? {...current, name: event.target.value} : current)}/>
+                <input id="rename-page-name" autoFocus data-dialog-autofocus
+                       value={renamePageDialog.name}
+                       onChange={event => setRenamePageDialog(current => current ? {
+                           ...current,
+                           name: event.target.value
+                       } : current)}/>
                 <div className="dialog-actions">
-                    <button type="button" onClick={() => setRenamePageDialog(null)}>Cancel</button>
-                    <button type="submit" disabled={!renamePageDialog.name.trim()}>Rename</button>
+                    <button type="button"
+                            onClick={() => setRenamePageDialog(null)}>Cancel
+                    </button>
+                    <button type="submit"
+                            disabled={!renamePageDialog.name.trim()}>Rename
+                    </button>
                 </div>
             </form>
         </EditorDialog>}
-        {renameDocumentName !== null && <EditorDialog title="Rename Document" onClose={() => setRenameDocumentName(null)}>
+        {renameDocumentName !== null && <EditorDialog title="Rename Document"
+                                                      onClose={() => setRenameDocumentName(null)}>
             <form className="rename-page-form" onSubmit={event => {
                 event.preventDefault();
                 const name = renameDocumentName.trim();
@@ -838,49 +1132,61 @@ export default function App() {
                 setRenameDocumentName(null);
             }}>
                 <label htmlFor="rename-document-name">Document name</label>
-                <input id="rename-document-name" autoFocus data-dialog-autofocus value={renameDocumentName}
+                <input id="rename-document-name" autoFocus data-dialog-autofocus
+                       value={renameDocumentName}
                        onChange={event => setRenameDocumentName(event.target.value)}/>
                 <div className="dialog-actions">
-                    <button type="button" onClick={() => setRenameDocumentName(null)}>Cancel</button>
-                    <button type="submit" disabled={!renameDocumentName.trim()}>Rename</button>
+                    <button type="button"
+                            onClick={() => setRenameDocumentName(null)}>Cancel
+                    </button>
+                    <button type="submit"
+                            disabled={!renameDocumentName.trim()}>Rename
+                    </button>
                 </div>
             </form>
         </EditorDialog>}
         {imageDialog?.kind === 'import' &&
-            <ImportPixelImage store={store} onClose={() => setImageDialog(null)}/>}
+            <ImportPixelImage store={store}
+                              onClose={() => setImageDialog(null)}/>}
         {imageDialog?.kind === 'create' &&
             <NewPixelImage store={store} onClose={() => setImageDialog(null)}
-                           onCreated={imageId => setImageDialog({kind: 'edit', imageId})}/>}
+                           onCreated={imageId => setImageDialog({
+                               kind: 'edit',
+                               imageId
+                           })}/>}
         {repeatingImageDialog &&
-            <NewRepeatingImage store={store} onClose={() => setRepeatingImageDialog(false)}/>}
-        {savedDocumentsOpen && <SavedDocumentsDialog onClose={() => setSavedDocumentsOpen(false)}
-                                                     onChanged={records => {
-                                                         const remaining = new Set(records.map(record => record.id));
-                                                         setWorkspace(current => ({
-                                                             ...current,
-                                                             tabs: current.tabs.map(tab => tab.savedDocumentId && !remaining.has(tab.savedDocumentId)
-                                                                 ? {
-                                                                     ...tab,
-                                                                     savedDocumentId: null,
-                                                                     savedJson: null
-                                                                 } : tab)
-                                                         }));
-                                                         setError('');
-                                                     }}
-                                                     onOpen={record => {
-                                                         try {
-                                                             const tab = makeTab(deserializeDocument(record.json), record.id, record.json);
-                                                             finishEditing();
-                                                             setWorkspace(current => ({
-                                                                 tabs: [...current.tabs, tab],
-                                                                 activeId: tab.id
-                                                             }));
-                                                             setSavedDocumentsOpen(false);
-                                                             setError('');
-                                                         } catch (reason) {
-                                                             setError(reason instanceof Error ? reason.message : 'Unable to open saved document');
-                                                         }
-                                                     }}/>}
-        {commandPaletteOpen && <CommandPalette commands={commands} onClose={() => setCommandPaletteOpen(false)}/>}
+            <NewRepeatingImage store={store}
+                               onClose={() => setRepeatingImageDialog(false)}/>}
+        {savedDocumentsOpen &&
+            <SavedDocumentsDialog onClose={() => setSavedDocumentsOpen(false)}
+                                  onChanged={records => {
+                                      const remaining = new Set(records.map(record => record.id));
+                                      setWorkspace(current => ({
+                                          ...current,
+                                          tabs: current.tabs.map(tab => tab.savedDocumentId && !remaining.has(tab.savedDocumentId)
+                                              ? {
+                                                  ...tab,
+                                                  savedDocumentId: null,
+                                                  savedJson: null
+                                              } : tab)
+                                      }));
+                                      setError('');
+                                  }}
+                                  onOpen={record => {
+                                      try {
+                                          const tab = makeTab(deserializeDocument(record.json), record.id, record.json);
+                                          finishEditing();
+                                          setWorkspace(current => ({
+                                              tabs: [...current.tabs, tab],
+                                              activeId: tab.id
+                                          }));
+                                          setSavedDocumentsOpen(false);
+                                          setError('');
+                                      } catch (reason) {
+                                          setError(reason instanceof Error ? reason.message : 'Unable to open saved document');
+                                      }
+                                  }}/>}
+        {commandPaletteOpen && <CommandPalette commands={commands}
+                                               onClose={() => setCommandPaletteOpen(false)}/>}
     </div>;
 }
