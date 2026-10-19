@@ -556,6 +556,21 @@
     width: auto;
 }
 
+.rename-page-form {
+    display: grid;
+    gap: 12px;
+}
+
+.rename-page-form input {
+    width: 100%;
+}
+
+.rename-page-form .dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
 .pixel-tools {
     display: flex;
     flex-wrap: wrap;

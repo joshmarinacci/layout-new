@@ -24,6 +24,7 @@ import {
     type StoreAction
 } from "./actions";
 import {DropdownMenu} from './DropdownMenu';
+import {EditorDialog} from './EditorDialog';
 import {EditorStore, emptyDocument} from './EditorStore';
 import {makeExampleDocument} from './exampleDocument';
 import {ImportPixelImage} from './ImportPixelImage';
@@ -151,6 +152,7 @@ export default function App() {
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
     const [pageMenu, setPageMenu] = useState<{ x: number; y: number; pageId: string } | null>(null);
     const [pagesMenu, setPagesMenu] = useState<{ x: number; y: number } | null>(null);
+    const [renamePageDialog, setRenamePageDialog] = useState<{pageId: string; name: string} | null>(null);
     const [savedDocumentsOpen, setSavedDocumentsOpen] = useState(false);
     const selectedAsset = doc.images.find(image => image.id === selectedAssetId);
     const saveDocument = () => {
@@ -306,8 +308,7 @@ export default function App() {
     };
     const renamePage = (pageId: string) => {
         const page = doc.pages.find(item => item.id === pageId);
-        const name = window.prompt('Page name', page?.name ?? 'Page');
-        if (name?.trim()) store.renamePage(pageId, name.trim());
+        if (page) setRenamePageDialog({pageId, name: page.name});
     };
     const nativeMenuAction = useRef<(id: string) => void>(() => {});
     nativeMenuAction.current = id => {
@@ -702,6 +703,22 @@ export default function App() {
                     setPagesMenu(null);
                 }}>{create_new_page.title}</button>
             </div>}
+        {renamePageDialog && <EditorDialog title="Rename Page" onClose={() => setRenamePageDialog(null)}>
+            <form className="rename-page-form" onSubmit={event => {
+                event.preventDefault();
+                const name = renamePageDialog.name.trim();
+                if (name) store.renamePage(renamePageDialog.pageId, name);
+                setRenamePageDialog(null);
+            }}>
+                <label htmlFor="rename-page-name">Page name</label>
+                <input id="rename-page-name" autoFocus value={renamePageDialog.name}
+                       onChange={event => setRenamePageDialog(current => current ? {...current, name: event.target.value} : current)}/>
+                <div className="dialog-actions">
+                    <button type="button" onClick={() => setRenamePageDialog(null)}>Cancel</button>
+                    <button type="submit" disabled={!renamePageDialog.name.trim()}>Rename</button>
+                </div>
+            </form>
+        </EditorDialog>}
         {imageDialog?.kind === 'import' &&
             <ImportPixelImage store={store} onClose={() => setImageDialog(null)}/>}
         {imageDialog?.kind === 'create' &&
