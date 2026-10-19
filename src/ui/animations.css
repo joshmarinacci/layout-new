@@ -2,19 +2,21 @@
     --anim-dur: 0.2s;
     interpolate-size: allow-keywords;
 }
+
 dialog {
     opacity: 0;
     transform: scale(0.7) translateY(20px);
-    transition:
-            opacity var(--anim-dur) ease,
-            transform var(--anim-dur) ease,
-            display var(--anim-dur) allow-discrete,
-            overlay var(--anim-dur) allow-discrete;
+    transition: opacity var(--anim-dur) ease,
+    transform var(--anim-dur) ease,
+    display var(--anim-dur) allow-discrete,
+    overlay var(--anim-dur) allow-discrete;
 }
+
 dialog[open] {
     opacity: 1;
     transform: scale(1) translateY(0);
 }
+
 @starting-style {
     dialog[open] {
         opacity: 0;
@@ -24,21 +26,20 @@ dialog[open] {
 
 dialog::backdrop {
     background-color: rgb(0 0 0 / 0%);
-    transition:
-            background-color var(--anim-dur) ease,
-            display var(--anim-dur) allow-discrete,
-            overlay var(--anim-dur) allow-discrete;
+    transition: background-color var(--anim-dur) ease,
+    display var(--anim-dur) allow-discrete,
+    overlay var(--anim-dur) allow-discrete;
 }
+
 dialog[open]::backdrop {
     background-color: rgb(0 0 0 / 50%);
 }
+
 @starting-style {
     dialog[open]::backdrop {
         background-color: rgb(0 0 0 / 0%);
     }
 }
-
-
 
 
 details::details-content {
@@ -47,11 +48,11 @@ details::details-content {
     overflow: hidden;
 
     /* Smoothly transition discrete properties along with numerical ones */
-    transition:
-            block-size var(--anim-dur) ease,
-            opacity var(--anim-dur) ease,
-            content-visibility var(--anim-dur) ease allow-discrete;
+    transition: block-size var(--anim-dur) ease,
+    opacity var(--anim-dur) ease,
+    content-visibility var(--anim-dur) ease allow-discrete;
 }
+
 /* 3. Define the styles when the details menu is open */
 details[open]::details-content {
     opacity: 1;
@@ -59,18 +60,20 @@ details[open]::details-content {
 }
 
 li.tree-item {
-    transition:
-            background-color var(--anim-dur) ease,
-            color var(--anim-dur) ease;
+    transition: background-color var(--anim-dur) ease,
+    color var(--anim-dur) ease;
 }
 
 
 button {
-    transition:
-            background-color var(--anim-dur) ease,
-            color var(--anim-dur) ease;
+    transition: background-color var(--anim-dur) ease,
+    color var(--anim-dur) ease;
 }
+
 /* Respect motion preferences; leave details usable on browsers without interpolate-size. */
 @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after, *::backdrop { transition: none !important; animation: none !important; }
+    *, *::before, *::after, *::backdrop {
+        transition: none !important;
+        animation: none !important;
+    }
 }

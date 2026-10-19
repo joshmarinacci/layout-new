@@ -12,6 +12,7 @@ import {
     ZoomOut
 } from 'lucide-react';
 import {type MouseEvent, useEffect, useRef, useState} from 'react';
+import {page_menu_actions} from "./actions";
 import {DropdownMenu} from './DropdownMenu';
 import {EditorStore, emptyDocument} from './EditorStore';
 import {makeExampleDocument} from './exampleDocument';
@@ -302,20 +303,6 @@ export default function App() {
         const page = doc.pages.find(item => item.id === pageId);
         const name = window.prompt('Page name', page?.name ?? 'Page');
         if (name?.trim()) store.renamePage(pageId, name.trim());
-    };
-    const createPageRect = (pageId: string) => {
-        store.selectPage(pageId);
-        const shape = makeRect('Rectangle', {x: 50, y: 50, width: 100, height: 80});
-        store.addShape(shape);
-        store.select(shape.id);
-        setPageMenu(null);
-    };
-    const createPageCircle = (pageId: string) => {
-        store.selectPage(pageId);
-        const shape = makeCircle('Circle', {x: 100, y: 100}, 40);
-        store.addShape(shape);
-        store.select(shape.id);
-        setPageMenu(null);
     };
     const undo = <IconButton label="Undo" icon={Undo2} disabled={!state.canUndo}
                              onClick={() => store.undo()}/>;
@@ -633,10 +620,13 @@ export default function App() {
                 setPageMenu(null);
             }}>Delete Page
             </button>
-            <button role="menuitem" onClick={() => createPageRect(pageMenu.pageId)}>New Rectangle
-            </button>
-            <button role="menuitem" onClick={() => createPageCircle(pageMenu.pageId)}>New Circle
-            </button>
+            {page_menu_actions.map((act, index) => {
+                return <button key={index} onClick={() => {
+                    act.perform(store, pageMenu.pageId)
+                    setPageMenu(null)
+                }}
+                >{act.title}</button>
+            })}
             <button role="menuitem" onClick={() => createVector(pageMenu.pageId)}>New Vector
                 Network
             </button>
