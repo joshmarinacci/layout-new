@@ -12,6 +12,8 @@ import {
     ZoomOut
 } from 'lucide-react';
 import {type MouseEvent, useEffect, useRef, useState} from 'react';
+import {isTauri} from '@tauri-apps/api/core';
+import {listen} from '@tauri-apps/api/event';
 import {
     create_new_page,
     delete_selection,
@@ -160,10 +162,10 @@ export default function App() {
         link.click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
     };
-    const saveToBrowser = () => {
+    const saveToBrowser = async () => {
         try {
             const json = store.toJSON();
-            const records = readSavedDocuments();
+            const records = await readSavedDocuments();
             const id = activeTab.savedDocumentId ?? crypto.randomUUID();
             const prior = records.find(record => record.id === id);
             const record: SavedDocumentRecord = {
@@ -172,7 +174,7 @@ export default function App() {
                 savedAt: new Date().toISOString(),
                 json
             };
-            writeSavedDocuments([...records.filter(item => item.id !== id), record]);
+            await writeSavedDocuments([...records.filter(item => item.id !== id), record]);
             setWorkspace(current => ({
                 ...current,
                 tabs: current.tabs.map(tab => tab.id === activeTab.id ? {
@@ -183,7 +185,7 @@ export default function App() {
             }));
             setError('');
         } catch (reason) {
-            setError(reason instanceof Error ? reason.message : 'Unable to save to browser storage');
+            setError(reason instanceof Error ? reason.message : 'Unable to save document');
         }
     };
     useEffect(() => {
@@ -307,11 +309,56 @@ export default function App() {
         const name = window.prompt('Page name', page?.name ?? 'Page');
         if (name?.trim()) store.renamePage(pageId, name.trim());
     };
+    const nativeMenuAction = useRef<(id: string) => void>(() => {});
+    nativeMenuAction.current = id => {
+        if (store.getSnapshot().transactionActive) return;
+        switch (id) {
+            case 'new-document': openDocument(emptyDocument()); break;
+            case 'open-saved': setSavedDocumentsOpen(true); break;
+            case 'load-json': file.current?.click(); break;
+            case 'save-document': void saveToBrowser(); break;
+            case 'export-json': saveDocument(); break;
+            case 'undo': store.undo(); break;
+            case 'redo': store.redo(); break;
+            case 'duplicate': if (store.getSnapshot().selectedIds.length) duplicate_selection.perform(store, getSelected()); break;
+            case 'delete': if (store.getSnapshot().selectedIds.length) delete_selection.perform(store, getSelected()); break;
+            case 'cut': if (store.getSnapshot().selectedIds.length) { copySelection(); delete_selection.perform(store, getSelected()); } break;
+            case 'copy': copySelection(); break;
+            case 'paste': pasteSelection(); break;
+            case 'new-page': create_new_page.perform(store); break;
+            case 'rename-page': renamePage(store.getSnapshot().selectedPageId); break;
+            case 'delete-page': if (store.getSnapshot().document.pages.length > 1) store.deletePage(store.getSnapshot().selectedPageId); break;
+            case 'new-vector': if (!selectedAssetId) createVector(); break;
+            case 'new-rectangle': if (!selectedAssetId) new_rect.perform(store); break;
+            case 'new-circle': if (!selectedAssetId) new_circle.perform(store); break;
+            case 'new-pixel-image': if (!selectedAssetId) setImageDialog({kind: 'create'}); break;
+            case 'new-repeating-image': if (!selectedAssetId && doc.images.length) setRepeatingImageDialog(true); break;
+            case 'import-png': if (!selectedAssetId) setImageDialog({kind: 'import'}); break;
+            case 'theme-system': setTheme('system'); break;
+            case 'theme-light': setTheme('light'); break;
+            case 'theme-dark': setTheme('dark'); break;
+        }
+    };
+    useEffect(() => {
+        if (!isTauri()) return;
+        let unlisten: (() => void) | undefined;
+        let disposed = false;
+        void listen<string>('native-menu-action', event => nativeMenuAction.current(event.payload))
+            .then(dispose => {
+                if (disposed) dispose();
+                else unlisten = dispose;
+            })
+            .catch(reason => setError(reason instanceof Error ? `Unable to connect native menu: ${reason.message}` : 'Unable to connect native menu'));
+        return () => {
+            disposed = true;
+            unlisten?.();
+        };
+    }, []);
     const undo = <IconButton label="Undo" icon={Undo2} disabled={!state.canUndo}
                              onClick={() => store.undo()}/>;
     const redo = <IconButton label="Redo" icon={Redo2} disabled={!state.canRedo}
                              onClick={() => store.redo()}/>;
-    return <div className="main-layout">
+    return <div className={`main-layout${isTauri() ? ' tauri-mode' : ''}`}>
         <nav className="menubar full-span">
             <DropdownMenu title="File">
                 <button disabled={state.transactionActive}
@@ -319,14 +366,14 @@ export default function App() {
                 </button>
                 <hr className="menu-separator" aria-hidden="true"/>
                 <MenuItem disabled={state.transactionActive}
-                          onClick={() => setSavedDocumentsOpen(true)} label="Open from Browser"
+                          onClick={() => setSavedDocumentsOpen(true)} label={isTauri() ? 'Open Saved Document' : 'Open from Browser'}
                           shortcut="⌘⇧O / Ctrl+Shift+O"/>
                 <button disabled={state.transactionActive}
                         onClick={() => file.current?.click()}>Load JSON file
                 </button>
                 <hr className="menu-separator" aria-hidden="true"/>
-                <MenuItem disabled={state.transactionActive} onClick={saveToBrowser}
-                          label="Save to Browser" shortcut="⌘S / Ctrl+S"/>
+                <MenuItem disabled={state.transactionActive} onClick={() => void saveToBrowser()}
+                          label={isTauri() ? 'Save Document' : 'Save to Browser'} shortcut="⌘S / Ctrl+S"/>
                 <button disabled={state.transactionActive} onClick={saveDocument}>Export JSON
                 </button>
             </DropdownMenu>
