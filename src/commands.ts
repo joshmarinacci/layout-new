@@ -1,8 +1,8 @@
-import {type EditorSnapshot, EditorStore} from "./EditorStore";
+import {type EditorSnapshot, EditorStore, emptyDocument} from "./EditorStore";
 import {makeCircle, makeRect} from "./reducer";
 
 
-import type {Document as DrawingDocument} from './types';
+import type {Document, Document as DrawingDocument} from './types';
 
 export interface DocumentTab {
     id: string;
@@ -16,12 +16,13 @@ export type Workspace = {
     activeId: string
 }
 
+type WorkspaceSetter = (workspace: Workspace) => Workspace
 export type CommandContext = {
     store: EditorStore,
     state: EditorSnapshot,
     finishEditing: () => void,
     workspace: Workspace,
-    setWorkspace: (workspace: Workspace) => void
+    setWorkspace: (s: Workspace | WorkspaceSetter) => void,
 }
 
 export type CommandId =
@@ -29,10 +30,11 @@ export type CommandId =
     | 'new-document' | 'save' | 'export-json'
     | 'new-page'
     | 'new-rectangle' | 'new-circle'
+    | 'group-selection' | 'ungroup-selection' | 'selection-duplicate'
     | 'align-left' | 'align-center' | 'align-right'
     | 'align-top' | 'align-middle' | 'align-bottom'
     | 'align-distribute-vertical' | 'align-distribute-horizontal'
-    | 'duplicate' | 'delete'
+    | 'delete'
     | 'open-palette'
     | 'toggle-right-sidebar' | 'toggle-left-sidebar'
 
@@ -45,6 +47,16 @@ export interface Command {
     enabled: (ctx: CommandContext) => boolean
     run: (ctx: CommandContext) => void;
 }
+
+export const NewDocumentCommand: Command = {
+    id: 'new-document',
+    title: 'New Document',
+    description: 'Create a blank document',
+    keywords: ['file', 'create'],
+    enabled: (ctx) => !ctx.state.transactionActive,
+    run: (ctx) => openDocument(ctx, emptyDocument())
+}
+
 
 export const UndoCommand: Command = {
     id: 'undo',
@@ -87,7 +99,6 @@ export const NewCircleCommand: Command = {
         ctx.store.select(shape.id);
     }
 }
-// enabled: ctx => !selectedAssetId && !state.transactionActive,
 
 export const NewPageCommand: Command = {
     id: 'new-page',
@@ -99,6 +110,54 @@ export const NewPageCommand: Command = {
     }
 }
 
+export const GroupSelectionCommand: Command = {
+    id: 'group-selection',
+    title: 'group selection',
+    description: 'group the selection',
+    enabled: () => true,
+    run: ctx => {
+        const shapes = getSelected(ctx.store);
+        if (!shapes.length) return;
+        ctx.store.createGroup(ctx.state.selectedPageId, shapes.map(shape => shape.id), `Group ${ctx.state.document.pages.flatMap(page => page.groups).length + 1}`);
+    }
+}
+export const UngroupSelectionCommand: Command = {
+    id: 'ungroup-selection',
+    title: 'Ungroup selection',
+    description: 'ungroup the selection',
+    enabled: () => true,
+    run: ctx => {
+        ctx.store.ungroupSelection(getSelected(ctx.store).map(shape => shape.id));
+    }
+}
+export const DuplicateSelectionCommand: Command = {
+    id: 'selection-duplicate',
+    title: 'Duplicate Selection',
+    description: 'Make a copy of selected shapes',
+    keywords: ['copy'],
+    enabled: ctx => !!ctx.state.selectedIds.length && !ctx.state.transactionActive,
+    run: (ctx) => {
+        let shapes = getSelected(ctx.store)
+        if (shapes.length) {
+            ctx.store.duplicateShapes(shapes.map(shape => shape.id))
+        }
+    }
+}
+export const DeleteSelectionCommand: Command = {
+    id: 'delete',
+    title: 'Delete Selection',
+    description: 'Remove selected shapes',
+    keywords: ['remove'],
+    enabled: ctx => !!ctx.state.selectedIds.length && !ctx.state.transactionActive,
+    run: (ctx) => {
+        let shapes = getSelected(ctx.store)
+        if (!shapes.length) return;
+        ctx.store.beginTransaction('Delete selection');
+        shapes.forEach(shape => ctx.store.removeShape(shape.id));
+        ctx.store.commitTransaction();
+        ctx.store.select(null);
+    }
+}
 
 export function makeTab(document: DrawingDocument, savedDocumentId: string | null = null, savedJson: string | null = null): DocumentTab {
     return {
@@ -108,3 +167,14 @@ export function makeTab(document: DrawingDocument, savedDocumentId: string | nul
         savedJson
     };
 }
+
+export const openDocument = (ctx: CommandContext, document: DrawingDocument) => {
+    const tab = makeTab(document);
+    ctx.finishEditing();
+    ctx.setWorkspace((current: Workspace) => ({
+        tabs: [...current.tabs, tab],
+        activeId: tab.id
+    }));
+};
+
+const getSelected = (store: EditorStore) => store.getSnapshot().document.shapes.filter(shape => store.getSnapshot().selectedIds.includes(shape.id));

@@ -7,8 +7,16 @@ import {
     produceWithPatches
 } from 'immer';
 import {makeImageShape, makePixelImage} from './pixelImages';
-import {convertImportedPixels, type DecodedPixels, type TileSize} from './pngImport';
-import {deserializeDocument, serializeDocument, validateDocument} from './serialization';
+import {
+    convertImportedPixels,
+    type DecodedPixels,
+    type TileSize
+} from './pngImport';
+import {
+    deserializeDocument,
+    serializeDocument,
+    validateDocument
+} from './serialization';
 import type {Document, PixelImageData, Shape, VectorNetwork} from './types';
 import {reconcileRegions} from './vectorNetworks';
 
@@ -57,7 +65,11 @@ export class EditorStore {
     constructor(document: Document = emptyDocument(), private readonly historyLimit = 100) {
         if (!Number.isInteger(historyLimit) || historyLimit < 1) throw new Error('History limit must be positive');
         const normalized = structuredClone(document) as Document;
-        const legacyPage = normalized.pages?.[0] ?? {id: 'page_1', name: 'Page 1', groups: []};
+        const legacyPage = normalized.pages?.[0] ?? {
+            id: 'page_1',
+            name: 'Page 1',
+            groups: []
+        };
         if (!normalized.pages?.length) normalized.pages = [legacyPage];
         normalized.shapes.forEach(shape => {
             if (!shape.pageId || !normalized.pages.some(page => page.id === shape.pageId)) shape.pageId = legacyPage.id;
@@ -195,7 +207,10 @@ export class EditorStore {
             for (const page of draft.pages) {
                 page.groups = page.groups.flatMap(group => {
                     const remaining = group.shapeIds.filter(id => !selected.has(id));
-                    return remaining.length ? [{...group, shapeIds: remaining}] : [];
+                    return remaining.length ? [{
+                        ...group,
+                        shapeIds: remaining
+                    }] : [];
                 });
             }
         });
@@ -531,7 +546,11 @@ export class EditorStore {
     replaceDocument(document: Document) {
         this.requireIdle();
         const normalized = structuredClone(document) as Document;
-        const legacyPage = normalized.pages?.[0] ?? {id: 'page_1', name: 'Page 1', groups: []};
+        const legacyPage = normalized.pages?.[0] ?? {
+            id: 'page_1',
+            name: 'Page 1',
+            groups: []
+        };
         if (!normalized.pages?.length) normalized.pages = [legacyPage];
         normalized.shapes.forEach(shape => {
             if (!shape.pageId || !normalized.pages.some(page => page.id === shape.pageId)) shape.pageId = legacyPage.id;

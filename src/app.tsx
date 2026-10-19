@@ -14,16 +14,11 @@ import {
 import {type MouseEvent, useEffect, useRef, useState} from 'react';
 import {isTauri} from '@tauri-apps/api/core';
 import {listen} from '@tauri-apps/api/event';
-import {
-    delete_selection,
-    duplicate_selection,
-    page_menu_actions,
-} from "./actions";
+import {page_menu_actions,} from "./actions";
 import {DropdownMenu} from './DropdownMenu';
 import {CommandPalette} from './CommandPalette';
 import {keybindings, matchesKeybinding} from './keybindings';
 import {EditorDialog} from './EditorDialog';
-import {emptyDocument} from './EditorStore';
 import {makeExampleDocument} from './exampleDocument';
 import {ImportPixelImage} from './ImportPixelImage';
 import {NewPixelImage} from './NewPixelImage';
@@ -44,12 +39,7 @@ import {
     translateShape
 } from './shapeAlignment';
 import TreeView from './TreeView';
-import type {
-    Bounds,
-    Document as DrawingDocument,
-    PixelImageData,
-    Shape
-} from './types';
+import type {Bounds, PixelImageData, Shape} from './types';
 import {IconButton, MenuItem, ToolbarGroup} from './ui/controls';
 import {useTheme} from './ui/theme';
 import {useEditorStore} from './useEditorStore';
@@ -59,13 +49,19 @@ import './app.css';
 import {
     type Command,
     type CommandContext,
+    DeleteSelectionCommand,
     type DocumentTab,
+    DuplicateSelectionCommand,
+    GroupSelectionCommand,
     makeTab,
     NewCircleCommand,
+    NewDocumentCommand,
     NewPageCommand,
     NewRectCommand,
+    openDocument,
     RedoCommand,
     UndoCommand,
+    UngroupSelectionCommand,
     type Workspace
 } from "./commands";
 
@@ -96,6 +92,13 @@ function StoreActionButton({command, disabled, ctx}: {
                    onClick={() => command.run(ctx)}>{command.title}</button>
 }
 
+function CommandMenuItem(props: { command: Command, ctx: CommandContext }) {
+    return <MenuItem
+        disabled={!props.command.enabled(props.ctx)}
+        onClick={() => props.command.run(props.ctx)}
+        label={props.command.title} shortcut="⌘D / Ctrl+D"/>
+}
+
 export default function App() {
     const [theme, setTheme] = useTheme();
     const [workspace, setWorkspace] = useState<Workspace>(() => {
@@ -111,14 +114,6 @@ export default function App() {
             document.activeElement.blur();
         }
         if (activeStore.current.getSnapshot().transactionActive) activeStore.current.cancelTransaction();
-    };
-    const openDocument = (document: DrawingDocument) => {
-        const tab = makeTab(document);
-        finishEditing();
-        setWorkspace(current => ({
-            tabs: [...current.tabs, tab],
-            activeId: tab.id
-        }));
     };
     const activateTab = (id: string) => {
         if (id === workspace.activeId) return;
@@ -316,16 +311,16 @@ export default function App() {
             if (key === 'delete' || key === 'backspace') {
                 if (!store.getSnapshot().selectedIds.length || store.getSnapshot().transactionActive) return;
                 event.preventDefault();
-                delete_selection.perform(store, getSelected())
+                DeleteSelectionCommand.run(ctx)
                 return;
             }
             if ((event.metaKey || event.ctrlKey) && !event.altKey && ['d', 'x', 'c', 'v'].includes(key)) {
                 event.preventDefault();
-                if (key === 'd') duplicate_selection.perform(store, getSelected())
+                if (key === 'd') DuplicateSelectionCommand.run(ctx)
                 if (key === 'c') copySelection();
                 if (key === 'x') {
                     copySelection();
-                    delete_selection.perform(store, getSelected())
+                    DeleteSelectionCommand.run(ctx)
                 }
                 if (key === 'v') pasteSelection();
                 return;
@@ -367,12 +362,6 @@ export default function App() {
     const pasteSelection = () => {
         if (clipboard.shapes.length) store.pasteShapes(clipboard.shapes, clipboard.images);
     };
-    const groupSelection = () => {
-        const shapes = getSelected();
-        if (!shapes.length) return;
-        store.createGroup(state.selectedPageId, shapes.map(shape => shape.id), `Group ${doc.pages.flatMap(page => page.groups).length + 1}`);
-    };
-    const ungroupSelection = () => store.ungroupSelection(getSelected().map(shape => shape.id));
     const selectedUngrouped = selectedShapes.some(shape => !doc.pages.flatMap(page => page.groups)
         .some(group => group.shapeIds.includes(shape.id)));
     const selectedGrouped = selectedShapes.some(shape => doc.pages.flatMap(page => page.groups)
@@ -426,33 +415,12 @@ export default function App() {
             run: saveDocument,
             enabled: (ctx) => true
         },
-        {
-            id: 'new-document',
-            title: 'New Document',
-            description: 'Create a blank document',
-            keywords: ['file', 'create'],
-            enabled: (ctx) => !state.transactionActive,
-            run: () => openDocument(emptyDocument())
-        },
+        NewDocumentCommand,
         NewPageCommand,
         NewRectCommand,
         NewCircleCommand,
-        {
-            id: 'duplicate',
-            title: 'Duplicate Selection',
-            description: 'Make a copy of selected shapes',
-            keywords: ['copy'],
-            enabled: ctx => !!state.selectedIds.length && !state.transactionActive,
-            run: ctx => duplicate_selection.perform(store, getSelected())
-        },
-        {
-            id: 'delete',
-            title: 'Delete Selection',
-            description: 'Remove selected shapes',
-            keywords: ['remove'],
-            enabled: ctx => !!state.selectedIds.length && !state.transactionActive,
-            run: ctx => delete_selection.perform(store, getSelected())
-        },
+        DuplicateSelectionCommand,
+        DeleteSelectionCommand,
         UndoCommand,
         RedoCommand,
         ...([
@@ -479,7 +447,7 @@ export default function App() {
         if (store.getSnapshot().transactionActive) return;
         switch (id) {
             case 'new-document':
-                openDocument(emptyDocument());
+                NewDocumentCommand.run(ctx)
                 break;
             case 'open-saved':
                 setSavedDocumentsOpen(true);
@@ -500,15 +468,15 @@ export default function App() {
                 RedoCommand.run(ctx);
                 break;
             case 'duplicate':
-                if (store.getSnapshot().selectedIds.length) duplicate_selection.perform(store, getSelected());
+                if (store.getSnapshot().selectedIds.length) DuplicateSelectionCommand.run(ctx)
                 break;
             case 'delete':
-                if (store.getSnapshot().selectedIds.length) delete_selection.perform(store, getSelected());
+                if (store.getSnapshot().selectedIds.length) DeleteSelectionCommand.run(ctx)
                 break;
             case 'cut':
                 if (store.getSnapshot().selectedIds.length) {
                     copySelection();
-                    delete_selection.perform(store, getSelected());
+                    DeleteSelectionCommand.run(ctx)
                 }
                 break;
             case 'copy':
@@ -577,10 +545,7 @@ export default function App() {
     return <div className={`main-layout${isTauri() ? ' tauri-mode' : ''}`}>
         <nav className="menubar full-span">
             <DropdownMenu title="File">
-                <MenuItem disabled={state.transactionActive}
-                          onClick={() => openDocument(emptyDocument())}
-                          label="New Document"
-                          shortcut={keybindings.find(binding => binding.commandId === 'new-document')?.mac ?? '⌘N'}/>
+                <CommandMenuItem command={NewDocumentCommand} ctx={ctx}/>
                 <hr className="menu-separator" aria-hidden="true"/>
                 <MenuItem disabled={state.transactionActive}
                           onClick={() => setSavedDocumentsOpen(true)}
@@ -599,19 +564,13 @@ export default function App() {
                 </button>
             </DropdownMenu>
             <DropdownMenu title="Edit">
-                <MenuItem
-                    disabled={!state.selectedIds.length || state.transactionActive}
-                    onClick={() => duplicate_selection.perform(store, getSelected())}
-                    label={duplicate_selection.title} shortcut="⌘D / Ctrl+D"/>
-                <button
-                    disabled={!state.selectedIds.length || state.transactionActive}
-                    onClick={() => delete_selection.perform(store, getSelected())}
-                >{delete_selection.title}</button>
+                <CommandMenuItem ctx={ctx} command={DuplicateSelectionCommand}/>
+                <CommandMenuItem ctx={ctx} command={DeleteSelectionCommand}/>
                 <MenuItem
                     disabled={!state.selectedIds.length || state.transactionActive}
                     onClick={() => {
                         copySelection();
-                        delete_selection.perform(store, getSelected())
+                        DeleteSelectionCommand.run(ctx)
                     }} label="Cut" shortcut="⌘X / Ctrl+X"/>
                 <MenuItem
                     disabled={!state.selectedIds.length || state.transactionActive}
@@ -711,7 +670,7 @@ export default function App() {
                        event.target.value = '';
                        if (!chosen) return;
                        try {
-                           openDocument(deserializeDocument(await chosen.text()));
+                           openDocument(ctx, deserializeDocument(await chosen.text()));
                            setError('');
                        } catch (error) {
                            setError(error instanceof Error ? error.message : 'Unable to load document');
@@ -789,7 +748,7 @@ export default function App() {
                 {!selectedAsset &&
                     <IconButton label="Delete selected shapes" icon={Trash2}
                                 disabled={!selectedShapes.length || state.transactionActive}
-                                onClick={() => delete_selection.perform(store, getSelected())}/>}
+                                onClick={() => DeleteSelectionCommand.run(ctx)}/>}
 
             </div>
             <div className="left scroll-container"><h2
@@ -915,28 +874,28 @@ export default function App() {
                  role="menu" onContextMenu={event => event.preventDefault()}
                  onPointerDown={event => event.stopPropagation()}>
                 {selectedUngrouped && <button role="menuitem" onClick={() => {
-                    groupSelection();
+                    GroupSelectionCommand.run(ctx)
                     setContextMenu(null);
                 }}>Group</button>}
                 {selectedGrouped && <button role="menuitem" onClick={() => {
-                    ungroupSelection();
+                    UngroupSelectionCommand.run(ctx)
                     setContextMenu(null);
                 }}>Ungroup</button>}
                 <button role="menuitem" disabled={!state.selectedIds.length}
                         onClick={() => {
-                            duplicate_selection.perform(store, getSelected())
+                            DuplicateSelectionCommand.run(ctx)
                             setContextMenu(null);
-                        }}>{duplicate_selection.title}</button>
+                        }}>{DuplicateSelectionCommand.title}</button>
                 <button role="menuitem" disabled={!state.selectedIds.length}
                         onClick={() => {
-                            delete_selection.perform(store, getSelected())
+                            DeleteSelectionCommand.run(ctx)
                             setContextMenu(null);
                         }}
-                >{delete_selection.title}</button>
+                >{DeleteSelectionCommand.title}</button>
                 <button role="menuitem" disabled={!state.selectedIds.length}
                         onClick={() => {
                             copySelection();
-                            delete_selection.perform(store, getSelected())
+                            DeleteSelectionCommand.run(ctx)
                             setContextMenu(null);
                         }}
                 >Cut
