@@ -56,7 +56,6 @@ import {
     NewDocumentCommand,
     NewPageCommand,
     NewRectCommand,
-    ShowCommandPaletteCommand,
     openDocument,
     RedoCommand,
     SelectionCopyCommand,
@@ -66,6 +65,7 @@ import {
     SelectionGroupCommand,
     SelectionPasteCommand,
     SelectionUngroupCommand,
+    ShowCommandPaletteCommand,
     ToggleLeftSidebar,
     ToggleRightSidebar,
     UndoCommand,
@@ -99,7 +99,7 @@ function CommandButton({command, ctx}: {
 }
 
 function CommandMenuItem(props: { ctx: CommandContext, command: Command }) {
-    const {ctx,command} = props
+    const {ctx, command} = props
     return <MenuItem
         disabled={!command.enabled(props.ctx)}
         shortcut={keybindings.find(binding => binding.commandId === command.id)?.mac ?? 'foo'}
@@ -393,6 +393,7 @@ export default function App() {
         });
     };
     const commands: Command[] = [
+
         {
             id: 'save',
             title: isTauri() ? 'Save Document' : 'Save to Browser',
