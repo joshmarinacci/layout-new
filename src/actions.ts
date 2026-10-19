@@ -9,7 +9,7 @@ export interface PageAction {
 
 
 export const new_page_rectangle:PageAction = {
-    title:'New Rectangle',
+    title:'New Rectangle x',
     perform:(store:EditorStore, pageId:string) => {
         store.selectPage(pageId);
         const shape = makeRect('Rectangle', {x: 50, y: 50, width: 100, height: 80});
@@ -18,10 +18,28 @@ export const new_page_rectangle:PageAction = {
     }
 }
 export const new_page_circle :PageAction= {
-    title: 'New Circle',
+    title: 'New Circle x',
     perform:(store:EditorStore, pageId:string) => {
         store.selectPage(pageId);
         const shape = makeCircle('Circle', {x: 100, y: 100}, 40);
+        store.addShape(shape);
+        store.select(shape.id);
+    }
+}
+
+export const new_rect:StoreAction = {
+    title: 'New Rectangle x',
+    perform: store => {
+        const shape = makeRect('rect', {x: 50, y: 250, width: 50, height: 50});
+        store.addShape(shape);
+        store.select(shape.id);
+    }
+}
+
+export const new_circle:StoreAction = {
+    title: 'New Circle x',
+    perform: store => {
+        const shape = makeCircle('circle', {x: 100, y: 300}, 40);
         store.addShape(shape);
         store.select(shape.id);
     }

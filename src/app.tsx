@@ -16,6 +16,8 @@ import {
     create_new_page,
     delete_selection,
     duplicate_selection,
+    new_circle,
+    new_rect,
     page_menu_actions,
     type StoreAction
 } from "./actions";
@@ -28,7 +30,6 @@ import {NewRepeatingImage} from './NewRepeatingImage';
 import {PixelAssetView} from './PixelAssetView';
 import {type PixelEditorController, PixelImageEditor} from './PixelImageEditor';
 import PropSheet from './PropSheet';
-import {makeCircle, makeRect} from './reducer';
 import {readSavedDocuments, type SavedDocumentRecord, writeSavedDocuments} from './savedDocuments';
 import {SavedDocumentsDialog} from './SavedDocumentsDialog';
 import {deserializeDocument} from './serialization';
@@ -361,18 +362,10 @@ export default function App() {
                 <button disabled={state.transactionActive} onClick={() => createVector()}>New Vector
                     Network
                 </button>
-                <button disabled={state.transactionActive} onClick={() => {
-                    const shape = makeRect('rect', {x: 50, y: 250, width: 50, height: 50});
-                    store.addShape(shape);
-                    store.select(shape.id);
-                }}>New Rect
-                </button>
-                <button disabled={state.transactionActive} onClick={() => {
-                    const shape = makeCircle('circle', {x: 100, y: 300}, 40);
-                    store.addShape(shape);
-                    store.select(shape.id);
-                }}>New Circle
-                </button>
+                <StoreActionButton action={new_rect} disabled={state.transactionActive}
+                                   store={store}/>
+                <StoreActionButton action={new_circle} disabled={state.transactionActive}
+                                   store={store}/>
                 <button disabled={state.transactionActive}
                         onClick={() => setImageDialog({kind: 'create'})}>New Pixel Image
                 </button>
@@ -596,7 +589,8 @@ export default function App() {
                     delete_selection.perform(store, getSelected())
                     setContextMenu(null);
                 }}
-                >Cut</button>
+                >Cut
+                </button>
                 <button role="menuitem" disabled={!state.selectedIds.length} onClick={() => {
                     copySelection();
                     setContextMenu(null);
