@@ -24,6 +24,8 @@ import {
     type StoreAction
 } from "./actions";
 import {DropdownMenu} from './DropdownMenu';
+import {CommandPalette, type Command} from './CommandPalette';
+import {keybindings, matchesKeybinding} from './keybindings';
 import {EditorDialog} from './EditorDialog';
 import {EditorStore, emptyDocument} from './EditorStore';
 import {makeExampleDocument} from './exampleDocument';
@@ -158,6 +160,7 @@ export default function App() {
     const [renamePageDialog, setRenamePageDialog] = useState<{pageId: string; name: string} | null>(null);
     const [renameDocumentName, setRenameDocumentName] = useState<string | null>(null);
     const [savedDocumentsOpen, setSavedDocumentsOpen] = useState(false);
+    const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
     const selectedAsset = doc.images.find(image => image.id === selectedAssetId);
     const saveDocument = () => {
         const url = URL.createObjectURL(new Blob([store.toJSON()], {type: 'application/json'}));
@@ -196,6 +199,25 @@ export default function App() {
     };
     useEffect(() => {
         const keydown = (event: KeyboardEvent) => {
+            if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'open-palette')!)) {
+                event.preventDefault();
+                setCommandPaletteOpen(value => !value);
+                return;
+            }
+            if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'toggle-left-sidebar')!)) {
+                event.preventDefault();
+                setLeftPanelVisible(value => !value);
+                return;
+            }
+            if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'toggle-right-sidebar')!)) {
+                event.preventDefault();
+                setRightPanelVisible(value => !value);
+                return;
+            }
+            if (commandPaletteOpen) {
+                if (event.key === 'Escape') { event.preventDefault(); setCommandPaletteOpen(false); }
+                return;
+            }
             if (event.target instanceof HTMLElement && (event.target.matches('input, textarea, select') || event.target.isContentEditable)) return;
             if (imageDialog?.kind === 'edit') {
                 const key = event.key.toLowerCase();
@@ -220,6 +242,16 @@ export default function App() {
                 }
             }
             if (store.getSnapshot().transactionActive) return;
+            if (event.target instanceof HTMLElement && (event.target.matches('input, textarea, select') || event.target.isContentEditable)) return;
+            const boundCommand = keybindings.find(binding => binding.commandId !== 'open-palette' && matchesKeybinding(event, binding));
+            if (boundCommand) {
+                const command = commands.find(item => item.id === boundCommand.commandId);
+                if (command?.enabled !== false) {
+                    event.preventDefault();
+                    command?.run();
+                    return;
+                }
+            }
             const key = event.key.toLowerCase();
             if ((event.metaKey || event.ctrlKey) && !event.altKey && key === 'o') {
                 event.preventDefault();
@@ -259,7 +291,7 @@ export default function App() {
         };
         window.addEventListener('keydown', keydown);
         return () => window.removeEventListener('keydown', keydown);
-    }, [store, selectedAssetId, state.selectedIds, doc, activeTab, workspace, imageDialog, pixelEditor, vectorId]);
+    }, [store, selectedAssetId, state.selectedIds, doc, activeTab, workspace, imageDialog, pixelEditor, vectorId, commandPaletteOpen]);
     useEffect(() => {
         const close = () => {
             setContextMenu(null);
@@ -329,6 +361,19 @@ export default function App() {
             }
         });
     };
+    const commands: Command[] = [
+        {id: 'save', name: isTauri() ? 'Save Document' : 'Save to Browser', description: 'Save the current document', keywords: ['file'], enabled: !state.transactionActive, run: () => { void saveToBrowser(); }},
+        {id: 'export-json', name: 'Export JSON', description: 'Download the document as a JSON file', keywords: ['save', 'download', 'file'], run: saveDocument},
+        {id: 'new-document', name: 'New Document', description: 'Create a blank document', keywords: ['file', 'create'], enabled: !state.transactionActive, run: () => openDocument(emptyDocument())},
+        {id: 'new-page', name: 'New Page', description: 'Add a page to the current document', keywords: ['create'], enabled: !state.transactionActive, run: () => create_new_page.perform(store)},
+        {id: 'new-rectangle', name: 'New Rectangle', description: 'Add a rectangle to the current page', keywords: ['shape', 'rect', 'create'], enabled: !selectedAssetId && !state.transactionActive, run: () => new_rect.perform(store)},
+        {id: 'new-circle', name: 'New Circle', description: 'Add a circle to the current page', keywords: ['shape', 'oval', 'create'], enabled: !selectedAssetId && !state.transactionActive, run: () => new_circle.perform(store)},
+        {id: 'duplicate', name: 'Duplicate Selection', description: 'Make a copy of selected shapes', keywords: ['copy'], enabled: !!state.selectedIds.length && !state.transactionActive, run: () => duplicate_selection.perform(store, getSelected())},
+        {id: 'delete', name: 'Delete Selection', description: 'Remove selected shapes', keywords: ['remove'], enabled: !!state.selectedIds.length && !state.transactionActive, run: () => delete_selection.perform(store, getSelected())},
+        {id: 'undo', name: 'Undo', description: 'Undo the last change', enabled: state.canUndo, run: () => store.undo()},
+        {id: 'redo', name: 'Redo', description: 'Redo the last undone change', enabled: state.canRedo, run: () => store.redo()},
+        ...([['left', 'Align Left', 'Align selected shapes to their left edges'], ['center', 'Align Horizontal Center', 'Align selected shapes by horizontal center'], ['right', 'Align Right', 'Align selected shapes to their right edges'], ['top', 'Align Top', 'Align selected shapes to their top edges'], ['middle', 'Align Vertical Middle', 'Align selected shapes by vertical middle'], ['bottom', 'Align Bottom', 'Align selected shapes to their bottom edges'], ['distribute-horizontal', 'Distribute Horizontally', 'Space three or more shapes evenly across'], ['distribute-vertical', 'Distribute Vertically', 'Space three or more shapes evenly down']] as const).map(([alignment, name, description]) => ({id: `align-${alignment}`, name, description, keywords: ['align', 'alignment', 'distribute'], enabled: !selectedAssetId && !state.transactionActive && selectedShapes.length >= (alignment.startsWith('distribute') ? 3 : 2), run: () => applyAlignment(alignment)}))
+    ];
     const nativeMenuAction = useRef<(id: string) => void>(() => {});
     nativeMenuAction.current = id => {
         if (store.getSnapshot().transactionActive) return;
@@ -381,9 +426,9 @@ export default function App() {
     return <div className={`main-layout${isTauri() ? ' tauri-mode' : ''}`}>
         <nav className="menubar full-span">
             <DropdownMenu title="File">
-                <button disabled={state.transactionActive}
-                        onClick={() => openDocument(emptyDocument())}>New Document
-                </button>
+                <MenuItem disabled={state.transactionActive}
+                          onClick={() => openDocument(emptyDocument())}
+                          label="New Document" shortcut={keybindings.find(binding => binding.commandId === 'new-document')?.mac ?? '⌘N'}/>
                 <hr className="menu-separator" aria-hidden="true"/>
                 <MenuItem disabled={state.transactionActive}
                           onClick={() => setSavedDocumentsOpen(true)} label={isTauri() ? 'Open Saved Document' : 'Open from Browser'}
@@ -413,6 +458,18 @@ export default function App() {
                           onClick={copySelection} label="Copy" shortcut="⌘C / Ctrl+C"/>
                 <MenuItem disabled={!clipboard.shapes.length || state.transactionActive}
                           onClick={pasteSelection} label="Paste" shortcut="⌘V / Ctrl+V"/>
+            </DropdownMenu>
+            <DropdownMenu title="View">
+                <MenuItem label="Show Command Palette"
+                          shortcut={keybindings.find(binding => binding.commandId === 'open-palette')?.mac ?? '⌘⇧P'}
+                          onClick={() => setCommandPaletteOpen(true)}/>
+                <hr className="menu-separator" aria-hidden="true"/>
+                <MenuItem label={`${leftPanelVisible ? '✓ Hide' : 'Show'} Left Sidebar`}
+                          shortcut={keybindings.find(binding => binding.commandId === 'toggle-left-sidebar')?.mac}
+                          onClick={() => setLeftPanelVisible(value => !value)}/>
+                <MenuItem label={`${rightPanelVisible ? '✓ Hide' : 'Show'} Right Sidebar`}
+                          shortcut={keybindings.find(binding => binding.commandId === 'toggle-right-sidebar')?.mac}
+                          onClick={() => setRightPanelVisible(value => !value)}/>
             </DropdownMenu>
             <DropdownMenu title="Page">
                 <StoreActionButton action={create_new_page}
@@ -824,5 +881,6 @@ export default function App() {
                                                              setError(reason instanceof Error ? reason.message : 'Unable to open saved document');
                                                          }
                                                      }}/>}
+        {commandPaletteOpen && <CommandPalette commands={commands} onClose={() => setCommandPaletteOpen(false)}/>}
     </div>;
 }

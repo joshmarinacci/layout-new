@@ -4,6 +4,8 @@ import type {Shape} from "./types";
 
 export interface PageAction {
     title:string
+    description?: string
+    shortcut?: string
     perform:(store:EditorStore, pageId:string) => void
 }
 
@@ -52,6 +54,8 @@ export const page_menu_actions:PageAction[] = [
 
 export interface StoreAction {
     title:string,
+    description?: string,
+    shortcut?: string,
     perform:(store:EditorStore) => void
 }
 
@@ -64,6 +68,8 @@ export const create_new_page:StoreAction = {
 
 export interface ShapeAction {
     title: string
+    description?: string
+    shortcut?: string
     perform:(store:EditorStore, shapes:Shape[]) => void
 }
 
