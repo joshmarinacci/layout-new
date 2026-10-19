@@ -57,3 +57,14 @@ export const duplicate_selection:ShapeAction = {
         }
     }
 }
+
+export const delete_selection:ShapeAction = {
+    title:'Delete x',
+    perform:(store, shapes) => {
+        if (!shapes.length) return;
+        store.beginTransaction('Delete selection');
+        shapes.forEach(shape => store.removeShape(shape.id));
+        store.commitTransaction();
+        store.select(null);
+    }
+}

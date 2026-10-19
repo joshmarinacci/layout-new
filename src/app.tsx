@@ -12,7 +12,13 @@ import {
     ZoomOut
 } from 'lucide-react';
 import {type MouseEvent, useEffect, useRef, useState} from 'react';
-import {create_new_page, duplicate_selection, page_menu_actions, type StoreAction} from "./actions";
+import {
+    create_new_page,
+    delete_selection,
+    duplicate_selection,
+    page_menu_actions,
+    type StoreAction
+} from "./actions";
 import {DropdownMenu} from './DropdownMenu';
 import {EditorStore, emptyDocument} from './EditorStore';
 import {makeExampleDocument} from './exampleDocument';
@@ -223,7 +229,7 @@ export default function App() {
             if (key === 'delete' || key === 'backspace') {
                 if (!store.getSnapshot().selectedIds.length || store.getSnapshot().transactionActive) return;
                 event.preventDefault();
-                deleteSelection();
+                delete_selection.perform(store, getSelected())
                 return;
             }
             if ((event.metaKey || event.ctrlKey) && !event.altKey && ['d', 'x', 'c', 'v'].includes(key)) {
@@ -232,7 +238,7 @@ export default function App() {
                 if (key === 'c') copySelection();
                 if (key === 'x') {
                     copySelection();
-                    deleteSelection();
+                    delete_selection.perform(store, getSelected())
                 }
                 if (key === 'v') pasteSelection();
                 return;
@@ -269,14 +275,6 @@ export default function App() {
             shapes: structuredClone(shapes),
             images: structuredClone(store.getSnapshot().document.images.filter(image => ids.has(image.id)))
         });
-    };
-    const deleteSelection = () => {
-        const shapes = getSelected();
-        if (!shapes.length) return;
-        store.beginTransaction('Delete selection');
-        shapes.forEach(shape => store.removeShape(shape.id));
-        store.commitTransaction();
-        store.select(null);
     };
     const pasteSelection = () => {
         if (clipboard.shapes.length) store.pasteShapes(clipboard.shapes, clipboard.images);
@@ -333,14 +331,15 @@ export default function App() {
             </DropdownMenu>
             <DropdownMenu title="Edit">
                 <MenuItem disabled={!state.selectedIds.length || state.transactionActive}
-                          onClick={() => duplicate_selection.perform(store, getSelected())} label={duplicate_selection.title} shortcut="⌘D / Ctrl+D"/>
+                          onClick={() => duplicate_selection.perform(store, getSelected())}
+                          label={duplicate_selection.title} shortcut="⌘D / Ctrl+D"/>
                 <button disabled={!state.selectedIds.length || state.transactionActive}
-                        onClick={deleteSelection}>Delete
-                </button>
+                        onClick={() => delete_selection.perform(store, getSelected())}
+                >{delete_selection.title}</button>
                 <MenuItem disabled={!state.selectedIds.length || state.transactionActive}
                           onClick={() => {
                               copySelection();
-                              deleteSelection();
+                              delete_selection.perform(store, getSelected())
                           }} label="Cut" shortcut="⌘X / Ctrl+X"/>
                 <MenuItem disabled={!state.selectedIds.length || state.transactionActive}
                           onClick={copySelection} label="Copy" shortcut="⌘C / Ctrl+C"/>
@@ -475,7 +474,7 @@ export default function App() {
                 </>}
                 {!selectedAsset && <IconButton label="Delete selected shapes" icon={Trash2}
                                                disabled={!selectedShapes.length || state.transactionActive}
-                                               onClick={deleteSelection}/>}
+                                               onClick={() => delete_selection.perform(store, getSelected())}/>}
 
             </div>
             <div className="left scroll-container"><h2
@@ -584,20 +583,20 @@ export default function App() {
                     setContextMenu(null);
                 }}>Ungroup</button>}
                 <button role="menuitem" disabled={!state.selectedIds.length} onClick={() => {
-                    duplicate_selection.perform(store,getSelected())
+                    duplicate_selection.perform(store, getSelected())
                     setContextMenu(null);
                 }}>{duplicate_selection.title}</button>
                 <button role="menuitem" disabled={!state.selectedIds.length} onClick={() => {
-                    deleteSelection();
+                    delete_selection.perform(store, getSelected())
                     setContextMenu(null);
-                }}>Delete
-                </button>
+                }}
+                >{delete_selection.title}</button>
                 <button role="menuitem" disabled={!state.selectedIds.length} onClick={() => {
                     copySelection();
-                    deleteSelection();
+                    delete_selection.perform(store, getSelected())
                     setContextMenu(null);
-                }}>Cut
-                </button>
+                }}
+                >Cut</button>
                 <button role="menuitem" disabled={!state.selectedIds.length} onClick={() => {
                     copySelection();
                     setContextMenu(null);
