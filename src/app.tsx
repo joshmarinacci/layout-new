@@ -59,9 +59,11 @@ import {
     openDocument,
     RedoCommand,
     SelectionCopyCommand,
+    SelectionCutCommand,
     SelectionDeleteCommand,
     SelectionDuplicateCommand,
     SelectionGroupCommand,
+    SelectionPasteCommand,
     SelectionUngroupCommand,
     UndoCommand,
     type Workspace
@@ -93,7 +95,7 @@ function CommandButton({command, ctx}: {
                    onClick={() => command.run(ctx)}>{command.title}</button>
 }
 
-function CommandMenuItem(props: { command: Command, ctx: CommandContext }) {
+function CommandMenuItem(props: { ctx: CommandContext, command: Command }) {
     return <MenuItem
         disabled={!props.command.enabled(props.ctx)}
         onClick={() => props.command.run(props.ctx)}
@@ -319,11 +321,8 @@ export default function App() {
                 event.preventDefault();
                 if (key === 'd') SelectionDuplicateCommand.run(ctx)
                 if (key === 'c') SelectionCopyCommand.run(ctx)
-                if (key === 'x') {
-                    SelectionCopyCommand.run(ctx)
-                    SelectionDeleteCommand.run(ctx)
-                }
-                if (key === 'v') pasteSelection();
+                if (key === 'x') SelectionCutCommand.run(ctx)
+                if (key === 'v') SelectionPasteCommand.run(ctx);
                 return;
             }
             if ((event.metaKey || event.ctrlKey) && ['z', 'y'].includes(event.key.toLowerCase())) {
@@ -348,9 +347,6 @@ export default function App() {
             window.removeEventListener('blur', close);
         };
     }, []);
-    const pasteSelection = () => {
-        if (clipboard.shapes.length) store.pasteShapes(clipboard.shapes, clipboard.images);
-    };
     const selectedUngrouped = selectedShapes.some(shape => !doc.pages.flatMap(page => page.groups)
         .some(group => group.shapeIds.includes(shape.id)));
     const selectedGrouped = selectedShapes.some(shape => doc.pages.flatMap(page => page.groups)
@@ -472,7 +468,7 @@ export default function App() {
                 SelectionCopyCommand.run(ctx)
                 break;
             case 'paste':
-                pasteSelection();
+                SelectionPasteCommand.run(ctx);
                 break;
             case 'new-page':
                 NewPageCommand.run(ctx);
@@ -534,7 +530,7 @@ export default function App() {
     return <div className={`main-layout${isTauri() ? ' tauri-mode' : ''}`}>
         <nav className="menubar full-span">
             <DropdownMenu title="File">
-                <CommandMenuItem command={NewDocumentCommand} ctx={ctx}/>
+                <CommandMenuItem ctx={ctx} command={NewDocumentCommand}/>
                 <hr className="menu-separator" aria-hidden="true"/>
                 <MenuItem disabled={state.transactionActive}
                           onClick={() => setSavedDocumentsOpen(true)}
@@ -555,17 +551,9 @@ export default function App() {
             <DropdownMenu title="Edit">
                 <CommandMenuItem ctx={ctx} command={SelectionDuplicateCommand}/>
                 <CommandMenuItem ctx={ctx} command={SelectionDeleteCommand}/>
-                <MenuItem
-                    disabled={!state.selectedIds.length || state.transactionActive}
-                    onClick={() => {
-                        SelectionCopyCommand.run(ctx);
-                        SelectionDeleteCommand.run(ctx)
-                    }} label="Cut" shortcut="⌘X / Ctrl+X"/>
-                <CommandMenuItem command={SelectionCopyCommand} ctx={ctx}/>
-                <MenuItem
-                    disabled={!clipboard.shapes.length || state.transactionActive}
-                    onClick={pasteSelection} label="Paste"
-                    shortcut="⌘V / Ctrl+V"/>
+                <CommandMenuItem ctx={ctx} command={SelectionCutCommand}/>
+                <CommandMenuItem ctx={ctx} command={SelectionCopyCommand}/>
+                <CommandMenuItem ctx={ctx} command={SelectionPasteCommand}/>
             </DropdownMenu>
             <DropdownMenu title="View">
                 <MenuItem label="Show Command Palette"
@@ -852,45 +840,15 @@ export default function App() {
                  style={{left: contextMenu.x, top: contextMenu.y}}
                  role="menu" onContextMenu={event => event.preventDefault()}
                  onPointerDown={event => event.stopPropagation()}>
-                {selectedUngrouped && <button role="menuitem" onClick={() => {
-                    SelectionGroupCommand.run(ctx)
-                    setContextMenu(null);
-                }}>Group</button>}
-                {selectedGrouped && <button role="menuitem" onClick={() => {
-                    SelectionUngroupCommand.run(ctx)
-                    setContextMenu(null);
-                }}>Ungroup</button>}
-                <button role="menuitem" disabled={!state.selectedIds.length}
-                        onClick={() => {
-                            SelectionDuplicateCommand.run(ctx)
-                            setContextMenu(null);
-                        }}>{SelectionDuplicateCommand.title}</button>
-                <button role="menuitem" disabled={!state.selectedIds.length}
-                        onClick={() => {
-                            SelectionDeleteCommand.run(ctx)
-                            setContextMenu(null);
-                        }}
-                >{SelectionDeleteCommand.title}</button>
-                <button role="menuitem" disabled={!state.selectedIds.length}
-                        onClick={() => {
-                            SelectionCopyCommand.run(ctx);
-                            SelectionDeleteCommand.run(ctx)
-                            setContextMenu(null);
-                        }}
-                >Cut
-                </button>
-                <button role="menuitem" disabled={!state.selectedIds.length}
-                        onClick={() => {
-                            SelectionCopyCommand.run(ctx);
-                            setContextMenu(null);
-                        }}>Copy
-                </button>
-                <button role="menuitem" disabled={!clipboard.shapes.length}
-                        onClick={() => {
-                            pasteSelection();
-                            setContextMenu(null);
-                        }}>Paste
-                </button>
+                {selectedUngrouped && <CommandMenuItem ctx={ctx}
+                                                       command={SelectionGroupCommand}/>}
+                {selectedGrouped && <CommandMenuItem ctx={ctx}
+                                                     command={SelectionUngroupCommand}/>}
+                <CommandMenuItem ctx={ctx} command={SelectionDuplicateCommand}/>
+                <CommandMenuItem ctx={ctx} command={SelectionDeleteCommand}/>
+                <CommandMenuItem ctx={ctx} command={SelectionCutCommand}/>
+                <CommandMenuItem ctx={ctx} command={SelectionCopyCommand}/>
+                <CommandMenuItem ctx={ctx} command={SelectionPasteCommand}/>
                 {selectedShapes.length > 1 && <>
                     <hr className="menu-separator" aria-hidden="true"/>
                     <button role="menuitem" onClick={() => {

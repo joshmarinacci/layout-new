@@ -47,6 +47,8 @@ export type CommandId =
     | 'selection-duplicate'
     | 'selection-delete'
     | 'selection-copy'
+    | 'selection-cut'
+    | 'selection-paste'
 
     | 'align-left'
     | 'align-center'
@@ -100,7 +102,6 @@ export const NewRectCommand: Command = {
     title: 'New Rectangle xx',
     description: 'Add a rectangle to the current page',
     keywords: ['shape', 'rect', 'create'],
-    // enabled: ctx => !selectedAssetId && !state.transactionActive,
     enabled: ctx => !ctx.state.transactionActive,
     run: ctx => {
         const shape = makeRect('rect', {x: 50, y: 250, width: 50, height: 50});
@@ -165,7 +166,7 @@ export const SelectionDuplicateCommand: Command = {
 }
 export const SelectionDeleteCommand: Command = {
     id: 'selection-delete',
-    title: 'Delete Selection',
+    title: 'Delete',
     description: 'Remove selected shapes',
     keywords: ['remove'],
     enabled: ctx => !!ctx.state.selectedIds.length && !ctx.state.transactionActive,
@@ -181,7 +182,7 @@ export const SelectionDeleteCommand: Command = {
 
 export const SelectionCopyCommand: Command = {
     id: 'selection-copy',
-    title: 'Copy Selection',
+    title: 'Copy',
     description: 'Copy Selected shapes',
     enabled: (ctx) => ctx.store.getSnapshot().selectedIds.length > 0,
     run: (ctx) => {
@@ -194,6 +195,26 @@ export const SelectionCopyCommand: Command = {
             shapes: structuredClone(shapes),
             images: structuredClone(ctx.store.getSnapshot().document.images.filter(image => ids.has(image.id)))
         });
+    }
+}
+export const SelectionCutCommand: Command = {
+    id: 'selection-cut',
+    title: 'Cut',
+    description: 'Cut selected shapes',
+    enabled: ctx => ctx.store.getSnapshot().selectedIds.length > 0 && !ctx.state.transactionActive,
+    run: ctx => {
+        SelectionCopyCommand.run(ctx)
+        SelectionDeleteCommand.run(ctx)
+    }
+}
+
+export const SelectionPasteCommand: Command = {
+    id: 'selection-paste',
+    title: 'Paste',
+    description: 'Paste shapes from clipboard',
+    enabled: ctx => ctx.clipboard.shapes.length>0 && !ctx.state.transactionActive,
+    run: ctx => {
+        if (ctx.clipboard.shapes.length) ctx.store.pasteShapes(ctx.clipboard.shapes, ctx.clipboard.images);
     }
 }
 
