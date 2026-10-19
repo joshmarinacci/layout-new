@@ -425,7 +425,8 @@ export default function App() {
             title: 'Export JSON',
             description: 'Download the document as a JSON file',
             keywords: ['save', 'download', 'file'],
-            run: saveDocument
+            run: saveDocument,
+            enabled: (store, state) => true
         },
         {
             id: 'new-document',
@@ -471,9 +472,9 @@ export default function App() {
             ['bottom', 'Align Bottom', 'Align selected shapes to their bottom edges'],
             ['distribute-horizontal', 'Distribute Horizontally', 'Space three or more shapes evenly across'],
             ['distribute-vertical', 'Distribute Vertically', 'Space three or more shapes evenly down']
-        ] as const).map(([alignment, name, description]) => ({
+        ] as const).map(([alignment, title, description]) => ({
             id: `align-${alignment}`,
-            name,
+            title,
             description,
             keywords: ['align', 'alignment', 'distribute'],
             enabled: (store: EditorStore, state: EditorSnapshot) => !selectedAssetId && !state.transactionActive && selectedShapes.length >= (alignment.startsWith('distribute') ? 3 : 2),
