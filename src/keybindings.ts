@@ -27,19 +27,19 @@ export const keybindings: Keybinding[] = [
     {commandId: 'undo', key: 'cmd-z', mac: '⌘Z', other: 'Ctrl+Z'},
     {commandId: 'redo', key: 'cmd-shift-z', mac: '⌘⇧Z', other: 'Ctrl+Shift+Z'},
     {
-        commandId: 'open-palette',
+        commandId: 'ui-show-command-palette',
         key: 'cmd-shift-p',
         mac: '⌘⇧P',
         other: 'Ctrl+Shift+P'
     },
     {
-        commandId: 'toggle-left-sidebar',
+        commandId: 'ui-toggle-left-sidebar',
         key: 'cmd-shift-b',
         mac: '⌘⇧B',
         other: 'Ctrl+Shift+B'
     },
     {
-        commandId: 'toggle-right-sidebar',
+        commandId: 'ui-toggle-right-sidebar',
         key: 'cmd-shift-alt-b',
         mac: '⌘⌥⇧B',
         other: 'Ctrl+Alt+Shift+B'

@@ -56,6 +56,7 @@ import {
     NewDocumentCommand,
     NewPageCommand,
     NewRectCommand,
+    OpenCommandPaletteCommand,
     openDocument,
     RedoCommand,
     SelectionCopyCommand,
@@ -65,6 +66,8 @@ import {
     SelectionGroupCommand,
     SelectionPasteCommand,
     SelectionUngroupCommand,
+    ToggleLeftSidebar,
+    ToggleRightSidebar,
     UndoCommand,
     type Workspace
 } from "./commands";
@@ -96,10 +99,12 @@ function CommandButton({command, ctx}: {
 }
 
 function CommandMenuItem(props: { ctx: CommandContext, command: Command }) {
+    const {ctx,command} = props
     return <MenuItem
-        disabled={!props.command.enabled(props.ctx)}
-        onClick={() => props.command.run(props.ctx)}
-        label={props.command.title} shortcut="⌘D / Ctrl+D"/>
+        disabled={!command.enabled(props.ctx)}
+        shortcut={keybindings.find(binding => binding.commandId === command.id)?.mac ?? 'foo'}
+        onClick={() => command.run(ctx)}
+        label={command.title}/>
 }
 
 export default function App() {
@@ -201,6 +206,12 @@ export default function App() {
         workspace, setWorkspace,
         finishEditing,
         clipboard, setClipboard,
+        commandPaletteOpen,
+        setCommandPaletteOpen,
+        leftPanelVisible,
+        setLeftPanelVisible,
+        rightPanelVisible,
+        setRightPanelVisible,
     }
 
     const saveDocument = () => {
@@ -240,19 +251,19 @@ export default function App() {
     };
     useEffect(() => {
         const keydown = (event: KeyboardEvent) => {
-            if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'open-palette')!)) {
+            if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'ui-show-command-palette')!)) {
                 event.preventDefault();
-                setCommandPaletteOpen(value => !value);
+                OpenCommandPaletteCommand.run(ctx)
                 return;
             }
-            if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'toggle-left-sidebar')!)) {
+            if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'ui-toggle-left-sidebar')!)) {
                 event.preventDefault();
-                setLeftPanelVisible(value => !value);
+                ToggleLeftSidebar.run(ctx)
                 return;
             }
-            if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'toggle-right-sidebar')!)) {
+            if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'ui-toggle-right-sidebar')!)) {
                 event.preventDefault();
-                setRightPanelVisible(value => !value);
+                ToggleRightSidebar.run(ctx)
                 return;
             }
             if (commandPaletteOpen) {
@@ -287,7 +298,7 @@ export default function App() {
             }
             if (store.getSnapshot().transactionActive) return;
             if (event.target instanceof HTMLElement && (event.target.matches('input, textarea, select') || event.target.isContentEditable)) return;
-            const boundCommand = keybindings.find(binding => binding.commandId !== 'open-palette' && matchesKeybinding(event, binding));
+            const boundCommand = keybindings.find(binding => binding.commandId !== 'ui-show-command-palette' && matchesKeybinding(event, binding));
             if (boundCommand) {
                 const command = commands.find(item => item.id === boundCommand.commandId);
                 if (command && command.enabled && command.enabled(ctx)) {
@@ -556,18 +567,10 @@ export default function App() {
                 <CommandMenuItem ctx={ctx} command={SelectionPasteCommand}/>
             </DropdownMenu>
             <DropdownMenu title="View">
-                <MenuItem label="Show Command Palette"
-                          shortcut={keybindings.find(binding => binding.commandId === 'open-palette')?.mac ?? '⌘⇧P'}
-                          onClick={() => setCommandPaletteOpen(true)}/>
+                <CommandMenuItem ctx={ctx} command={OpenCommandPaletteCommand}/>
                 <hr className="menu-separator" aria-hidden="true"/>
-                <MenuItem
-                    label={`${leftPanelVisible ? '✓ Hide' : 'Show'} Left Sidebar`}
-                    shortcut={keybindings.find(binding => binding.commandId === 'toggle-left-sidebar')?.mac}
-                    onClick={() => setLeftPanelVisible(value => !value)}/>
-                <MenuItem
-                    label={`${rightPanelVisible ? '✓ Hide' : 'Show'} Right Sidebar`}
-                    shortcut={keybindings.find(binding => binding.commandId === 'toggle-right-sidebar')?.mac}
-                    onClick={() => setRightPanelVisible(value => !value)}/>
+                <CommandMenuItem ctx={ctx} command={ToggleLeftSidebar}/>
+                <CommandMenuItem ctx={ctx} command={ToggleRightSidebar}/>
             </DropdownMenu>
             <DropdownMenu title="Page">
                 <CommandButton command={NewPageCommand} ctx={ctx}/>

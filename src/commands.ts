@@ -20,16 +20,22 @@ export type ClipboardState = {
     images: PixelImageData[]
 }
 
-type Setter<W> = (w: W) => W
+type Setter<W> = (s:W | ((w: W) => W)) => void
 
 export type CommandContext = {
     store: EditorStore,
     state: EditorSnapshot,
     finishEditing: () => void,
     workspace: Workspace,
-    setWorkspace: (s: Workspace | Setter<Workspace>) => void,
+    setWorkspace: Setter<Workspace>,
     clipboard: ClipboardState,
-    setClipboard: (s: ClipboardState | Setter<ClipboardState>) => void
+    setClipboard: Setter<ClipboardState>
+    commandPaletteOpen: boolean,
+    setCommandPaletteOpen: Setter<boolean>
+    leftPanelVisible: boolean
+    setLeftPanelVisible: Setter<boolean>
+    rightPanelVisible: boolean
+    setRightPanelVisible: Setter<boolean>
 }
 
 export type CommandId =
@@ -59,9 +65,10 @@ export type CommandId =
     | 'align-distribute-vertical'
     | 'align-distribute-horizontal'
 
-    | 'open-palette'
-    | 'toggle-right-sidebar'
-    | 'toggle-left-sidebar'
+    | 'ui-toggle-right-sidebar'
+    | 'ui-toggle-left-sidebar'
+    | 'ui-show-command-palette'
+
 
 export interface Command {
     id: CommandId;
@@ -207,16 +214,41 @@ export const SelectionCutCommand: Command = {
         SelectionDeleteCommand.run(ctx)
     }
 }
-
 export const SelectionPasteCommand: Command = {
     id: 'selection-paste',
     title: 'Paste',
     description: 'Paste shapes from clipboard',
-    enabled: ctx => ctx.clipboard.shapes.length>0 && !ctx.state.transactionActive,
+    enabled: ctx => ctx.clipboard.shapes.length > 0 && !ctx.state.transactionActive,
     run: ctx => {
         if (ctx.clipboard.shapes.length) ctx.store.pasteShapes(ctx.clipboard.shapes, ctx.clipboard.images);
     }
 }
+
+export const OpenCommandPaletteCommand: Command = {
+    id: 'ui-show-command-palette',
+    title: 'Show Command Palette',
+    description: 'show the command palette',
+    enabled: () => true,
+    run: ctx => {
+        ctx.setCommandPaletteOpen(true)
+    }
+}
+
+export const ToggleLeftSidebar: Command = {
+    id: 'ui-toggle-left-sidebar',
+    title: 'Toggle Left Sidebar',
+    description: 'Toggle the left sidebar',
+    enabled: () => true,
+    run: ctx => ctx.setLeftPanelVisible(!ctx.leftPanelVisible)
+}
+export const ToggleRightSidebar: Command = {
+    id: 'ui-toggle-right-sidebar',
+    title: 'Toggle Right Sidebar',
+    description: 'Toggle the right sidebar',
+    enabled: () => true,
+    run: ctx => ctx.setRightPanelVisible(!ctx.rightPanelVisible)
+}
+
 
 export function makeTab(document: DrawingDocument, savedDocumentId: string | null = null, savedJson: string | null = null): DocumentTab {
     return {
