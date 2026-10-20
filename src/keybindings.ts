@@ -11,7 +11,7 @@ export type Keybinding = {
 /** Portable command shortcut registry. Key strings use cmd/ctrl/shift/alt modifiers. */
 export const keybindings: Keybinding[] = [
     {commandId: 'new-document', key: 'cmd-n', mac: '⌘N', other: 'Ctrl+N'},
-    {commandId: 'save', key: 'cmd-s', mac: '⌘S', other: 'Ctrl+S'},
+    {commandId: 'save-local-document', key: 'cmd-s', mac: '⌘S', other: 'Ctrl+S'},
     {
         commandId: 'selection-duplicate',
         key: 'cmd-d',

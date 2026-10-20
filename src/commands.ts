@@ -10,6 +10,12 @@ import type {
 } from './types';
 import {makeVector} from "./vectorNetworks";
 import type {PixelEditorController} from "./PixelImageEditor";
+import {isTauri} from "@tauri-apps/api/core";
+import {
+    readSavedDocuments,
+    type SavedDocumentRecord,
+    writeSavedDocuments
+} from "./savedDocuments";
 
 export interface DocumentTab {
     id: string;
@@ -53,6 +59,7 @@ export type CommandContext = {
     setClipboard: Setter<ClipboardState>
     commandPaletteOpen: boolean,
     setCommandPaletteOpen: Setter<boolean>
+    setSavedDocumentsOpen: Setter<boolean>
     leftPanelVisible: boolean
     setLeftPanelVisible: Setter<boolean>
     rightPanelVisible: boolean
@@ -63,6 +70,8 @@ export type CommandContext = {
     setRepeatingImageDialog: Setter<boolean>
     setVectorId:Setter<string|null>
     setPixelEditor:Setter<PixelEditorController|null>
+    setError:Setter<string>
+    setFileDialogOpen:Setter<boolean>
 }
 
 export type CommandId =
@@ -70,7 +79,10 @@ export type CommandId =
     | 'redo'
     | 'new-document'
     | 'rename-document'
-    | 'save'
+    | 'open-local-document'
+    | 'save-local-document'
+    | 'open-json-document'
+    | 'save-json-document'
     | 'export-json'
 
     | 'new-page'
@@ -129,6 +141,39 @@ export const RenameDocumentCommand: Command = {
     enabled: ctx => ctx.state.document !== undefined,
     run: ctx => ctx.setRenameDocumentName(ctx.state.document.title)
 }
+export const OpenDocumentCommand:Command = {
+    id: 'open-local-document',
+    title:isTauri()?'Open Saved Document':'Open from Browser',
+    description:'opens a document from local storage',
+    enabled: ctx => !ctx.state.transactionActive,
+    run:ctx => {
+        ctx.setSavedDocumentsOpen(true)
+    }
+}
+export const SaveDocumentCommand:Command = {
+    id: 'save-local-document',
+    title: isTauri() ? 'Save Document' : 'Save to Browser',
+    description: 'Save the current document',
+    enabled: ctx => !ctx.state.transactionActive,
+    keywords: ['file'],
+    run: ctx => saveToBrowser(ctx)
+}
+export const OpenJsonCommand:Command = {
+    id: 'open-json-document',
+    title:'Import JSON',
+    description: 'Imports a portable JSON file from disk',
+    enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => ctx.setFileDialogOpen(true)
+}
+export const SaveJsonCommand:Command = {
+    id: 'save-json-document',
+    title:'Export JSON',
+    description: 'exports current document as a portable JSON file',
+    keywords: ['save', 'download', 'file'],
+    enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => saveDocument(ctx)
+}
+
 export const NewPageCommand: Command = {
     id: 'new-page',
     title: 'New Page',
@@ -399,4 +444,43 @@ const createVector = (ctx: CommandContext) => {
     ctx.setPixelEditor(null);
     ctx.setVectorId(shape.id);
     // setPageMenu(null);
+};
+
+
+const saveDocument = (ctx: CommandContext) => {
+    const url = URL.createObjectURL(new Blob([ctx.store.toJSON()], {type: 'application/json'}));
+    const safeTitle = ctx.state.document.title.trim().replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').replace(/\s+/g, ' ').replace(/\.+$/g, '') || 'Untitled';
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${safeTitle}.json`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+const saveToBrowser = async (ctx: CommandContext) => {
+    try {
+        const json = ctx.store.toJSON();
+        const records = await readSavedDocuments();
+        const activeTab = ctx.workspace.tabs.find(tab => tab.id === ctx.workspace.activeId)!;
+
+        const id = activeTab.savedDocumentId ?? crypto.randomUUID();
+        const prior = records.find(record => record.id === id);
+        const record: SavedDocumentRecord = {
+            id,
+            name: prior?.name ?? (ctx.state.document.title.trim() || 'Untitled'),
+            savedAt: new Date().toISOString(),
+            json
+        };
+        await writeSavedDocuments([...records.filter(item => item.id !== id), record]);
+        ctx.setWorkspace(current => ({
+            ...current,
+            tabs: current.tabs.map(tab => tab.id === activeTab.id ? {
+                ...tab,
+                savedDocumentId: id,
+                savedJson: json
+            } : tab)
+        }));
+        ctx.setError('');
+    } catch (reason) {
+        ctx.setError(reason instanceof Error ? reason.message : 'Unable to save document');
+    }
 };

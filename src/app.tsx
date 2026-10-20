@@ -25,11 +25,6 @@ import {NewRepeatingImage} from './NewRepeatingImage';
 import {PixelAssetView} from './PixelAssetView';
 import {type PixelEditorController, PixelImageEditor} from './PixelImageEditor';
 import PropSheet from './PropSheet';
-import {
-    readSavedDocuments,
-    type SavedDocumentRecord,
-    writeSavedDocuments
-} from './savedDocuments';
 import {SavedDocumentsDialog} from './SavedDocumentsDialog';
 import {deserializeDocument} from './serialization';
 import {
@@ -49,7 +44,6 @@ import {
     type Command,
     type CommandContext,
     DeletePageCommand,
-    type DocumentTab,
     type ImageDialogConfig,
     ImportPNGCommand,
     makeTab,
@@ -63,9 +57,13 @@ import {
     NewRepeatingImageCommand,
     NewVectorNetworkCommand,
     openDocument,
+    OpenDocumentCommand,
+    OpenJsonCommand,
     RedoCommand,
     RenameDocumentCommand,
     RenamePageCommand,
+    SaveDocumentCommand,
+    SaveJsonCommand,
     SelectionCopyCommand,
     SelectionCutCommand,
     SelectionDeleteCommand,
@@ -79,41 +77,8 @@ import {
     UndoCommand,
     type Workspace
 } from "./commands";
+import {CommandButton, CommandMenuItem, DocumentTabButton} from "./common";
 
-
-function DocumentTabButton({tab, active, activate, onContextMenu}: {
-    tab: DocumentTab;
-    active: boolean;
-    activate: () => void
-    onContextMenu: (event: MouseEvent<HTMLButtonElement>) => void
-}) {
-    const {document} = useEditorStore(tab.store);
-    const dirty = tab.savedJson !== tab.store.toJSON();
-    return <button role="tab" id={`tab-${tab.id}`} aria-selected={active}
-                   aria-controls="document-editor"
-                   tabIndex={active ? 0 : -1} onClick={activate}
-                   onContextMenu={onContextMenu}
-                   title={`${document.title || 'Untitled'}${dirty ? ' — unsaved in browser storage' : ' — saved in browser storage'}`}>
-        {document.title || 'Untitled'}{dirty ? ' •' : ''}
-    </button>;
-}
-
-function CommandButton({command, ctx}: {
-    command: Command,
-    ctx: CommandContext
-}) {
-    return <button disabled={!command.enabled(ctx)}
-                   onClick={() => command.run(ctx)}>{command.title}</button>
-}
-
-function CommandMenuItem(props: { ctx: CommandContext, command: Command }) {
-    const {ctx, command} = props
-    return <MenuItem
-        disabled={!command.enabled(props.ctx)}
-        shortcut={keybindings.find(binding => binding.commandId === command.id)?.mac ?? 'foo'}
-        onClick={() => command.run(ctx)}
-        label={command.title}/>
-}
 
 export default function App() {
     const [theme, setTheme] = useTheme();
@@ -198,6 +163,7 @@ export default function App() {
         clipboard, setClipboard,
         commandPaletteOpen,
         setCommandPaletteOpen,
+        setSavedDocumentsOpen,
         leftPanelVisible,
         setLeftPanelVisible,
         rightPanelVisible,
@@ -208,43 +174,11 @@ export default function App() {
         setRepeatingImageDialog,
         setVectorId,
         setPixelEditor,
-    }
-
-    const saveDocument = () => {
-        const url = URL.createObjectURL(new Blob([store.toJSON()], {type: 'application/json'}));
-        const safeTitle = doc.title.trim().replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').replace(/\s+/g, ' ').replace(/\.+$/g, '') || 'Untitled';
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${safeTitle}.json`;
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-    };
-    const saveToBrowser = async () => {
-        try {
-            const json = store.toJSON();
-            const records = await readSavedDocuments();
-            const id = activeTab.savedDocumentId ?? crypto.randomUUID();
-            const prior = records.find(record => record.id === id);
-            const record: SavedDocumentRecord = {
-                id,
-                name: prior?.name ?? (doc.title.trim() || 'Untitled'),
-                savedAt: new Date().toISOString(),
-                json
-            };
-            await writeSavedDocuments([...records.filter(item => item.id !== id), record]);
-            setWorkspace(current => ({
-                ...current,
-                tabs: current.tabs.map(tab => tab.id === activeTab.id ? {
-                    ...tab,
-                    savedDocumentId: id,
-                    savedJson: json
-                } : tab)
-            }));
-            setError('');
-        } catch (reason) {
-            setError(reason instanceof Error ? reason.message : 'Unable to save document');
+        setError,
+        setFileDialogOpen: (open) => {
+            file.current?.click()
         }
-    };
+    }
     useEffect(() => {
         const keydown = (event: KeyboardEvent) => {
             if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'ui-show-command-palette')!)) {
@@ -314,7 +248,7 @@ export default function App() {
             }
             if ((event.metaKey || event.ctrlKey) && !event.altKey && key === 's') {
                 event.preventDefault();
-                if (!store.getSnapshot().transactionActive) saveToBrowser();
+                if (!store.getSnapshot().transactionActive) SaveDocumentCommand.run(ctx)
                 return;
             }
             if (vectorId && (key === 'delete' || key === 'backspace' || ((event.metaKey || event.ctrlKey) && ['d', 'x', 'c', 'v'].includes(key)))) return;
@@ -385,27 +319,12 @@ export default function App() {
         });
     };
     const commands: Command[] = [
-
-        {
-            id: 'save',
-            title: isTauri() ? 'Save Document' : 'Save to Browser',
-            description: 'Save the current document',
-            keywords: ['file'],
-            enabled: (ctx) => !ctx.state.transactionActive,
-            run: () => {
-                void saveToBrowser();
-            }
-        },
-        {
-            id: 'export-json',
-            title: 'Export JSON',
-            description: 'Download the document as a JSON file',
-            keywords: ['save', 'download', 'file'],
-            run: saveDocument,
-            enabled: (ctx) => true
-        },
         NewDocumentCommand,
         RenameDocumentCommand,
+        OpenDocumentCommand,
+        SaveDocumentCommand,
+        OpenJsonCommand,
+        SaveJsonCommand,
         NewPageCommand,
         RenamePageCommand,
         DeletePageCommand,
@@ -456,10 +375,10 @@ export default function App() {
                 file.current?.click();
                 break;
             case 'save-document':
-                void saveToBrowser();
+                SaveDocumentCommand.run(ctx)
                 break;
             case 'export-json':
-                saveDocument();
+                SaveJsonCommand.run(ctx)
                 break;
             case 'undo':
                 UndoCommand.run(ctx);
@@ -547,21 +466,10 @@ export default function App() {
             <DropdownMenu title="File">
                 <CommandMenuItem ctx={ctx} command={NewDocumentCommand}/>
                 <hr className="menu-separator" aria-hidden="true"/>
-                <MenuItem disabled={state.transactionActive}
-                          onClick={() => setSavedDocumentsOpen(true)}
-                          label={isTauri() ? 'Open Saved Document' : 'Open from Browser'}
-                          shortcut="⌘⇧O / Ctrl+Shift+O"/>
-                <button disabled={state.transactionActive}
-                        onClick={() => file.current?.click()}>Load JSON file
-                </button>
+                <CommandMenuItem ctx={ctx} command={OpenDocumentCommand}/>
+                <CommandMenuItem ctx={ctx} command={OpenJsonCommand}/>
                 <hr className="menu-separator" aria-hidden="true"/>
-                <MenuItem disabled={state.transactionActive}
-                          onClick={() => void saveToBrowser()}
-                          label={isTauri() ? 'Save Document' : 'Save to Browser'}
-                          shortcut="⌘S / Ctrl+S"/>
-                <button disabled={state.transactionActive}
-                        onClick={saveDocument}>Export JSON
-                </button>
+                <CommandButton command={SaveJsonCommand} ctx={ctx}/>
             </DropdownMenu>
             <DropdownMenu title="Edit">
                 <CommandMenuItem ctx={ctx} command={SelectionDuplicateCommand}/>
@@ -798,16 +706,10 @@ export default function App() {
                         store={store}/></div>
                 </>}
         </div>
-        <div className="statusbar full-span"><span
-            role="alert">{error}</span><span
-            className="spacer"/><label>Scroll to pan; Ctrl/⌘+scroll to zoom;
-            Space or middle-drag to
-            pan. Shift-click toggles selection; drag empty canvas to select.
-            Drag selected shapes to
-            move; Option/Alt-drag to duplicate. Handles resize. Shift-resize
-            images to keep
-            proportions. Double-click a pixel image or vector network to
-            edit.</label></div>
+        <div className="statusbar full-span">
+            <span role="alert">{error}</span>
+            <span className="spacer"/>
+        </div>
         <footer className="statusbar full-span">
             <IconButton
                 label={leftPanelVisible ? 'Hide tree panel' : 'Show tree panel'}
