@@ -351,10 +351,10 @@ export default function App() {
                 NewDocumentCommand.run(ctx)
                 break;
             case 'open-saved':
-                setSavedDocumentsOpen(true);
+                OpenDocumentCommand.run(ctx)
                 break;
             case 'load-json':
-                file.current?.click();
+                OpenJsonCommand.run(ctx)
                 break;
             case 'save-document':
                 SaveDocumentCommand.run(ctx)
@@ -375,10 +375,7 @@ export default function App() {
                 if (store.getSnapshot().selectedIds.length) SelectionDeleteCommand.run(ctx)
                 break;
             case 'cut':
-                if (store.getSnapshot().selectedIds.length) {
-                    SelectionCopyCommand.run(ctx)
-                    SelectionDeleteCommand.run(ctx)
-                }
+                if (store.getSnapshot().selectedIds.length) SelectionCutCommand.run(ctx)
                 break;
             case 'copy':
                 SelectionCopyCommand.run(ctx)
@@ -472,12 +469,12 @@ export default function App() {
                 <CommandButton command={DeletePageCommand} ctx={ctx}/>
             </DropdownMenu>
             {!selectedAsset && <DropdownMenu title="Shape">
-                <CommandButton command={NewVectorNetworkCommand} ctx={ctx}/>
+                <CommandButton ctx={ctx} command={NewVectorNetworkCommand}/>
                 <CommandButton ctx={ctx} command={NewRectCommand}/>
                 <CommandButton ctx={ctx} command={NewCircleCommand}/>
-                <CommandButton command={NewPixelImageCommand} ctx={ctx}/>
-                <CommandButton command={NewRepeatingImageCommand} ctx={ctx}/>
-                <CommandButton command={ImportPNGCommand} ctx={ctx}/>
+                <CommandButton ctx={ctx} command={NewPixelImageCommand}/>
+                <CommandButton ctx={ctx} command={NewRepeatingImageCommand}/>
+                <CommandButton ctx={ctx} command={ImportPNGCommand}/>
             </DropdownMenu>}
             {!selectedAsset && selectedShapes.length > 1 &&
                 <DropdownMenu title="Align">
