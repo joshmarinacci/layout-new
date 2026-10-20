@@ -50,6 +50,7 @@ import {
     type ClipboardState,
     type Command,
     type CommandContext,
+    DeletePageCommand,
     type DocumentTab,
     makeTab,
     NewCircleCommand,
@@ -58,6 +59,8 @@ import {
     NewRectCommand,
     openDocument,
     RedoCommand,
+    RenameDocumentCommand,
+    RenamePageCommand,
     SelectionCopyCommand,
     SelectionCutCommand,
     SelectionDeleteCommand,
@@ -212,6 +215,8 @@ export default function App() {
         setLeftPanelVisible,
         rightPanelVisible,
         setRightPanelVisible,
+        setRenamePageDialog,
+        setRenameDocumentName,
     }
 
     const saveDocument = () => {
@@ -376,10 +381,6 @@ export default function App() {
         setContextMenu(null);
         setPageMenu({x: event.clientX, y: event.clientY, pageId});
     };
-    const renamePage = (pageId: string) => {
-        const page = doc.pages.find(item => item.id === pageId);
-        if (page) setRenamePageDialog({pageId, name: page.name});
-    };
     const applyAlignment = (alignment: ShapeAlignment) => {
         if (selectedShapes.length < 2) return;
         const offsets = shapeAlignmentOffsets(selectedShapes, alignment);
@@ -413,7 +414,10 @@ export default function App() {
             enabled: (ctx) => true
         },
         NewDocumentCommand,
+        RenameDocumentCommand,
         NewPageCommand,
+        RenamePageCommand,
+        DeletePageCommand,
         NewRectCommand,
         NewCircleCommand,
         SelectionGroupCommand,
@@ -494,10 +498,10 @@ export default function App() {
                 NewPageCommand.run(ctx);
                 break;
             case 'rename-page':
-                renamePage(store.getSnapshot().selectedPageId);
+                RenamePageCommand.run(ctx)
                 break;
             case 'delete-page':
-                if (store.getSnapshot().document.pages.length > 1) store.deletePage(store.getSnapshot().selectedPageId);
+                DeletePageCommand.run(ctx)
                 break;
             case 'new-vector':
                 if (!selectedAssetId) createVector();
@@ -583,15 +587,8 @@ export default function App() {
             </DropdownMenu>
             <DropdownMenu title="Page">
                 <CommandButton command={NewPageCommand} ctx={ctx}/>
-                <button disabled={state.transactionActive}
-                        onClick={() => renamePage(state.selectedPageId)}>Rename
-                    Page
-                </button>
-                <button
-                    disabled={doc.pages.length <= 1 || state.transactionActive}
-                    onClick={() => store.deletePage(state.selectedPageId)}>Delete
-                    Page
-                </button>
+                <CommandButton command={RenamePageCommand} ctx={ctx}/>
+                <CommandButton command={DeletePageCommand} ctx={ctx}/>
             </DropdownMenu>
             {!selectedAsset && <DropdownMenu title="Shape">
                 <button disabled={state.transactionActive}
@@ -915,34 +912,16 @@ export default function App() {
                               role="menu" aria-label="Document actions"
                               onContextMenu={event => event.preventDefault()}
                               onPointerDown={event => event.stopPropagation()}>
-            <button role="menuitem" onClick={() => {
-                setDocumentMenu(null);
-                setRenameDocumentName(doc.title);
-            }}>Rename Document
-            </button>
-            <button role="menuitem" disabled={state.transactionActive}
-                    onClick={() => {
-                        NewPageCommand.run(ctx);
-                        setDocumentMenu(null);
-                    }}>New Page
-            </button>
+            <CommandMenuItem ctx={ctx} command={RenameDocumentCommand}/>
+            <CommandMenuItem ctx={ctx} command={NewPageCommand}/>
         </div>}
         {pageMenu && <div className="shape-context-menu"
                           style={{left: pageMenu.x, top: pageMenu.y}}
                           role="menu" aria-label="Page actions"
                           onContextMenu={event => event.preventDefault()}
                           onPointerDown={event => event.stopPropagation()}>
-            <button role="menuitem" onClick={() => {
-                renamePage(pageMenu.pageId);
-                setPageMenu(null);
-            }}>Rename Page
-            </button>
-            <button role="menuitem" disabled={doc.pages.length <= 1}
-                    onClick={() => {
-                        store.deletePage(pageMenu.pageId);
-                        setPageMenu(null);
-                    }}>Delete Page
-            </button>
+            <CommandMenuItem ctx={ctx} command={RenamePageCommand}/>
+            <CommandMenuItem ctx={ctx} command={DeletePageCommand}/>
             {page_menu_actions.map((act, index) => {
                 return <button key={index} onClick={() => {
                     act.perform(store, pageMenu.pageId)

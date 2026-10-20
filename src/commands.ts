@@ -19,8 +19,12 @@ export type ClipboardState = {
     shapes: Shape[]
     images: PixelImageData[]
 }
+export type RenamePageState = {
+    pageId: string
+    name: string
+}
 
-type Setter<W> = (s:W | ((w: W) => W)) => void
+type Setter<W> = (s: W | ((w: W) => W)) => void
 
 export type CommandContext = {
     store: EditorStore,
@@ -36,15 +40,21 @@ export type CommandContext = {
     setLeftPanelVisible: Setter<boolean>
     rightPanelVisible: boolean
     setRightPanelVisible: Setter<boolean>
+    setRenamePageDialog: Setter<RenamePageState>
+    setRenameDocumentName: Setter<string>
 }
 
 export type CommandId =
     | 'undo'
     | 'redo'
     | 'new-document'
+    | 'rename-document'
     | 'save'
     | 'export-json'
+
     | 'new-page'
+    | 'rename-page'
+    | 'delete-page'
     | 'new-rectangle'
     | 'new-circle'
 
@@ -88,6 +98,39 @@ export const NewDocumentCommand: Command = {
     enabled: (ctx) => !ctx.state.transactionActive,
     run: (ctx) => openDocument(ctx, emptyDocument())
 }
+export const RenameDocumentCommand: Command = {
+    id: 'rename-document',
+    title: 'Rename Document',
+    description:'rename the document',
+    enabled: ctx => ctx.state.document !== undefined,
+    run: ctx => ctx.setRenameDocumentName(ctx.state.document.title)
+}
+export const NewPageCommand: Command = {
+    id: 'new-page',
+    title: 'New Page',
+    description: 'add a new page to the current document',
+    enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => ctx.store.createPage()
+}
+export const RenamePageCommand: Command = {
+    id:'rename-page',
+    title:'Rename page',
+    description: 'Rename the selected page',
+    enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => {
+        const pageId = ctx.state.selectedPageId
+        const page = ctx.state.document.pages.find(item => item.id === pageId);
+        if (page) ctx.setRenamePageDialog({pageId, name: page.name});
+    }
+}
+export const DeletePageCommand: Command = {
+    id:'delete-page',
+    title: 'Delete page',
+    description: 'Delete the selected page',
+    enabled: ctx => ctx.state.document.pages.length > 1 && !ctx.state.transactionActive,
+    run: ctx => ctx.store.deletePage(ctx.state.selectedPageId)
+}
+
 
 export const UndoCommand: Command = {
     id: 'undo',
@@ -126,15 +169,6 @@ export const NewCircleCommand: Command = {
         const shape = makeCircle('circle', {x: 100, y: 300}, 40);
         ctx.store.addShape(shape);
         ctx.store.select(shape.id);
-    }
-}
-export const NewPageCommand: Command = {
-    id: 'new-page',
-    title: 'New Page',
-    description: 'add a new page to the current document',
-    enabled: ctx => !ctx.state.transactionActive,
-    run: ctx => {
-        ctx.store.createPage();
     }
 }
 
