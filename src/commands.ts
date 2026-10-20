@@ -16,6 +16,11 @@ import {
     type SavedDocumentRecord,
     writeSavedDocuments
 } from "./savedDocuments";
+import {
+    type ShapeAlignment,
+    shapeAlignmentOffsets,
+    translateShape
+} from "./shapeAlignment";
 
 export interface DocumentTab {
     id: string;
@@ -483,4 +488,100 @@ const saveToBrowser = async (ctx: CommandContext) => {
     } catch (reason) {
         ctx.setError(reason instanceof Error ? reason.message : 'Unable to save document');
     }
+};
+
+
+export const AlignLeftCommand:Command = {
+    id: 'align-left',
+    title:'Align Left',
+    description: 'Align selected shapes to their left edges',
+    keywords: ['align', 'alignment', 'distribute'],
+    run: ctx => applyAlignment(ctx, 'left'),
+    enabled: ctx => getSelectedShapes(ctx).length >= 2,
+}
+
+export const AlignCenterCommand:Command = {
+    id:'align-center',
+    title:'Align Horizontal Center',
+    description: 'Align selected shapes by horizontal center',
+    keywords: ['align', 'alignment', 'distribute'],
+    run: ctx => applyAlignment(ctx, 'center'),
+    enabled: ctx => getSelectedShapes(ctx).length >= 2,
+}
+export const AlignRightCommand:Command = {
+    id:'align-right',
+    title:'Align Right',
+    description:'Align selected shapes to their right edges',
+    keywords: ['align', 'alignment', 'distribute'],
+    run: ctx => applyAlignment(ctx, 'right'),
+    enabled: ctx => getSelectedShapes(ctx).length >= 2,
+}
+export const AlignTopCommand:Command = {
+    id:'align-top',
+    title:'Align Top',
+    description:'Align selected shapes to their top edges',
+    keywords: ['align', 'alignment', 'distribute'],
+    run: ctx => applyAlignment(ctx, 'top'),
+    enabled: ctx => getSelectedShapes(ctx).length >= 2,
+}
+export const AlignMiddleCommand:Command = {
+    id:'align-middle',
+    title:'Align Vertical Middle',
+    description:'Align selected shapes by vertical middle',
+    keywords: ['align', 'alignment', 'distribute'],
+    run: ctx => applyAlignment(ctx, 'middle'),
+    enabled: ctx => getSelectedShapes(ctx).length >= 2,
+}
+export const AlignBottomCommand:Command = {
+    id:'align-bottom',
+    title:'Align Bottom',
+    description:'Align selected shapes to their bottom edges',
+    keywords: ['align', 'alignment', 'distribute'],
+    run: ctx => applyAlignment(ctx, 'bottom'),
+    enabled: ctx => getSelectedShapes(ctx).length >= 2,
+}
+export const AlignDistributeHorizontalCommand:Command = {
+    id: 'align-distribute-horizontal',
+    title:    'Distribute Horizontally',
+    description:     'Space three or more shapes evenly across',
+    keywords: ['align', 'alignment', 'distribute'],
+    run: ctx => applyAlignment(ctx, 'distribute-horizontal'),
+    enabled: ctx => getSelectedShapes(ctx).length >= 3
+}
+export const AlignDistributeVerticalCommand:Command = {
+    id:'align-distribute-vertical',
+    title:'Distribute Vertically',
+    description:'Space three or more shapes evenly down',
+    keywords: ['align', 'alignment', 'distribute'],
+    run: ctx => applyAlignment(ctx, 'distribute-vertical'),
+    enabled: ctx => getSelectedShapes(ctx).length >= 3
+}
+
+
+    // enabled: (ctx) => {
+        // const pageShapes = ctx.state.document.shapes.filter(shape => shape.pageId === ctx.state.selectedPageId);
+        // const selectedShapes = pageShapes.filter(shape => ctx.state.selectedIds.includes(shape.id));
+        // return !ctx.state.transactionActive && selectedShapes.length >= (alignment.startsWith('distribute') ? 3 : 2)
+    // },
+    // run: (ctx) => applyAlignment(ctx,alignment)
+
+function getSelectedShapes(ctx:CommandContext):Array<Shape> {
+    const pageShapes = ctx.state.document.shapes.filter(shape => shape.pageId === ctx.state.selectedPageId);
+    const selectedShapes = pageShapes.filter(shape => ctx.state.selectedIds.includes(shape.id));
+    return selectedShapes
+}
+
+const applyAlignment = (ctx:CommandContext, alignment: ShapeAlignment) => {
+    const pageShapes = ctx.state.document.shapes.filter(shape => shape.pageId === ctx.state.selectedPageId);
+    const selectedShapes = pageShapes.filter(shape => ctx.state.selectedIds.includes(shape.id));
+    if (selectedShapes.length < 2) return;
+    const offsets = shapeAlignmentOffsets(selectedShapes, alignment);
+    const selectedIds = new Set(offsets.keys());
+    ctx.store.edit('Align shapes', draft => {
+        for (const shape of draft.shapes) {
+            if (!selectedIds.has(shape.id)) continue;
+            const offset = offsets.get(shape.id)!;
+            if (offset.x || offset.y) translateShape(shape, offset.x, offset.y);
+        }
+    });
 };
