@@ -14,7 +14,6 @@ import {
 import {type MouseEvent, useEffect, useRef, useState} from 'react';
 import {isTauri} from '@tauri-apps/api/core';
 import {listen} from '@tauri-apps/api/event';
-import {page_menu_actions,} from "./actions";
 import {DropdownMenu} from './DropdownMenu';
 import {CommandPalette} from './CommandPalette';
 import {keybindings, matchesKeybinding} from './keybindings';
@@ -39,11 +38,10 @@ import {
     translateShape
 } from './shapeAlignment';
 import TreeView from './TreeView';
-import type {Bounds, Shape} from './types';
+import type {Shape} from './types';
 import {IconButton, MenuItem, ToolbarGroup} from './ui/controls';
 import {useTheme} from './ui/theme';
 import {useEditorStore} from './useEditorStore';
-import {makeVector} from './vectorNetworks';
 import VisualEditor from './VisualEditor';
 import './app.css';
 import {
@@ -52,11 +50,18 @@ import {
     type CommandContext,
     DeletePageCommand,
     type DocumentTab,
+    type ImageDialogConfig,
+    ImportPNGCommand,
     makeTab,
     NewCircleCommand,
     NewDocumentCommand,
+    NewPageCircleCommand,
     NewPageCommand,
+    NewPageRectangleCommand,
+    NewPixelImageCommand,
     NewRectCommand,
+    NewRepeatingImageCommand,
+    NewVectorNetworkCommand,
     openDocument,
     RedoCommand,
     RenameDocumentCommand,
@@ -142,15 +147,7 @@ export default function App() {
     const [canvasZoom, setCanvasZoom] = useState(1);
     const [leftPanelVisible, setLeftPanelVisible] = useState(true);
     const [rightPanelVisible, setRightPanelVisible] = useState(true);
-    const [imageDialog, setImageDialog] = useState<{
-        kind: 'create' | 'import'
-    } | {
-        kind: 'edit';
-        imageId: string;
-        source?: Bounds;
-        palettePosition?: { x: number; y: number };
-        imageScreenRect?: Bounds
-    } | null>(null);
+    const [imageDialog, setImageDialog] = useState<ImageDialogConfig>(null)
     const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
     const [vectorId, setVectorId] = useState<string | null>(null);
     useEffect(() => {
@@ -161,16 +158,6 @@ export default function App() {
     useEffect(() => {
         if (vectorId && (!doc.shapes.some(s => s.id === vectorId) || !state.selectedIds.includes(vectorId) || selectedAssetId)) setVectorId(null);
     }, [doc, state.selectedIds, vectorId, selectedAssetId]);
-    const createVector = (pageId = state.selectedPageId) => {
-        store.selectPage(pageId);
-        const shape = makeVector();
-        store.addShape(shape);
-        store.select(shape.id);
-        setImageDialog(null);
-        setPixelEditor(null);
-        setVectorId(shape.id);
-        setPageMenu(null);
-    };
     const [pixelEditor, setPixelEditor] = useState<PixelEditorController | null>(null);
     const [repeatingImageDialog, setRepeatingImageDialog] = useState(false);
     const [clipboard, setClipboard] = useState<ClipboardState>({
@@ -217,6 +204,10 @@ export default function App() {
         setRightPanelVisible,
         setRenamePageDialog,
         setRenameDocumentName,
+        setImageDialog,
+        setRepeatingImageDialog,
+        setVectorId,
+        setPixelEditor,
     }
 
     const saveDocument = () => {
@@ -504,7 +495,7 @@ export default function App() {
                 DeletePageCommand.run(ctx)
                 break;
             case 'new-vector':
-                if (!selectedAssetId) createVector();
+                if (!selectedAssetId) NewVectorNetworkCommand.run(ctx)
                 break;
             case 'new-rectangle':
                 if (!selectedAssetId) NewRectCommand.run(ctx)
@@ -513,13 +504,13 @@ export default function App() {
                 if (!selectedAssetId) NewCircleCommand.run(ctx);
                 break;
             case 'new-pixel-image':
-                if (!selectedAssetId) setImageDialog({kind: 'create'});
+                if (!selectedAssetId) NewPixelImageCommand.run(ctx)// setImageDialog({kind: 'create'});
                 break;
             case 'new-repeating-image':
-                if (!selectedAssetId && doc.images.length) setRepeatingImageDialog(true);
+                if (!selectedAssetId && doc.images.length) NewRepeatingImageCommand.run(ctx)// setRepeatingImageDialog(true);
                 break;
             case 'import-png':
-                if (!selectedAssetId) setImageDialog({kind: 'import'});
+                if (!selectedAssetId) ImportPNGCommand.run(ctx) // setImageDialog({kind: 'import'});
                 break;
             case 'theme-system':
                 setTheme('system');
@@ -591,24 +582,12 @@ export default function App() {
                 <CommandButton command={DeletePageCommand} ctx={ctx}/>
             </DropdownMenu>
             {!selectedAsset && <DropdownMenu title="Shape">
-                <button disabled={state.transactionActive}
-                        onClick={() => createVector()}>New Vector
-                    Network
-                </button>
+                <CommandButton command={NewVectorNetworkCommand} ctx={ctx}/>
                 <CommandButton ctx={ctx} command={NewRectCommand}/>
                 <CommandButton ctx={ctx} command={NewCircleCommand}/>
-                <button disabled={state.transactionActive}
-                        onClick={() => setImageDialog({kind: 'create'})}>New
-                    Pixel Image
-                </button>
-                <button disabled={state.transactionActive || !doc.images.length}
-                        onClick={() => setRepeatingImageDialog(true)}>New
-                    Repeating Image
-                </button>
-                <button disabled={state.transactionActive}
-                        onClick={() => setImageDialog({kind: 'import'})}>Import
-                    PNG
-                </button>
+                <CommandButton command={NewPixelImageCommand} ctx={ctx}/>
+                <CommandButton command={NewRepeatingImageCommand} ctx={ctx}/>
+                <CommandButton command={ImportPNGCommand} ctx={ctx}/>
             </DropdownMenu>}
             {!selectedAsset && selectedShapes.length > 1 &&
                 <DropdownMenu title="Align">
@@ -922,36 +901,12 @@ export default function App() {
                           onPointerDown={event => event.stopPropagation()}>
             <CommandMenuItem ctx={ctx} command={RenamePageCommand}/>
             <CommandMenuItem ctx={ctx} command={DeletePageCommand}/>
-            {page_menu_actions.map((act, index) => {
-                return <button key={index} onClick={() => {
-                    act.perform(store, pageMenu.pageId)
-                    setPageMenu(null)
-                }}
-                >{act.title}</button>
-            })}
-            <button role="menuitem"
-                    onClick={() => createVector(pageMenu.pageId)}>New Vector
-                Network
-            </button>
-            <button role="menuitem" onClick={() => {
-                store.selectPage(pageMenu.pageId);
-                setPageMenu(null);
-                setImageDialog({kind: 'create'});
-            }}>New Pixel Image
-            </button>
-            <button role="menuitem" disabled={!doc.images.length}
-                    onClick={() => {
-                        store.selectPage(pageMenu.pageId);
-                        setPageMenu(null);
-                        setRepeatingImageDialog(true);
-                    }}>New Repeating Image
-            </button>
-            <button role="menuitem" onClick={() => {
-                store.selectPage(pageMenu.pageId);
-                setPageMenu(null);
-                setImageDialog({kind: 'import'});
-            }}>Import PNG
-            </button>
+            <CommandMenuItem ctx={ctx} command={NewPageRectangleCommand}/>
+            <CommandMenuItem ctx={ctx} command={NewPageCircleCommand}/>
+            <CommandMenuItem ctx={ctx} command={NewVectorNetworkCommand}/>
+            <CommandMenuItem ctx={ctx} command={NewPixelImageCommand}/>
+            <CommandMenuItem ctx={ctx} command={NewRepeatingImageCommand}/>
+            <CommandMenuItem ctx={ctx} command={ImportPNGCommand}/>
         </div>}
         {pagesMenu &&
             <div className="shape-context-menu"

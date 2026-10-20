@@ -2,7 +2,14 @@ import {type EditorSnapshot, EditorStore, emptyDocument} from "./EditorStore";
 import {makeCircle, makeRect} from "./reducer";
 
 
-import type {Document as DrawingDocument, PixelImageData, Shape} from './types';
+import type {
+    Bounds,
+    Document as DrawingDocument,
+    PixelImageData,
+    Shape
+} from './types';
+import {makeVector} from "./vectorNetworks";
+import type {PixelEditorController} from "./PixelImageEditor";
 
 export interface DocumentTab {
     id: string;
@@ -23,6 +30,16 @@ export type RenamePageState = {
     pageId: string
     name: string
 }
+export type ImageDialogConfig = {
+    kind: 'create' | 'import'
+} | {
+    kind: 'edit';
+    imageId: string;
+    source?: Bounds;
+    palettePosition?: { x: number; y: number };
+    imageScreenRect?: Bounds
+} | null
+
 
 type Setter<W> = (s: W | ((w: W) => W)) => void
 
@@ -40,8 +57,12 @@ export type CommandContext = {
     setLeftPanelVisible: Setter<boolean>
     rightPanelVisible: boolean
     setRightPanelVisible: Setter<boolean>
-    setRenamePageDialog: Setter<RenamePageState>
-    setRenameDocumentName: Setter<string>
+    setRenamePageDialog: Setter<RenamePageState | null>
+    setRenameDocumentName: Setter<string | null>
+    setImageDialog: Setter<ImageDialogConfig>
+    setRepeatingImageDialog: Setter<boolean>
+    setVectorId:Setter<string|null>
+    setPixelEditor:Setter<PixelEditorController|null>
 }
 
 export type CommandId =
@@ -78,6 +99,9 @@ export type CommandId =
     | 'ui-toggle-right-sidebar'
     | 'ui-toggle-left-sidebar'
     | 'ui-show-command-palette'
+    | 'new-vector-network' | 'new-pixelimage' | 'new-repeatingimage'
+    | 'new-page-rectangle' | 'new-page-circle'
+    | 'import-png'
 
 
 export interface Command {
@@ -101,7 +125,7 @@ export const NewDocumentCommand: Command = {
 export const RenameDocumentCommand: Command = {
     id: 'rename-document',
     title: 'Rename Document',
-    description:'rename the document',
+    description: 'rename the document',
     enabled: ctx => ctx.state.document !== undefined,
     run: ctx => ctx.setRenameDocumentName(ctx.state.document.title)
 }
@@ -113,8 +137,8 @@ export const NewPageCommand: Command = {
     run: ctx => ctx.store.createPage()
 }
 export const RenamePageCommand: Command = {
-    id:'rename-page',
-    title:'Rename page',
+    id: 'rename-page',
+    title: 'Rename page',
     description: 'Rename the selected page',
     enabled: ctx => !ctx.state.transactionActive,
     run: ctx => {
@@ -124,7 +148,7 @@ export const RenamePageCommand: Command = {
     }
 }
 export const DeletePageCommand: Command = {
-    id:'delete-page',
+    id: 'delete-page',
     title: 'Delete page',
     description: 'Delete the selected page',
     enabled: ctx => ctx.state.document.pages.length > 1 && !ctx.state.transactionActive,
@@ -170,6 +194,68 @@ export const NewCircleCommand: Command = {
         ctx.store.addShape(shape);
         ctx.store.select(shape.id);
     }
+}
+
+export const NewPageRectangleCommand: Command = {
+    id: 'new-page-rectangle',
+    title: 'New Rectangle',
+    description: 'create a new rectangle o the page',
+    enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => {
+        ctx.store.selectPage(ctx.state.selectedPageId);
+        const shape = makeRect('Rectangle', {
+            x: 50,
+            y: 50,
+            width: 100,
+            height: 80
+        });
+        ctx.store.addShape(shape);
+        ctx.store.select(shape.id);
+    }
+}
+export const NewPageCircleCommand: Command = {
+    id: 'new-page-circle',
+    title: 'New Circle',
+    enabled: ctx => !ctx.state.transactionActive,
+    description: 'Create a new circle on the page',
+    run: ctx => {
+        ctx.store.selectPage(ctx.state.selectedPageId);
+        const shape = makeCircle('Circle', {x: 100, y: 100}, 40);
+        ctx.store.addShape(shape);
+        ctx.store.select(shape.id);
+    }
+}
+export const NewVectorNetworkCommand: Command = {
+    id: 'new-vector-network',
+    title: 'New Vector Network',
+    description: 'create a new vector network shape',
+    enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => createVector(ctx)
+}
+export const NewPixelImageCommand: Command = {
+    id: 'new-pixelimage',
+    title: 'New Pixel Image',
+    description: 'create a new pixel art image',
+    enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => {
+        ctx.setImageDialog({kind: 'create'});
+    }
+}
+export const NewRepeatingImageCommand: Command = {
+    id: 'new-repeatingimage',
+    title: 'New Repeating Image',
+    description: 'create a repeating image',
+    enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => {
+        ctx.setRepeatingImageDialog(true);
+    }
+}
+export const ImportPNGCommand: Command = {
+    id: 'import-png',
+    title: 'Import PNG',
+    description: 'import a png into pixel art',
+    enabled: () => true,
+    run: ctx => ctx.setImageDialog({kind: 'import'})
 }
 
 export const SelectionGroupCommand: Command = {
@@ -303,3 +389,14 @@ export const openDocument = (ctx: CommandContext, document: DrawingDocument) => 
 };
 
 const getSelected = (store: EditorStore) => store.getSnapshot().document.shapes.filter(shape => store.getSnapshot().selectedIds.includes(shape.id));
+
+const createVector = (ctx: CommandContext) => {
+    ctx.store.selectPage(ctx.state.selectedPageId);
+    const shape = makeVector();
+    ctx.store.addShape(shape);
+    ctx.store.select(shape.id);
+    ctx.setImageDialog(null)
+    ctx.setPixelEditor(null);
+    ctx.setVectorId(shape.id);
+    // setPageMenu(null);
+};
