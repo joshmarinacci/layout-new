@@ -30,55 +30,24 @@ import {SavedDocumentsDialog} from './SavedDocumentsDialog';
 import {deserializeDocument} from './serialization';
 import TreeView from './TreeView';
 import type {Shape} from './types';
-import {IconButton, MenuItem, ToolbarGroup} from './ui/controls';
+import {IconButton, ToolbarGroup} from './ui/controls';
 import {useTheme} from './ui/theme';
 import {useEditorStore} from './useEditorStore';
 import VisualEditor from './VisualEditor';
 import './app.css';
 import {
-    AlignBottomCommand,
-    AlignCenterCommand,
-    AlignDistributeHorizontalCommand,
-    AlignDistributeVerticalCommand,
-    AlignLeftCommand,
-    AlignMiddleCommand,
-    AlignRightCommand,
-    AlignTopCommand,
     type ClipboardState,
     type CommandContext,
     commandRegistry,
-    DeletePageCommand,
     type ImageDialogConfig,
-    ImportPNGCommand,
     makeTab,
-    NewCircleCommand,
-    NewDocumentCommand,
-    NewPageCircleCommand,
-    NewPageCommand,
-    NewPageRectangleCommand,
-    NewPixelImageCommand,
-    NewRectCommand,
-    NewRepeatingImageCommand,
-    NewVectorNetworkCommand,
     openDocument,
-    OpenDocumentCommand,
-    OpenJsonCommand,
-    RedoCommand,
-    RenameDocumentCommand,
-    RenamePageCommand,
     SaveDocumentCommand,
-    SaveJsonCommand,
     SelectionCopyCommand,
     SelectionCutCommand,
     SelectionDeleteCommand,
     SelectionDuplicateCommand,
-    SelectionGroupCommand,
     SelectionPasteCommand,
-    SelectionUngroupCommand,
-    ShowCommandPaletteCommand,
-    ToggleLeftSidebar,
-    ToggleRightSidebar,
-    UndoCommand,
     type Workspace
 } from "./commands";
 import {CommandButton, CommandMenuItem, DocumentTabButton} from "./common";
@@ -400,7 +369,8 @@ export default function App() {
                 <CommandMenuItem ctx={ctx} commandId="theme-dark"/>
             </DropdownMenu>
             <DropdownMenu title="Help">
-                <CommandMenuItem ctx={ctx} commandId="ui-show-keyboard-shortcuts"/>
+                <CommandMenuItem ctx={ctx}
+                                 commandId="ui-show-keyboard-shortcuts"/>
             </DropdownMenu>
             <input hidden ref={file} type="file" accept=".json,application/json"
                    onChange={async event => {
@@ -662,7 +632,8 @@ export default function App() {
                  role="menu" aria-label="Pages actions"
                  onContextMenu={event => event.preventDefault()}
                  onPointerDown={event => event.stopPropagation()}>
-                <CommandMenuItem ctx={ctx} commandId="new-page" onRun={() => setPagesMenu(null)}/>
+                <CommandMenuItem ctx={ctx} commandId="new-page"
+                                 onRun={() => setPagesMenu(null)}/>
             </div>}
         {renamePageDialog && <EditorDialog title="Rename Page"
                                            onClose={() => setRenamePageDialog(null)}>
@@ -755,6 +726,7 @@ export default function App() {
         {commandPaletteOpen && <CommandPalette commands={commands}
                                                ctx={ctx}
                                                onClose={() => setCommandPaletteOpen(false)}/>}
-        {keyboardShortcutsOpen && <KeyboardShortcutsDialog onClose={() => setKeyboardShortcutsOpen(false)}/>}
+        {keyboardShortcutsOpen && <KeyboardShortcutsDialog
+            onClose={() => setKeyboardShortcutsOpen(false)}/>}
     </div>;
 }

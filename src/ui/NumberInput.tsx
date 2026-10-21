@@ -1,10 +1,20 @@
-import {useEffect, useRef, useState, type KeyboardEvent} from 'react';
+import {type KeyboardEvent, useEffect, useRef, useState} from 'react';
 
 function roundToTenth(value: number) {
     return Math.round((value + Number.EPSILON) * 10) / 10;
 }
 
-export function NumberInput({label, value, min, step = 1, shiftStep = 10, onChange, onFocus, onBlur, onKeyDown}: {
+export function NumberInput({
+                                label,
+                                value,
+                                min,
+                                step = 1,
+                                shiftStep = 10,
+                                onChange,
+                                onFocus,
+                                onBlur,
+                                onKeyDown
+                            }: {
     label: string;
     value: number | string;
     min?: number;
@@ -43,16 +53,20 @@ export function NumberInput({label, value, min, step = 1, shiftStep = 10, onChan
     };
 
     return <div className="number-input-control" onWheel={handleWheel}>
-        <button type="button" className="number-step-button" aria-label={`Decrease ${label}`}
-                title={`Decrease ${label}`} onMouseDown={event => event.preventDefault()}
-                onClick={() => adjust(-step)}>−</button>
-        <input ref={input} aria-label={label} type="number" inputMode="decimal" value={draft}
+        <button type="button" className="number-step-button"
+                aria-label={`Decrease ${label}`}
+                title={`Decrease ${label}`}
+                onMouseDown={event => event.preventDefault()}
+                onClick={() => adjust(-step)}>−
+        </button>
+        <input ref={input} aria-label={label} type="number" inputMode="decimal"
+               value={draft}
                min={min} step={step} onFocus={() => {
-                   if (!editing.current) {
-                       editing.current = true;
-                       onFocus?.();
-                   }
-               }}
+            if (!editing.current) {
+                editing.current = true;
+                onFocus?.();
+            }
+        }}
                onBlur={() => {
                    if (skipBlurCommit.current) {
                        skipBlurCommit.current = false;
@@ -83,8 +97,11 @@ export function NumberInput({label, value, min, step = 1, shiftStep = 10, onChan
                    const parsed = event.currentTarget.valueAsNumber;
                    if (Number.isFinite(parsed) && (min === undefined || parsed >= min)) onChange(parsed);
                }}/>
-        <button type="button" className="number-step-button" aria-label={`Increase ${label}`}
-                title={`Increase ${label}`} onMouseDown={event => event.preventDefault()}
-                onClick={() => adjust(step)}>+</button>
+        <button type="button" className="number-step-button"
+                aria-label={`Increase ${label}`}
+                title={`Increase ${label}`}
+                onMouseDown={event => event.preventDefault()}
+                onClick={() => adjust(step)}>+
+        </button>
     </div>;
 }
