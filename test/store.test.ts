@@ -63,6 +63,19 @@ describe('EditorStore', () => {
         store.select(final.shapes[0].id); store.beginTransaction('cancel'); store.removeShape(final.shapes[0].id); store.cancelTransaction();
         expect(store.getSnapshot().document).toEqual(final); expect(store.getSnapshot().selectedId).toBe(final.shapes[0].id);
     });
+    it('reorders layer-tree shapes within and across groups', () => {
+        const {store, first, second} = setup();
+        const third = makeRect('third', {x: 400, y: 0, width: 100, height: 100});
+        store.addShape(third);
+        const groupId = store.createGroup('page_1', [first.id, second.id], 'Pair')!;
+        store.reorderShapes('page_1', second.id, first.id, 'before', groupId, groupId);
+        expect(store.getSnapshot().document.pages[0].groups[0].shapeIds).toEqual([second.id, first.id]);
+        store.reorderShapes('page_1', first.id, third.id, 'after', groupId, null);
+        expect(store.getSnapshot().document.pages[0].groups[0].shapeIds).toEqual([second.id]);
+        expect(store.getSnapshot().document.shapes.map(shape => shape.id)).toEqual([second.id, third.id, first.id]);
+        store.undo();
+        expect(store.getSnapshot().document.pages[0].groups[0].shapeIds).toEqual([second.id, first.id]);
+    });
     it('preserves redo for no-ops and cancellation, invalidates it for committed edits', () => {
         const {store} = setup(); store.setTitle('new'); store.undo();
         store.beginTransaction('back and forth'); store.setTitle('temporary'); store.setTitle('Untitled'); store.commitTransaction();
@@ -92,11 +105,20 @@ describe('EditorStore', () => {
 describe('serialization', () => {
     it('round trips all supported shape variants with no editor state', () => {
         const document = makeExampleDocument(); const rectangle = makeRect('oval', {x: 2, y: 4, width: 80, height: 40});
+        document.palettes.push({id: 'palette-1', name: 'Mixed spaces', colors: [
+            {id: 'color-1', name: 'Leaf', space: 'hsl', value: 'hsl(120 100% 50%)'},
+            {id: 'color-2', space: 'oklab', value: 'oklab(0.7 0.1 0.1)'}
+        ]});
         document.shapes.push({id: 'oval', name: 'oval', type: 'oval', pageId: 'page_1', components: {oval: rectangle.components.rect, fill: rectangle.components.fill, stroke: rectangle.components.stroke}});
         expect(deserializeDocument(serializeDocument(document))).toEqual(document);
         const store = new EditorStore(document); store.select(document.shapes[0].id); store.setTitle('updated');
-        expect(Object.keys(JSON.parse(store.toJSON()))).toEqual(['version', 'images', 'pages', 'title', 'shapes']);
+        expect(Object.keys(JSON.parse(store.toJSON()))).toEqual(['version', 'images', 'palettes', 'pages', 'title', 'shapes']);
         store.loadJSON(serializeDocument(document)); expect(store.getSnapshot()).toMatchObject({document, selectedId: null, canUndo: false, canRedo: false});
+    });
+    it('migrates version 5 documents to an empty palette collection', () => {
+        const old = {...makeExampleDocument(), version: 5} as Record<string, unknown>;
+        delete old.palettes;
+        expect(deserializeDocument(JSON.stringify(old)).palettes).toEqual([]);
     });
     it.each(['{', 'null', '{"version":1,"title":"x","shapes":[]}', '{"version":0,"title":"x","shapes":[{}]}'])('rejects malformed input: %s', json => {
         const {store} = setup(); const initial = store.getSnapshot(); expect(() => store.loadJSON(json)).toThrow(); expect(store.getSnapshot()).toBe(initial);

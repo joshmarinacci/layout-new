@@ -39,8 +39,9 @@ export interface EditorSnapshot {
 }
 
 export const emptyDocument = (): Document => ({
-    version: 5,
+    version: 6,
     images: [],
+    palettes: [],
     title: 'Untitled',
     shapes: [],
     pages: [{id: 'page_1', name: 'Page 1', groups: []}]
@@ -146,15 +147,21 @@ export class EditorStore {
         });
     }
 
-    reorderShapes(pageId: string, id: string, targetId: string, position: 'before' | 'after' = 'before') {
+    reorderShapes(pageId: string, id: string, targetId: string, position: 'before' | 'after' = 'before', sourceGroupId: string | null = null, targetGroupId: string | null = sourceGroupId) {
         if (id === targetId) return;
         this.edit('Reorder shapes', draft => {
             const from = draft.shapes.findIndex(shape => shape.id === id && shape.pageId === pageId);
             const to = draft.shapes.findIndex(shape => shape.id === targetId && shape.pageId === pageId);
             if (from < 0 || to < 0) throw new Error('Shapes must be on the same page');
+            const page = draft.pages.find(item => item.id === pageId);
+            const parentGroup = (shapeId: string) => page?.groups.find(group => group.shapeIds.includes(shapeId))?.id ?? null;
+            if (parentGroup(id) !== sourceGroupId || parentGroup(targetId) !== targetGroupId) throw new Error('Shape layer changed during drag');
             const [shape] = draft.shapes.splice(from, 1);
             const targetIndex = draft.shapes.findIndex(item => item.id === targetId);
             draft.shapes.splice(targetIndex + (position === 'after' ? 1 : 0), 0, shape);
+            if (sourceGroupId) page!.groups.find(item => item.id === sourceGroupId)!.shapeIds = page!.groups.find(item => item.id === sourceGroupId)!.shapeIds.filter(shapeId => shapeId !== id);
+            if (targetGroupId) page!.groups.find(item => item.id === targetGroupId)!.shapeIds.push(id);
+            for (const group of page?.groups ?? []) group.shapeIds = draft.shapes.filter(item => item.pageId === pageId && group.shapeIds.includes(item.id)).map(item => item.id);
         });
     }
 
@@ -493,6 +500,7 @@ export class EditorStore {
         const [next, patches, inversePatches] = produceWithPatches(transaction.before, draft => {
             draft.title = final.title;
             if (JSON.stringify(transaction.before.pages) !== JSON.stringify(final.pages)) draft.pages = final.pages;
+            if (JSON.stringify(transaction.before.palettes) !== JSON.stringify(final.palettes)) draft.palettes = final.palettes;
             draft.images.length = final.images.length;
             final.images.forEach((image, i) => {
                 if (JSON.stringify(transaction.before.images[i]) !== JSON.stringify(image)) draft.images[i] = image;

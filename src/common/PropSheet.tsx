@@ -1,10 +1,11 @@
 import {PropertySection} from '../ui/controls';
 import type {Draft} from 'immer';
-import type {Shape, ShapeComponent} from '../model/types';
+import type {ColorPalette, Shape, ShapeComponent} from '../model/types';
 import type {EditorStore} from '../model/EditorStore';
 import {useEditorStore} from '../model/useEditorStore';
 import {NameField} from './NameField';
 import {NumberInput} from '../ui/NumberInput';
+import {normalizeColor} from '../shapes/palettes';
 
 function Field({
                    store,
@@ -12,6 +13,7 @@ function Field({
                    value,
                    type = 'number',
                    nonnegative = false,
+                   palettes = [],
                    update
                }: {
     store: EditorStore;
@@ -19,6 +21,7 @@ function Field({
     value: number | string;
     type?: 'number' | 'color';
     nonnegative?: boolean;
+    palettes?: ColorPalette[];
     update: (value: string) => void;
 }) {
     const onFocus = () => store.beginTransaction(title);
@@ -39,9 +42,10 @@ function Field({
                                           onFocus={onFocus} onBlur={onBlur}
                                           onKeyDown={onKeyDown}
                                           onChange={next => update(String(next))}/> :
-            <input aria-label={title} type="color" value={value}
+            <><input aria-label={title} type="color" value={value}
                    onFocus={onFocus} onBlur={onBlur}
-                   onChange={event => update(event.target.value)}/>}</div>;
+                   onChange={event => update(event.target.value)}/>
+                {palettes.length > 0 && <select aria-label={`${title} palette color`} value="" onChange={event => {if (event.target.value) update(event.target.value);}}><option value="">Choose from palette…</option>{palettes.map(palette => <optgroup key={palette.id} label={palette.name}>{palette.colors.map((color, index) => <option key={color.id} value={normalizeColor(color.value)}>{color.name || `Color ${index+1}`} · {normalizeColor(color.value)}</option>)}</optgroup>)}</select>}</>}</div>;
 }
 
 function componentFor(shape: Draft<Shape>, key: string): Draft<ShapeComponent> {
@@ -70,6 +74,7 @@ export default function PropSheet({store}: { store: EditorStore }) {
         <Field key={`${key}.${title}`} store={store} title={title}
                value={fieldValue(key, read)} type={type}
                nonnegative={nonnegative}
+               palettes={type === 'color' ? state.document.palettes : []}
                update={value => update(key, component => write(component, value))}/>;
     return <div className="prop-sheet">
         <PropertySection title="General">

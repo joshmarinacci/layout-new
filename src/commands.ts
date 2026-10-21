@@ -28,6 +28,7 @@ import {
 import {CommandRegistry} from './common/CommandRegistry';
 import type {Theme} from './ui/theme';
 import {type LucideIcon, Redo2Icon, Undo2Icon} from 'lucide-react';
+import {newPalette, pico8Colors} from './shapes/palettes';
 
 export interface DocumentTab {
     id: string;
@@ -86,6 +87,9 @@ export type CommandContext = {
     setError: Setter<string>
     setFileDialogOpen: Setter<boolean>
     setTheme: Setter<Theme>
+    setSelectedAssetId: Setter<string | null>
+    setSelectedPaletteId: Setter<string | null>
+    openPaletteImport: () => void
 }
 
 export type CommandId =
@@ -129,6 +133,7 @@ export type CommandId =
     | 'new-vector-network' | 'new-pixelimage' | 'new-repeatingimage'
     | 'new-page-rectangle' | 'new-page-circle'
     | 'import-png'
+    | 'new-color-palette' | 'import-color-palette' | 'new-pico8-palette'
     | 'theme-system' | 'theme-light' | 'theme-dark'
 
 
@@ -323,6 +328,33 @@ export const ImportPNGCommand: Command = {
     enabled: () => true,
     run: ctx => ctx.setImageDialog({kind: 'import'})
 }
+
+export const NewColorPaletteCommand: Command = {
+    id: 'new-color-palette', title: 'New Color Palette', description: 'Create a new editable color palette',
+    keywords: ['asset', 'palette', 'colors', 'create'],
+    enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => {
+        try {
+            const palette = newPalette();
+            ctx.store.edit('Create palette', draft => {draft.palettes.push(palette);});
+            ctx.store.select(null);
+            ctx.setSelectedAssetId(null);
+            ctx.setSelectedPaletteId(palette.id);
+            ctx.setError('');
+        } catch (error) { ctx.setError(error instanceof Error ? error.message : 'Unable to create palette'); }
+    }
+};
+export const ImportColorPaletteCommand: Command = {
+    id: 'import-color-palette', title: 'Import Color Palette', description: 'Import a GIMP, JSON, or hex-list palette',
+    keywords: ['asset', 'palette', 'colors', 'gpl', 'json', 'import'],
+    enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => ctx.openPaletteImport()
+};
+export const NewPico8PaletteCommand: Command = {
+    id: 'new-pico8-palette', title: 'Add PICO-8 Palette', description: 'Add the PICO-8 color palette to Assets',
+    keywords: ['asset', 'palette', 'colors', 'preset'], enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => {const palette = newPalette('PICO-8', pico8Colors); ctx.store.edit('Create PICO-8 palette', draft => { draft.palettes.push(palette); }); ctx.setSelectedAssetId(null); ctx.setSelectedPaletteId(palette.id); ctx.store.select(null);}
+};
 
 export const SelectionGroupCommand: Command = {
     id: 'selection-group',
@@ -613,7 +645,8 @@ export const allCommands: Command[] = [
     OpenJsonCommand, SaveJsonCommand, NewPageCommand, RenamePageCommand, DeletePageCommand,
     UndoCommand, RedoCommand, NewRectCommand, NewCircleCommand, NewPageRectangleCommand,
     NewPageCircleCommand, NewVectorNetworkCommand, NewPixelImageCommand, NewRepeatingImageCommand,
-    ImportPNGCommand, SelectionGroupCommand, SelectionUngroupCommand, SelectionDuplicateCommand,
+    ImportPNGCommand, NewColorPaletteCommand, ImportColorPaletteCommand, NewPico8PaletteCommand,
+    SelectionGroupCommand, SelectionUngroupCommand, SelectionDuplicateCommand,
     SelectionDeleteCommand, SelectionCopyCommand, SelectionCutCommand, SelectionPasteCommand,
     ShowCommandPaletteCommand, ShowKeyboardShortcutsCommand, ToggleLeftSidebar, ToggleRightSidebar, SystemThemeCommand,
     LightThemeCommand, DarkThemeCommand, AlignLeftCommand,

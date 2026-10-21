@@ -1,4 +1,5 @@
 import {deriveFaces} from '../shapes/vectorNetworks';
+import {normalizeColor} from '../shapes/palettes';
 import type {Document} from '../model/types';
 
 type ObjectValue = Record<string, unknown>;
@@ -21,12 +22,31 @@ function component(value: unknown, kind: string, fields: string[]) {
     if (c.kind !== kind) throw new Error(`Expected ${kind}`);
     return c;
 }
-function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5): asserts value is Document {
-    const doc = object(value); keys(doc, version >= 4 ? ['version', 'title', 'shapes', 'images', 'pages'] : ['version', 'title', 'shapes', 'images']);
+function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6): asserts value is Document {
+    const doc = object(value); keys(doc, version >= 6 ? ['version', 'title', 'shapes', 'images', 'palettes', 'pages'] : version >= 4 ? ['version', 'title', 'shapes', 'images', 'pages'] : ['version', 'title', 'shapes', 'images']);
     if (doc.version !== version) throw new Error('Unsupported document version');
     text(doc.title);
     if (!Array.isArray(doc.shapes)) throw new Error('Expected shapes array');
     if (!Array.isArray(doc.images)) throw new Error('Expected images array');
+    if (version >= 6) {
+        if (!Array.isArray(doc.palettes)) throw new Error('Expected palettes array');
+        const paletteIds = new Set<string>();
+        for (const value of doc.palettes) {
+            const palette = object(value); keys(palette, ['id', 'name', 'colors']); text(palette.id); text(palette.name);
+            if (!palette.id || paletteIds.has(palette.id as string) || !Array.isArray(palette.colors) || palette.colors.length > 256) throw new Error('Invalid palette');
+            paletteIds.add(palette.id as string);
+            const colorIds = new Set<string>();
+            for (const colorValue of palette.colors) {
+                const color = object(colorValue);
+                if (Object.keys(color).length < 3 || Object.keys(color).length > 4 || !Object.hasOwn(color, 'id') || !Object.hasOwn(color, 'space') || !Object.hasOwn(color, 'value') || Object.keys(color).some(key => !['id', 'name', 'space', 'value'].includes(key))) throw new Error('Invalid palette color');
+                text(color.id); text(color.value);
+                if (Object.hasOwn(color, 'name')) text(color.name);
+                if (!color.id || colorIds.has(color.id as string) || !['srgb','rgb','hsl','oklab','oklch'].includes(color.space as string)) throw new Error('Invalid palette color');
+                try { normalizeColor(color.value as string); } catch { throw new Error('Invalid palette color value'); }
+                colorIds.add(color.id as string);
+            }
+        }
+    }
     const imageIds = new Set<string>();
     for (const item of doc.images) {
         const image = object(item);
@@ -148,7 +168,7 @@ function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5): asserts val
     }
 }
 export function validateDocument(value: unknown): asserts value is Document {
-    validateSchema(value, 5);
+    validateSchema(value, 6);
 }
 export function serializeDocument(document: Document): string {
     const normalized = structuredClone(document) as Document;
@@ -186,6 +206,7 @@ export function deserializeDocument(json: string): Document {
             })};
     }
     if (source.version === 4) { validateSchema(source, 4); source = {...source, version: 5}; }
+    if (source.version === 5) { validateSchema(source, 5); source = {...source, version: 6, palettes: []}; }
     validateDocument(source);
     for (const shape of source.shapes) if (shape.type === 'vector') {
         const n = shape.components.network, faces = deriveFaces(n);

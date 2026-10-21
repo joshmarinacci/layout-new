@@ -13,7 +13,7 @@ import {
     type ReactNode,
     useState
 } from 'react';
-import type {DrawDocument, PixelImageData, Shape} from '../model/types';
+import type {ColorPalette, DrawDocument, PixelImageData, Shape} from '../model/types';
 
 function cls(props: Record<string, boolean>) {
     return Object.entries(props).filter(([, active]) => active).map(([name]) => name).join(' ');
@@ -81,6 +81,8 @@ export default function TreeView(props: {
     onSelect: (value: Shape, additive: boolean) => void,
     selectedAssetId: string | null,
     onSelectAsset: (image: PixelImageData) => void,
+    selectedPaletteId: string | null,
+    onSelectPalette: (palette: ColorPalette) => void,
     onShapeContextMenu: (event: MouseEvent<HTMLButtonElement>, shape: Shape) => void,
     selectedPageId: string,
     onSelectPage: (id: string) => void,
@@ -90,8 +92,10 @@ export default function TreeView(props: {
     onSelectGroup: (ids: string[]) => void,
     onPageContextMenu: (event: MouseEvent<HTMLButtonElement>, pageId: string) => void,
     onPagesContextMenu: (event: MouseEvent<HTMLButtonElement>) => void,
+    onAssetsContextMenu: (event: MouseEvent<HTMLButtonElement>) => void,
+    onPaletteContextMenu: (event: MouseEvent<HTMLButtonElement>, palette: ColorPalette) => void,
     onReorderPage: (id: string, targetId: string, position: 'before' | 'after') => void,
-    onReorderShape: (pageId: string, id: string, targetId: string, position: 'before' | 'after') => void,
+    onReorderShape: (pageId: string, id: string, targetId: string, position: 'before' | 'after', sourceGroupId: string | null, targetGroupId: string | null) => void,
 }) {
     const doc = props.document;
     const [dropTarget, setDropTarget] = useState<{
@@ -100,11 +104,12 @@ export default function TreeView(props: {
         pageId?: string;
         position: 'before' | 'after'
     } | null>(null);
-    const drag = (event: DragEvent<HTMLButtonElement>, type: 'page' | 'shape', id: string, pageId?: string) => {
+    const drag = (event: DragEvent<HTMLButtonElement>, type: 'page' | 'shape', id: string, pageId?: string, groupId?: string | null) => {
         event.dataTransfer.setData('application/x-layout-tree-item', JSON.stringify({
             type,
             id,
-            pageId
+            pageId,
+            groupId
         }));
         event.dataTransfer.effectAllowed = 'move';
         setDropTarget(null);
@@ -119,7 +124,7 @@ export default function TreeView(props: {
             position: event.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
         });
     };
-    const drop = (event: DragEvent<HTMLButtonElement>, type: 'page' | 'shape', targetId: string, pageId?: string) => {
+    const drop = (event: DragEvent<HTMLButtonElement>, type: 'page' | 'shape', targetId: string, pageId?: string, groupId?: string | null) => {
         event.preventDefault();
         const rect = event.currentTarget.getBoundingClientRect();
         const position = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
@@ -127,10 +132,11 @@ export default function TreeView(props: {
             const source = JSON.parse(event.dataTransfer.getData('application/x-layout-tree-item')) as {
                 type: string;
                 id: string;
-                pageId?: string
+                pageId?: string;
+                groupId?: string | null
             };
             if (source.type === type && type === 'page') props.onReorderPage(source.id, targetId, position);
-            else if (source.type === 'shape' && type === 'shape' && source.pageId === pageId) props.onReorderShape(pageId!, source.id, targetId, position);
+            else if (source.type === 'shape' && type === 'shape' && source.pageId === pageId) props.onReorderShape(pageId!, source.id, targetId, position, source.groupId ?? null, groupId ?? null);
         } catch { /* Ignore unrelated or malformed drops. */
         }
         setDropTarget(null);
@@ -160,23 +166,27 @@ export default function TreeView(props: {
                                       onSelect={event => props.onSelect(shape, event.shiftKey)}
                                       onContextMenu={event => props.onShapeContextMenu(event, shape)}
                                       draggable
-                                      onDragStart={event => drag(event, 'shape', shape.id, page.id)}
+                                      onDragStart={event => drag(event, 'shape', shape.id, page.id, group.id)}
                                       dropPosition={dropTarget?.type === 'shape' && dropTarget.id === shape.id ? dropTarget.position : null}
                                       onDragOver={event => dragOver(event, 'shape', shape.id, page.id)}
-                                      onDrop={event => drop(event, 'shape', shape.id, page.id)}/>)}</TreeNode>)}
+                                      onDrop={event => drop(event, 'shape', shape.id, page.id, group.id)}/>)}</TreeNode>)}
                     {doc.shapes.filter(shape => shape.pageId === page.id && !page.groups.some(group => group.shapeIds.includes(shape.id))).map(shape =>
                         <TreeNode key={shape.id} label={shape.name} depth={3}
                                   selected={props.selectedIds.includes(shape.id)}
                                   onSelect={event => props.onSelect(shape, event.shiftKey)}
                                   onContextMenu={event => props.onShapeContextMenu(event, shape)}
                                   draggable
-                                  onDragStart={event => drag(event, 'shape', shape.id, page.id)}
+                                  onDragStart={event => drag(event, 'shape', shape.id, page.id, null)}
                                   dropPosition={dropTarget?.type === 'shape' && dropTarget.id === shape.id ? dropTarget.position : null}
                                   onDragOver={event => dragOver(event, 'shape', shape.id, page.id)}
-                                  onDrop={event => drop(event, 'shape', shape.id, page.id)}/>)}
+                                  onDrop={event => drop(event, 'shape', shape.id, page.id, null)}/>)}
                 </TreeNode>)}
             </TreeNode>
-            <TreeNode label="Assets" depth={1}>
+            <TreeNode label="Assets" depth={1} onContextMenu={props.onAssetsContextMenu}>
+                {doc.palettes.map(palette => <TreeNode key={palette.id} label={`${palette.name} (${palette.colors.length} colors)`} depth={2}
+                                                        selected={palette.id === props.selectedPaletteId}
+                                                        onSelect={() => props.onSelectPalette(palette)}
+                                                        onContextMenu={event => props.onPaletteContextMenu(event, palette)}/>) }
                 {doc.images.map(image => <TreeNode key={image.id}
                                                    label={`${image.name} (${image.width} × ${image.height})`}
                                                    depth={2}

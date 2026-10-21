@@ -22,6 +22,8 @@ import {ImportPixelImage} from './shapes/ImportPixelImage';
 import {NewPixelImage} from './shapes/NewPixelImage';
 import {NewRepeatingImage} from './shapes/NewRepeatingImage';
 import {PixelAssetView} from './shapes/PixelAssetView';
+import {PaletteAssetView} from './shapes/PaletteAssetView';
+import {parsePalette} from './shapes/palettes';
 import {
     type PixelEditorController,
     PixelImageEditor
@@ -31,7 +33,7 @@ import {SavedDocumentsDialog} from './io/SavedDocumentsDialog';
 import {deserializeDocument} from './io/serialization';
 import TreeView from './common/TreeView';
 import type {Shape} from './model/types';
-import {IconButton, ToolbarGroup} from './ui/controls';
+import {IconButton, MenuItem, ToolbarGroup} from './ui/controls';
 import {useTheme} from './ui/theme';
 import {useEditorStore} from './model/useEditorStore';
 import VisualEditor from './editor/VisualEditor';
@@ -78,6 +80,7 @@ export default function App() {
         if (id === workspace.activeId) return;
         finishEditing();
         setSelectedAssetId(null);
+        setSelectedPaletteId(null);
         setWorkspace(current => ({...current, activeId: id}));
     };
     const state = useEditorStore(store);
@@ -86,12 +89,14 @@ export default function App() {
     const pageShapes = doc.shapes.filter(shape => shape.pageId === state.selectedPageId);
     const selectedShapes = pageShapes.filter(shape => state.selectedIds.includes(shape.id));
     const file = useRef<HTMLInputElement>(null);
+    const paletteFile = useRef<HTMLInputElement>(null);
     const [error, setError] = useState('');
     const [canvasZoom, setCanvasZoom] = useState(1);
     const [leftPanelVisible, setLeftPanelVisible] = useState(true);
     const [rightPanelVisible, setRightPanelVisible] = useState(true);
     const [imageDialog, setImageDialog] = useState<ImageDialogConfig>(null)
     const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+    const [selectedPaletteId, setSelectedPaletteId] = useState<string | null>(null);
     const [vectorId, setVectorId] = useState<string | null>(null);
     useEffect(() => {
         setVectorId(null);
@@ -124,6 +129,8 @@ export default function App() {
         x: number;
         y: number
     } | null>(null);
+    const [assetsMenu, setAssetsMenu] = useState<{x: number; y: number} | null>(null);
+    const [paletteMenu, setPaletteMenu] = useState<{x: number; y: number; paletteId: string} | null>(null);
     const [renamePageDialog, setRenamePageDialog] = useState<{
         pageId: string;
         name: string
@@ -133,7 +140,7 @@ export default function App() {
     const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
     const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
     const selectedAsset = doc.images.find(image => image.id === selectedAssetId);
-
+    const selectedPalette = doc.palettes.find(palette => palette.id === selectedPaletteId);
     const ctx: CommandContext = {
         store,
         state,
@@ -158,7 +165,10 @@ export default function App() {
         setFileDialogOpen: (open) => {
             file.current?.click()
         },
-        setTheme
+        setTheme,
+        setSelectedAssetId,
+        setSelectedPaletteId,
+        openPaletteImport: () => paletteFile.current?.click()
     }
     useEffect(() => {
         const keydown = (event: KeyboardEvent) => {
@@ -261,6 +271,8 @@ export default function App() {
             setDocumentMenu(null);
             setPageMenu(null);
             setPagesMenu(null);
+            setAssetsMenu(null);
+            setPaletteMenu(null);
         };
         window.addEventListener('pointerdown', close);
         window.addEventListener('blur', close);
@@ -292,7 +304,7 @@ export default function App() {
     });
     nativeMenuAction.current = id => {
         if (store.getSnapshot().transactionActive) return;
-        if (selectedAssetId && ['new-vector-network', 'new-rectangle', 'new-circle', 'new-pixelimage', 'new-repeatingimage', 'import-png'].includes(id)) return;
+        if ((selectedAssetId || selectedPaletteId) && ['new-vector-network', 'new-rectangle', 'new-circle', 'new-pixelimage', 'new-repeatingimage', 'import-png'].includes(id)) return;
         if (id === 'new-repeatingimage' && !doc.images.length) return;
         const command = commandRegistry.get(id);
         if (command?.enabled(ctx)) command.run(ctx);
@@ -342,7 +354,7 @@ export default function App() {
                 <CommandButton commandId="rename-page" ctx={ctx}/>
                 <CommandButton commandId="delete-page" ctx={ctx}/>
             </DropdownMenu>
-            {!selectedAsset && <DropdownMenu title="Shape">
+            {!selectedAsset && !selectedPalette && <DropdownMenu title="Shape">
                 <CommandButton ctx={ctx} commandId="new-vector-network"/>
                 <CommandButton ctx={ctx} commandId="new-rectangle"/>
                 <CommandButton ctx={ctx} commandId="new-circle"/>
@@ -350,7 +362,13 @@ export default function App() {
                 <CommandButton ctx={ctx} commandId="new-repeatingimage"/>
                 <CommandButton ctx={ctx} commandId="import-png"/>
             </DropdownMenu>}
-            {!selectedAsset && selectedShapes.length > 1 &&
+            <DropdownMenu title="Assets">
+                <CommandMenuItem ctx={ctx} commandId="new-color-palette"/>
+                <CommandMenuItem ctx={ctx} commandId="import-color-palette"/>
+                <Separator/>
+                <CommandMenuItem ctx={ctx} commandId="new-pico8-palette"/>
+            </DropdownMenu>
+            {!selectedAsset && !selectedPalette && selectedShapes.length > 1 &&
                 <DropdownMenu title="Align">
                     <CommandMenuItem ctx={ctx} commandId="align-left"/>
                     <CommandMenuItem ctx={ctx} commandId="align-center"/>
@@ -421,10 +439,10 @@ export default function App() {
              className={`document-editor full-span${leftPanelVisible ? '' : ' hide-left'}${rightPanelVisible ? '' : ' hide-right'}`}
              role="tabpanel" aria-labelledby={`tab-${activeTab.id}`}>
             <div className="toolbar full-span" key={activeTab.id}>
-                {selectedAsset &&
-                    <button onClick={() => setSelectedAssetId(null)}>Back to
+                {(selectedAsset || selectedPalette) &&
+                    <button onClick={() => {setSelectedAssetId(null); setSelectedPaletteId(null);}}>Back to
                         canvas</button>}
-                {!selectedAsset &&
+                {!selectedAsset && !selectedPalette &&
                     <div className="canvas-zoom-controls" role="group"
                          aria-label="Canvas zoom controls">
                         <IconButton label="Zoom out" icon={ZoomOut}
@@ -438,13 +456,13 @@ export default function App() {
                         <IconButton label="Reset zoom" icon={Maximize2}
                                     onClick={() => setCanvasZoom(1)}/>
                     </div>}
-                {!selectedAsset && selectedShapes.length === 1 && selected?.type === 'vector' &&
+                {!selectedAsset && !selectedPalette && selectedShapes.length === 1 && selected?.type === 'vector' &&
                     <button disabled={state.transactionActive} onClick={() => {
                         setImageDialog(null);
                         setPixelEditor(null);
                         setVectorId(selected.id);
                     }}>Edit Vector</button>}
-                {!selectedAsset && selectedShapes.length === 1 && selected?.type === 'pixel-image' && <>
+                {!selectedAsset && !selectedPalette && selectedShapes.length === 1 && selected?.type === 'pixel-image' && <>
                     <button disabled={state.transactionActive}
                             onClick={() => setImageDialog({
                                 kind: 'edit',
@@ -457,17 +475,17 @@ export default function App() {
                         Copy
                     </button>
                 </>}
-                {!selectedAsset &&
+                {!selectedAsset && !selectedPalette &&
                     <IconButton label="Delete selected shapes" icon={Trash2}
                                 disabled={!selectedShapes.length || state.transactionActive}
                                 onClick={() => SelectionDeleteCommand.run(ctx)}/>}
 
             </div>
-            <div className="left scroll-container"><h2
-                className="panel-heading">Layers &amp; assets</h2><TreeView
+            <div className="left scroll-container"><h2 className="panel-heading">Layers &amp; assets</h2><input ref={paletteFile} hidden type="file" accept=".gpl,.json,.txt,.hex" onChange={async event => {const chosen = event.target.files?.[0]; event.target.value = ''; if (!chosen) return; try {const palette = parsePalette(await chosen.text(), chosen.name); store.edit('Import palette', draft => { draft.palettes.push(palette); }); store.select(null); setSelectedAssetId(null); setSelectedPaletteId(palette.id); setError('');} catch (error) {setError(error instanceof Error ? error.message : 'Unable to import palette');}}}/><TreeView
                 document={doc}
                 selectedIds={state.selectedIds}
                 selectedAssetId={selectedAssetId}
+                selectedPaletteId={selectedPaletteId}
                 onDocumentContextMenu={event => {
                     event.preventDefault();
                     setContextMenu(null);
@@ -477,16 +495,24 @@ export default function App() {
                 }}
                 onSelect={(shape, additive) => {
                     setSelectedAssetId(null);
+                    setSelectedPaletteId(null);
                     additive ? store.toggleSelection(shape.id) : store.select(shape.id);
                 }}
                 onSelectAsset={image => {
                     finishEditing();
                     store.select(null);
                     setSelectedAssetId(image.id);
+                    setSelectedPaletteId(null);
+                }}
+                onSelectPalette={palette => {finishEditing(); store.select(null); setSelectedAssetId(null); setSelectedPaletteId(palette.id);}}
+                onPaletteContextMenu={(event, palette) => {
+                    event.preventDefault();
+                    setContextMenu(null); setDocumentMenu(null); setPageMenu(null); setPagesMenu(null); setAssetsMenu(null);
+                    setPaletteMenu({x: event.clientX, y: event.clientY, paletteId: palette.id});
                 }}
                 onShapeContextMenu={(event, shape) => showShapeContextMenu(event, shape)}
                 selectedPageId={state.selectedPageId}
-                onSelectPage={id => store.selectPage(id)}
+                onSelectPage={id => {setSelectedAssetId(null); setSelectedPaletteId(null); store.selectPage(id);}}
                 onUngroup={id => store.ungroup(id)}
                 onRenameGroup={(id, name) => store.renameGroup(id, name)}
                 onSelectGroup={ids => store.setSelection(ids)}
@@ -501,10 +527,11 @@ export default function App() {
                         y: event.clientY
                     });
                 }}
+                onAssetsContextMenu={event => {event.preventDefault(); setContextMenu(null); setDocumentMenu(null); setPageMenu(null); setPagesMenu(null); setAssetsMenu({x: event.clientX, y: event.clientY});}}
                 onReorderPage={(id, targetId, position) => store.reorderPage(id, targetId, position)}
-                onReorderShape={(pageId, id, targetId, position) => store.reorderShapes(pageId, id, targetId, position)}/>
+                onReorderShape={(pageId, id, targetId, position, sourceGroupId, targetGroupId) => store.reorderShapes(pageId, id, targetId, position, sourceGroupId, targetGroupId)}/>
             </div>
-            {selectedAsset ?
+            {selectedPalette ? <div className="asset-center scroll-container"><PaletteAssetView store={store} palette={selectedPalette} onBack={() => setSelectedPaletteId(null)}/></div> : selectedAsset ?
                 <div className="asset-center scroll-container"><PixelAssetView
                     store={store}
                     image={selectedAsset}
@@ -639,6 +666,43 @@ export default function App() {
                 <CommandMenuItem ctx={ctx} commandId="new-page"
                                  onRun={() => setPagesMenu(null)}/>
             </div>}
+        {assetsMenu && <div className="shape-context-menu" style={{left: assetsMenu.x, top: assetsMenu.y}}
+                            role="menu" aria-label="Assets actions"
+                            onContextMenu={event => event.preventDefault()}
+                            onPointerDown={event => event.stopPropagation()}>
+            <CommandMenuItem ctx={ctx} commandId="new-color-palette" onRun={() => setAssetsMenu(null)}/>
+            <CommandMenuItem ctx={ctx} commandId="import-color-palette" onRun={() => setAssetsMenu(null)}/>
+            <hr className="menu-separator" aria-hidden="true"/>
+            <CommandMenuItem ctx={ctx} commandId="new-pico8-palette" onRun={() => setAssetsMenu(null)}/>
+        </div>}
+        {paletteMenu && (() => {
+            const palette = doc.palettes.find(item => item.id === paletteMenu.paletteId);
+            if (!palette) return null;
+            const close = () => setPaletteMenu(null);
+            return <div className="shape-context-menu" style={{left: paletteMenu.x, top: paletteMenu.y}}
+                        role="menu" aria-label={`${palette.name} palette actions`}
+                        onContextMenu={event => event.preventDefault()}
+                        onPointerDown={event => event.stopPropagation()}>
+                <MenuItem label="Rename" onClick={() => {
+                    const name = window.prompt('Palette name', palette.name)?.trim();
+                    if (name) store.edit('Rename palette', draft => { const item = draft.palettes.find(value => value.id === palette.id); if (item) item.name = name; });
+                    close();
+                }}/>
+                <MenuItem label="Duplicate" onClick={() => {
+                    const copy = structuredClone(palette);
+                    copy.id = crypto.randomUUID(); copy.name += ' copy'; copy.colors.forEach(color => color.id = crypto.randomUUID());
+                    store.edit('Duplicate palette', draft => { draft.palettes.push(copy); });
+                    close();
+                }}/>
+                <MenuItem label="Delete" className="danger" onClick={() => {
+                    if (window.confirm(`Delete palette “${palette.name}”?`)) {
+                        store.edit('Delete palette', draft => { draft.palettes = draft.palettes.filter(item => item.id !== palette.id); });
+                        if (selectedPaletteId === palette.id) setSelectedPaletteId(null);
+                    }
+                    close();
+                }}/>
+            </div>;
+        })()}
         {renamePageDialog && <EditorDialog title="Rename Page"
                                            onClose={() => setRenamePageDialog(null)}>
             <form className="rename-page-form" onSubmit={event => {

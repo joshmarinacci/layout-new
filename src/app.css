@@ -732,6 +732,30 @@
     padding: 16px;
 }
 
+.panel-heading { display: flex; align-items: center; justify-content: space-between; }
+.panel-heading button { font-size: .75rem; padding: .25rem .45rem; }
+.palette-view { width: min(900px, 100%); margin: 1rem auto; padding: 1rem; }
+.palette-view-header { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; border-bottom: 1px solid var(--border, #777); padding-bottom: 1rem; }
+.palette-view-header h2 { margin: 0; }
+.palette-view-header small { flex-basis: 100%; color: var(--warning, #a36a00); }
+.palette-actions { display: flex; flex-wrap: wrap; gap: .4rem; width: 100%; }
+.palette-actions button { display: inline-flex; align-items: center; gap: .35rem; }
+.palette-actions svg, .palette-color > button svg { width: 1rem; height: 1rem; }
+.palette-colors { display: grid; gap: .6rem; margin-top: 1rem; }
+.palette-color-slot { min-width: 0; }
+.palette-color-placeholder { border: 1px dashed var(--selection-stroke); border-radius: .5rem; background: color-mix(in srgb, var(--selection-stroke) 8%, transparent); }
+.palette-color { display: grid; grid-template-columns: auto 3rem minmax(0, 1fr) auto auto; gap: .6rem; align-items: center; padding: .65rem; border: 1px solid var(--border, #777); border-radius: .5rem; }
+.palette-color.dragging { box-shadow: 0 8px 24px #0004; background: var(--panel-background, Canvas); }
+.palette-drag-handle { cursor: grab; padding: .25rem; border: 0; background: transparent; }
+.palette-drag-handle { touch-action: none; }
+.palette-drag-handle:active { cursor: grabbing; }
+.palette-swatch { width: 3rem; height: 3rem; border: 1px solid var(--border, #777); border-radius: .35rem; }
+.palette-color-fields { display: grid; grid-template-columns: repeat(3, minmax(7rem, 1fr)); gap: .6rem; }
+.palette-color-fields label, .palette-view-header label { display: flex; align-items: center; gap: .35rem; }
+.palette-color-fields input:not([type=color]) { min-width: 0; width: 100%; }
+.palette-color-fields code { font-size: .8rem; }
+@media (max-width: 700px) { .palette-color-fields { grid-template-columns: 1fr; } }
+
 .asset-view-header {
     display: flex;
     align-items: center;

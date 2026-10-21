@@ -50,6 +50,20 @@ export interface ImageAsset {
     height: number;
 }
 
+export interface PaletteColor {
+    id: string;
+    name?: string;
+    space: 'srgb' | 'rgb' | 'hsl' | 'oklab' | 'oklch';
+    /** CSS color value in `space`; converted on demand for display and use. */
+    value: string;
+}
+
+export interface ColorPalette {
+    id: string;
+    name: string;
+    colors: PaletteColor[];
+}
+
 /* ========== components ========= */
 
 export type ShapeComponent =
@@ -190,10 +204,11 @@ export interface Page {
 }
 
 export interface Document {
-    version: 5
+    version: 6
     title: string
     shapes: Shape[];
     images: PixelImageData[];
+    palettes: ColorPalette[];
     pages: Page[];
 }
 
