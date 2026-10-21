@@ -21,6 +21,8 @@ import {
     shapeAlignmentOffsets,
     translateShape
 } from "./shapeAlignment";
+import {CommandRegistry} from './CommandRegistry';
+import type {Theme} from './ui/theme';
 
 export interface DocumentTab {
     id: string;
@@ -64,6 +66,7 @@ export type CommandContext = {
     setClipboard: Setter<ClipboardState>
     commandPaletteOpen: boolean,
     setCommandPaletteOpen: Setter<boolean>
+    setKeyboardShortcutsOpen: Setter<boolean>
     setSavedDocumentsOpen: Setter<boolean>
     leftPanelVisible: boolean
     setLeftPanelVisible: Setter<boolean>
@@ -77,6 +80,7 @@ export type CommandContext = {
     setPixelEditor:Setter<PixelEditorController|null>
     setError:Setter<string>
     setFileDialogOpen:Setter<boolean>
+    setTheme: Setter<Theme>
 }
 
 export type CommandId =
@@ -116,9 +120,11 @@ export type CommandId =
     | 'ui-toggle-right-sidebar'
     | 'ui-toggle-left-sidebar'
     | 'ui-show-command-palette'
+    | 'ui-show-keyboard-shortcuts'
     | 'new-vector-network' | 'new-pixelimage' | 'new-repeatingimage'
     | 'new-page-rectangle' | 'new-page-circle'
     | 'import-png'
+    | 'theme-system' | 'theme-light' | 'theme-dark'
 
 
 export interface Command {
@@ -210,6 +216,7 @@ export const UndoCommand: Command = {
     id: 'undo',
     title: 'Undo',
     description: 'Undo the last change',
+    keywords: ['history', 'edit'],
     enabled: (ctx) => ctx.state.canUndo,
     run: ctx => ctx.store.undo()
 }
@@ -217,6 +224,7 @@ export const RedoCommand: Command = {
     id: 'redo',
     title: 'Redo',
     description: 'Redo the last undone change',
+    keywords: ['history', 'edit'],
     enabled: ctx => ctx.state.canRedo,
     run: ctx => ctx.store.redo()
 }
@@ -345,7 +353,7 @@ export const SelectionDeleteCommand: Command = {
     id: 'selection-delete',
     title: 'Delete',
     description: 'Remove selected shapes',
-    keywords: ['remove'],
+    keywords: ['selection', 'remove', 'edit'],
     enabled: ctx => !!ctx.state.selectedIds.length && !ctx.state.transactionActive,
     run: (ctx) => {
         let shapes = getSelected(ctx.store)
@@ -398,16 +406,27 @@ export const ShowCommandPaletteCommand: Command = {
     id: 'ui-show-command-palette',
     title: 'Show Command Palette',
     description: 'show the command palette',
+    keywords: ['view', 'commands'],
     enabled: () => true,
     run: ctx => {
         ctx.setCommandPaletteOpen(true)
     }
 }
 
+export const ShowKeyboardShortcutsCommand: Command = {
+    id: 'ui-show-keyboard-shortcuts',
+    title: 'Keyboard Shortcuts',
+    description: 'Show all keyboard shortcuts grouped by command keywords',
+    keywords: ['help', 'keyboard', 'shortcuts'],
+    enabled: () => true,
+    run: ctx => ctx.setKeyboardShortcutsOpen(true)
+}
+
 export const ToggleLeftSidebar: Command = {
     id: 'ui-toggle-left-sidebar',
     title: 'Toggle Left Sidebar',
     description: 'Toggle the left sidebar',
+    keywords: ['view', 'panels'],
     enabled: () => true,
     run: ctx => ctx.setLeftPanelVisible(!ctx.leftPanelVisible)
 }
@@ -415,9 +434,32 @@ export const ToggleRightSidebar: Command = {
     id: 'ui-toggle-right-sidebar',
     title: 'Toggle Right Sidebar',
     description: 'Toggle the right sidebar',
+    keywords: ['view', 'panels'],
     enabled: () => true,
     run: ctx => ctx.setRightPanelVisible(!ctx.rightPanelVisible)
 }
+
+export const SystemThemeCommand: Command = {
+    id: 'theme-system',
+    title: 'System Theme',
+    description: 'Use the system appearance preference',
+    enabled: () => true,
+    run: ctx => ctx.setTheme('system')
+};
+export const LightThemeCommand: Command = {
+    id: 'theme-light',
+    title: 'Light Theme',
+    description: 'Use the light appearance',
+    enabled: () => true,
+    run: ctx => ctx.setTheme('light')
+};
+export const DarkThemeCommand: Command = {
+    id: 'theme-dark',
+    title: 'Dark Theme',
+    description: 'Use the dark appearance',
+    enabled: () => true,
+    run: ctx => ctx.setTheme('dark')
+};
 
 
 export function makeTab(document: DrawingDocument, savedDocumentId: string | null = null, savedJson: string | null = null): DocumentTab {
@@ -556,6 +598,22 @@ export const AlignDistributeVerticalCommand:Command = {
     run: ctx => applyAlignment(ctx, 'distribute-vertical'),
     enabled: ctx => getSelectedShapes(ctx).length >= 3
 }
+
+/** Canonical command definitions used by the palette, shortcuts, menus, and native menu events. */
+export const allCommands: Command[] = [
+    NewDocumentCommand, RenameDocumentCommand, OpenDocumentCommand, SaveDocumentCommand,
+    OpenJsonCommand, SaveJsonCommand, NewPageCommand, RenamePageCommand, DeletePageCommand,
+    UndoCommand, RedoCommand, NewRectCommand, NewCircleCommand, NewPageRectangleCommand,
+    NewPageCircleCommand, NewVectorNetworkCommand, NewPixelImageCommand, NewRepeatingImageCommand,
+    ImportPNGCommand, SelectionGroupCommand, SelectionUngroupCommand, SelectionDuplicateCommand,
+    SelectionDeleteCommand, SelectionCopyCommand, SelectionCutCommand, SelectionPasteCommand,
+    ShowCommandPaletteCommand, ShowKeyboardShortcutsCommand, ToggleLeftSidebar, ToggleRightSidebar, SystemThemeCommand,
+    LightThemeCommand, DarkThemeCommand, AlignLeftCommand,
+    AlignCenterCommand, AlignRightCommand, AlignTopCommand, AlignMiddleCommand,
+    AlignBottomCommand, AlignDistributeHorizontalCommand, AlignDistributeVerticalCommand
+];
+
+export const commandRegistry = new CommandRegistry(allCommands);
 
 
     // enabled: (ctx) => {

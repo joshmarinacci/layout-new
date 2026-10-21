@@ -567,6 +567,28 @@
     margin-top: 12px;
 }
 
+.keyboard-shortcuts { min-width: min(520px, 75vw); }
+.keyboard-shortcut-group + .keyboard-shortcut-group { margin-top: 18px; }
+.keyboard-shortcut-group h3 {
+    margin: 0 0 6px;
+    color: var(--muted-text);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+.keyboard-shortcut-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--panel-border-color);
+}
+.keyboard-shortcut-row > div { display: grid; gap: 2px; }
+.keyboard-shortcut-row small { color: var(--muted-text); }
+.keyboard-shortcut-row kbd { flex: 0 0 auto; }
+
 .saved-document-row {
     display: flex;
     align-items: center;

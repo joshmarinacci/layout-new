@@ -18,6 +18,7 @@ import {DropdownMenu} from './DropdownMenu';
 import {CommandPalette} from './CommandPalette';
 import {keybindings, matchesKeybinding} from './keybindings';
 import {EditorDialog} from './EditorDialog';
+import {KeyboardShortcutsDialog} from './KeyboardShortcutsDialog';
 import {makeExampleDocument} from './exampleDocument';
 import {ImportPixelImage} from './ImportPixelImage';
 import {NewPixelImage} from './NewPixelImage';
@@ -44,8 +45,8 @@ import {
     AlignRightCommand,
     AlignTopCommand,
     type ClipboardState,
-    type Command,
     type CommandContext,
+    commandRegistry,
     DeletePageCommand,
     type ImageDialogConfig,
     ImportPNGCommand,
@@ -81,7 +82,6 @@ import {
     type Workspace
 } from "./commands";
 import {CommandButton, CommandMenuItem, DocumentTabButton} from "./common";
-
 
 export default function App() {
     const [theme, setTheme] = useTheme();
@@ -156,6 +156,7 @@ export default function App() {
     const [renameDocumentName, setRenameDocumentName] = useState<string | null>(null);
     const [savedDocumentsOpen, setSavedDocumentsOpen] = useState(false);
     const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+    const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
     const selectedAsset = doc.images.find(image => image.id === selectedAssetId);
 
     const ctx: CommandContext = {
@@ -166,6 +167,7 @@ export default function App() {
         clipboard, setClipboard,
         commandPaletteOpen,
         setCommandPaletteOpen,
+        setKeyboardShortcutsOpen,
         setSavedDocumentsOpen,
         leftPanelVisible,
         setLeftPanelVisible,
@@ -180,23 +182,24 @@ export default function App() {
         setError,
         setFileDialogOpen: (open) => {
             file.current?.click()
-        }
+        },
+        setTheme
     }
     useEffect(() => {
         const keydown = (event: KeyboardEvent) => {
             if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'ui-show-command-palette')!)) {
                 event.preventDefault();
-                ShowCommandPaletteCommand.run(ctx)
+                commandRegistry.require('ui-show-command-palette').run(ctx)
                 return;
             }
             if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'ui-toggle-left-sidebar')!)) {
                 event.preventDefault();
-                ToggleLeftSidebar.run(ctx)
+                commandRegistry.require('ui-toggle-left-sidebar').run(ctx)
                 return;
             }
             if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'ui-toggle-right-sidebar')!)) {
                 event.preventDefault();
-                ToggleRightSidebar.run(ctx)
+                commandRegistry.require('ui-toggle-right-sidebar').run(ctx)
                 return;
             }
             if (commandPaletteOpen) {
@@ -233,7 +236,7 @@ export default function App() {
             if (event.target instanceof HTMLElement && (event.target.matches('input, textarea, select') || event.target.isContentEditable)) return;
             const boundCommand = keybindings.find(binding => binding.commandId !== 'ui-show-command-palette' && matchesKeybinding(event, binding));
             if (boundCommand) {
-                const command = commands.find(item => item.id === boundCommand.commandId);
+                const command = commandRegistry.get(boundCommand.commandId);
                 if (command && command.enabled && command.enabled(ctx)) {
                     event.preventDefault();
                     command.run(ctx);
@@ -309,117 +312,15 @@ export default function App() {
         setContextMenu(null);
         setPageMenu({x: event.clientX, y: event.clientY, pageId});
     };
-    const commands: Command[] = [
-        NewDocumentCommand,
-        RenameDocumentCommand,
-        OpenDocumentCommand,
-        SaveDocumentCommand,
-        OpenJsonCommand,
-        SaveJsonCommand,
-        NewPageCommand,
-        RenamePageCommand,
-        DeletePageCommand,
-        NewRectCommand,
-        NewCircleCommand,
-        SelectionGroupCommand,
-        SelectionUngroupCommand,
-        SelectionDuplicateCommand,
-        SelectionDeleteCommand,
-        SelectionCutCommand,
-        SelectionCopyCommand,
-        SelectionPasteCommand,
-        UndoCommand,
-        RedoCommand,
-        ShowCommandPaletteCommand,
-        ToggleLeftSidebar,
-        ToggleRightSidebar,
-        AlignLeftCommand,
-        AlignCenterCommand,
-        AlignRightCommand,
-        AlignTopCommand,
-        AlignMiddleCommand,
-        AlignBottomCommand,
-        AlignDistributeHorizontalCommand,
-        AlignDistributeVerticalCommand,
-    ];
+    const commands = commandRegistry.getAll();
     const nativeMenuAction = useRef<(id: string) => void>(() => {
     });
     nativeMenuAction.current = id => {
         if (store.getSnapshot().transactionActive) return;
-        switch (id) {
-            case 'new-document':
-                NewDocumentCommand.run(ctx)
-                break;
-            case 'open-saved':
-                OpenDocumentCommand.run(ctx)
-                break;
-            case 'load-json':
-                OpenJsonCommand.run(ctx)
-                break;
-            case 'save-document':
-                SaveDocumentCommand.run(ctx)
-                break;
-            case 'export-json':
-                SaveJsonCommand.run(ctx)
-                break;
-            case 'undo':
-                UndoCommand.run(ctx);
-                break;
-            case 'redo':
-                RedoCommand.run(ctx);
-                break;
-            case 'duplicate':
-                if (store.getSnapshot().selectedIds.length) SelectionDuplicateCommand.run(ctx)
-                break;
-            case 'delete':
-                if (store.getSnapshot().selectedIds.length) SelectionDeleteCommand.run(ctx)
-                break;
-            case 'cut':
-                if (store.getSnapshot().selectedIds.length) SelectionCutCommand.run(ctx)
-                break;
-            case 'copy':
-                SelectionCopyCommand.run(ctx)
-                break;
-            case 'paste':
-                SelectionPasteCommand.run(ctx);
-                break;
-            case 'new-page':
-                NewPageCommand.run(ctx);
-                break;
-            case 'rename-page':
-                RenamePageCommand.run(ctx)
-                break;
-            case 'delete-page':
-                DeletePageCommand.run(ctx)
-                break;
-            case 'new-vector':
-                if (!selectedAssetId) NewVectorNetworkCommand.run(ctx)
-                break;
-            case 'new-rectangle':
-                if (!selectedAssetId) NewRectCommand.run(ctx)
-                break;
-            case 'new-circle':
-                if (!selectedAssetId) NewCircleCommand.run(ctx);
-                break;
-            case 'new-pixel-image':
-                if (!selectedAssetId) NewPixelImageCommand.run(ctx)// setImageDialog({kind: 'create'});
-                break;
-            case 'new-repeating-image':
-                if (!selectedAssetId && doc.images.length) NewRepeatingImageCommand.run(ctx)// setRepeatingImageDialog(true);
-                break;
-            case 'import-png':
-                if (!selectedAssetId) ImportPNGCommand.run(ctx) // setImageDialog({kind: 'import'});
-                break;
-            case 'theme-system':
-                setTheme('system');
-                break;
-            case 'theme-light':
-                setTheme('light');
-                break;
-            case 'theme-dark':
-                setTheme('dark');
-                break;
-        }
+        if (selectedAssetId && ['new-vector-network', 'new-rectangle', 'new-circle', 'new-pixelimage', 'new-repeatingimage', 'import-png'].includes(id)) return;
+        if (id === 'new-repeatingimage' && !doc.images.length) return;
+        const command = commandRegistry.get(id);
+        if (command?.enabled(ctx)) command.run(ctx);
     };
     useEffect(() => {
         if (!isTauri()) return;
@@ -443,61 +344,63 @@ export default function App() {
     return <div className={`main-layout${isTauri() ? ' tauri-mode' : ''}`}>
         <nav className="menubar full-span">
             <DropdownMenu title="File">
-                <CommandMenuItem ctx={ctx} command={NewDocumentCommand}/>
+                <CommandMenuItem ctx={ctx} commandId="new-document"/>
                 <hr className="menu-separator" aria-hidden="true"/>
-                <CommandMenuItem ctx={ctx} command={OpenDocumentCommand}/>
-                <CommandMenuItem ctx={ctx} command={OpenJsonCommand}/>
+                <CommandMenuItem ctx={ctx} commandId="open-local-document"/>
+                <CommandMenuItem ctx={ctx} commandId="open-json-document"/>
                 <hr className="menu-separator" aria-hidden="true"/>
-                <CommandButton command={SaveJsonCommand} ctx={ctx}/>
+                <CommandButton commandId="save-json-document" ctx={ctx}/>
             </DropdownMenu>
             <DropdownMenu title="Edit">
-                <CommandMenuItem ctx={ctx} command={SelectionDuplicateCommand}/>
-                <CommandMenuItem ctx={ctx} command={SelectionDeleteCommand}/>
-                <CommandMenuItem ctx={ctx} command={SelectionCutCommand}/>
-                <CommandMenuItem ctx={ctx} command={SelectionCopyCommand}/>
-                <CommandMenuItem ctx={ctx} command={SelectionPasteCommand}/>
+                <CommandMenuItem ctx={ctx} commandId="selection-duplicate"/>
+                <CommandMenuItem ctx={ctx} commandId="selection-delete"/>
+                <CommandMenuItem ctx={ctx} commandId="selection-cut"/>
+                <CommandMenuItem ctx={ctx} commandId="selection-copy"/>
+                <CommandMenuItem ctx={ctx} commandId="selection-paste"/>
             </DropdownMenu>
             <DropdownMenu title="View">
-                <CommandMenuItem ctx={ctx} command={ShowCommandPaletteCommand}/>
+                <CommandMenuItem ctx={ctx} commandId="ui-show-command-palette"/>
                 <hr className="menu-separator" aria-hidden="true"/>
-                <CommandMenuItem ctx={ctx} command={ToggleLeftSidebar}/>
-                <CommandMenuItem ctx={ctx} command={ToggleRightSidebar}/>
+                <CommandMenuItem ctx={ctx} commandId="ui-toggle-left-sidebar"/>
+                <CommandMenuItem ctx={ctx} commandId="ui-toggle-right-sidebar"/>
             </DropdownMenu>
             <DropdownMenu title="Page">
-                <CommandButton command={NewPageCommand} ctx={ctx}/>
-                <CommandButton command={RenamePageCommand} ctx={ctx}/>
-                <CommandButton command={DeletePageCommand} ctx={ctx}/>
+                <CommandButton commandId="new-page" ctx={ctx}/>
+                <CommandButton commandId="rename-page" ctx={ctx}/>
+                <CommandButton commandId="delete-page" ctx={ctx}/>
             </DropdownMenu>
             {!selectedAsset && <DropdownMenu title="Shape">
-                <CommandButton ctx={ctx} command={NewVectorNetworkCommand}/>
-                <CommandButton ctx={ctx} command={NewRectCommand}/>
-                <CommandButton ctx={ctx} command={NewCircleCommand}/>
-                <CommandButton ctx={ctx} command={NewPixelImageCommand}/>
-                <CommandButton ctx={ctx} command={NewRepeatingImageCommand}/>
-                <CommandButton ctx={ctx} command={ImportPNGCommand}/>
+                <CommandButton ctx={ctx} commandId="new-vector-network"/>
+                <CommandButton ctx={ctx} commandId="new-rectangle"/>
+                <CommandButton ctx={ctx} commandId="new-circle"/>
+                <CommandButton ctx={ctx} commandId="new-pixelimage"/>
+                <CommandButton ctx={ctx} commandId="new-repeatingimage"/>
+                <CommandButton ctx={ctx} commandId="import-png"/>
             </DropdownMenu>}
             {!selectedAsset && selectedShapes.length > 1 &&
                 <DropdownMenu title="Align">
-                    <CommandMenuItem ctx={ctx} command={AlignLeftCommand}/>
-                    <CommandMenuItem ctx={ctx} command={AlignCenterCommand}/>
-                    <CommandMenuItem ctx={ctx} command={AlignRightCommand}/>
+                    <CommandMenuItem ctx={ctx} commandId="align-left"/>
+                    <CommandMenuItem ctx={ctx} commandId="align-center"/>
+                    <CommandMenuItem ctx={ctx} commandId="align-right"/>
 
-                    <CommandMenuItem ctx={ctx} command={AlignTopCommand}/>
-                    <CommandMenuItem ctx={ctx} command={AlignMiddleCommand}/>
-                    <CommandMenuItem ctx={ctx} command={AlignBottomCommand}/>
+                    <CommandMenuItem ctx={ctx} commandId="align-top"/>
+                    <CommandMenuItem ctx={ctx} commandId="align-middle"/>
+                    <CommandMenuItem ctx={ctx} commandId="align-bottom"/>
                     <hr className="menu-separator" aria-hidden="true"/>
                     <CommandMenuItem ctx={ctx}
-                                     command={AlignDistributeHorizontalCommand}/>
+                                     commandId="align-distribute-horizontal"/>
                     <CommandMenuItem ctx={ctx}
-                                     command={AlignDistributeVerticalCommand}/>
+                                     commandId="align-distribute-vertical"/>
                 </DropdownMenu>}
             <ToolbarGroup label="History">{undo}{redo}</ToolbarGroup>
             <span className="spacer"/>
             <DropdownMenu title="Appearance" icon={SunMoon}>
-                {(['system', 'light', 'dark'] as const).map(value => <MenuItem
-                    key={value}
-                    label={`${theme === value ? '✓ ' : ''}${value === 'system' ? 'System theme' : value === 'light' ? 'Light theme' : 'Dark theme'}`}
-                    onClick={() => setTheme(value)}/>)}
+                <CommandMenuItem ctx={ctx} commandId="theme-system"/>
+                <CommandMenuItem ctx={ctx} commandId="theme-light"/>
+                <CommandMenuItem ctx={ctx} commandId="theme-dark"/>
+            </DropdownMenu>
+            <DropdownMenu title="Help">
+                <CommandMenuItem ctx={ctx} commandId="ui-show-keyboard-shortcuts"/>
             </DropdownMenu>
             <input hidden ref={file} type="file" accept=".json,application/json"
                    onChange={async event => {
@@ -703,30 +606,30 @@ export default function App() {
                  role="menu" onContextMenu={event => event.preventDefault()}
                  onPointerDown={event => event.stopPropagation()}>
                 {selectedUngrouped && <CommandMenuItem ctx={ctx}
-                                                       command={SelectionGroupCommand}/>}
+                                                       commandId="selection-group"/>}
                 {selectedGrouped && <CommandMenuItem ctx={ctx}
-                                                     command={SelectionUngroupCommand}/>}
-                <CommandMenuItem ctx={ctx} command={SelectionDuplicateCommand}/>
-                <CommandMenuItem ctx={ctx} command={SelectionDeleteCommand}/>
-                <CommandMenuItem ctx={ctx} command={SelectionCutCommand}/>
-                <CommandMenuItem ctx={ctx} command={SelectionCopyCommand}/>
-                <CommandMenuItem ctx={ctx} command={SelectionPasteCommand}/>
+                                                     commandId="selection-ungroup"/>}
+                <CommandMenuItem ctx={ctx} commandId="selection-duplicate"/>
+                <CommandMenuItem ctx={ctx} commandId="selection-delete"/>
+                <CommandMenuItem ctx={ctx} commandId="selection-cut"/>
+                <CommandMenuItem ctx={ctx} commandId="selection-copy"/>
+                <CommandMenuItem ctx={ctx} commandId="selection-paste"/>
                 {selectedShapes.length > 1 && <>
                     <hr className="menu-separator" aria-hidden="true"/>
-                    <CommandMenuItem ctx={ctx} command={AlignLeftCommand}/>
-                    <CommandMenuItem ctx={ctx} command={AlignRightCommand}/>
-                    <CommandMenuItem ctx={ctx} command={AlignCenterCommand}/>
+                    <CommandMenuItem ctx={ctx} commandId="align-left"/>
+                    <CommandMenuItem ctx={ctx} commandId="align-right"/>
+                    <CommandMenuItem ctx={ctx} commandId="align-center"/>
 
-                    <CommandMenuItem ctx={ctx} command={AlignTopCommand}/>
-                    <CommandMenuItem ctx={ctx} command={AlignMiddleCommand}/>
-                    <CommandMenuItem ctx={ctx} command={AlignBottomCommand}/>
+                    <CommandMenuItem ctx={ctx} commandId="align-top"/>
+                    <CommandMenuItem ctx={ctx} commandId="align-middle"/>
+                    <CommandMenuItem ctx={ctx} commandId="align-bottom"/>
 
 
                     <hr className="menu-separator" aria-hidden="true"/>
                     <CommandMenuItem ctx={ctx}
-                                     command={AlignDistributeHorizontalCommand}/>
+                                     commandId="align-distribute-horizontal"/>
                     <CommandMenuItem ctx={ctx}
-                                     command={AlignDistributeVerticalCommand}/>
+                                     commandId="align-distribute-vertical"/>
                 </>}
             </div>}
         {documentMenu && <div className="shape-context-menu" style={{
@@ -736,22 +639,22 @@ export default function App() {
                               role="menu" aria-label="Document actions"
                               onContextMenu={event => event.preventDefault()}
                               onPointerDown={event => event.stopPropagation()}>
-            <CommandMenuItem ctx={ctx} command={RenameDocumentCommand}/>
-            <CommandMenuItem ctx={ctx} command={NewPageCommand}/>
+            <CommandMenuItem ctx={ctx} commandId="rename-document"/>
+            <CommandMenuItem ctx={ctx} commandId="new-page"/>
         </div>}
         {pageMenu && <div className="shape-context-menu"
                           style={{left: pageMenu.x, top: pageMenu.y}}
                           role="menu" aria-label="Page actions"
                           onContextMenu={event => event.preventDefault()}
                           onPointerDown={event => event.stopPropagation()}>
-            <CommandMenuItem ctx={ctx} command={RenamePageCommand}/>
-            <CommandMenuItem ctx={ctx} command={DeletePageCommand}/>
-            <CommandMenuItem ctx={ctx} command={NewPageRectangleCommand}/>
-            <CommandMenuItem ctx={ctx} command={NewPageCircleCommand}/>
-            <CommandMenuItem ctx={ctx} command={NewVectorNetworkCommand}/>
-            <CommandMenuItem ctx={ctx} command={NewPixelImageCommand}/>
-            <CommandMenuItem ctx={ctx} command={NewRepeatingImageCommand}/>
-            <CommandMenuItem ctx={ctx} command={ImportPNGCommand}/>
+            <CommandMenuItem ctx={ctx} commandId="rename-page"/>
+            <CommandMenuItem ctx={ctx} commandId="delete-page"/>
+            <CommandMenuItem ctx={ctx} commandId="new-page-rectangle"/>
+            <CommandMenuItem ctx={ctx} commandId="new-page-circle"/>
+            <CommandMenuItem ctx={ctx} commandId="new-vector-network"/>
+            <CommandMenuItem ctx={ctx} commandId="new-pixelimage"/>
+            <CommandMenuItem ctx={ctx} commandId="new-repeatingimage"/>
+            <CommandMenuItem ctx={ctx} commandId="import-png"/>
         </div>}
         {pagesMenu &&
             <div className="shape-context-menu"
@@ -759,10 +662,7 @@ export default function App() {
                  role="menu" aria-label="Pages actions"
                  onContextMenu={event => event.preventDefault()}
                  onPointerDown={event => event.stopPropagation()}>
-                <button role="menuitem" onClick={() => {
-                    NewPageCommand.run(ctx)
-                    setPagesMenu(null);
-                }}>{NewPageCommand.title}</button>
+                <CommandMenuItem ctx={ctx} commandId="new-page" onRun={() => setPagesMenu(null)}/>
             </div>}
         {renamePageDialog && <EditorDialog title="Rename Page"
                                            onClose={() => setRenamePageDialog(null)}>
@@ -855,5 +755,6 @@ export default function App() {
         {commandPaletteOpen && <CommandPalette commands={commands}
                                                ctx={ctx}
                                                onClose={() => setCommandPaletteOpen(false)}/>}
+        {keyboardShortcutsOpen && <KeyboardShortcutsDialog onClose={() => setKeyboardShortcutsOpen(false)}/>}
     </div>;
 }

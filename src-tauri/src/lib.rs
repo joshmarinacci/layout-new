@@ -46,10 +46,10 @@ pub fn run() {
             ])?;
 
             let new_document = item("new-document", "New Document", Some("CmdOrCtrl+N"))?;
-            let open_saved = item("open-saved", "Open Saved Document…", Some("CmdOrCtrl+Shift+O"))?;
-            let load_json = item("load-json", "Load JSON File…", None)?;
-            let save_document = item("save-document", "Save Document", Some("CmdOrCtrl+S"))?;
-            let export_json = item("export-json", "Export JSON…", None)?;
+            let open_saved = item("open-local-document", "Open Saved Document…", Some("CmdOrCtrl+Shift+O"))?;
+            let load_json = item("open-json-document", "Load JSON File…", None)?;
+            let save_document = item("save-local-document", "Save Document", Some("CmdOrCtrl+S"))?;
+            let export_json = item("save-json-document", "Export JSON…", None)?;
             let file_menu = Submenu::with_items(handle, "File", true, &[
                 &new_document, &open_saved, &load_json, &PredefinedMenuItem::separator(handle)?,
                 &save_document, &export_json,
@@ -57,11 +57,11 @@ pub fn run() {
 
             let undo = item("undo", "Undo", Some("CmdOrCtrl+Z"))?;
             let redo = item("redo", "Redo", Some("CmdOrCtrl+Shift+Z"))?;
-            let duplicate = item("duplicate", "Duplicate", Some("CmdOrCtrl+D"))?;
-            let delete = item("delete", "Delete", None)?;
-            let cut = item("cut", "Cut", Some("CmdOrCtrl+X"))?;
-            let copy = item("copy", "Copy", Some("CmdOrCtrl+C"))?;
-            let paste = item("paste", "Paste", Some("CmdOrCtrl+V"))?;
+            let duplicate = item("selection-duplicate", "Duplicate", Some("CmdOrCtrl+D"))?;
+            let delete = item("selection-delete", "Delete", None)?;
+            let cut = item("selection-cut", "Cut", Some("CmdOrCtrl+X"))?;
+            let copy = item("selection-copy", "Copy", Some("CmdOrCtrl+C"))?;
+            let paste = item("selection-paste", "Paste", Some("CmdOrCtrl+V"))?;
             let edit_menu = Submenu::with_items(handle, "Edit", true, &[
                 &undo, &redo, &PredefinedMenuItem::separator(handle)?, &duplicate, &delete,
                 &PredefinedMenuItem::separator(handle)?, &cut, &copy, &paste,
@@ -72,11 +72,11 @@ pub fn run() {
             let delete_page = item("delete-page", "Delete Page", None)?;
             let page_menu = Submenu::with_items(handle, "Page", true, &[&new_page, &rename_page, &delete_page])?;
 
-            let new_vector = item("new-vector", "New Vector Network", None)?;
+            let new_vector = item("new-vector-network", "New Vector Network", None)?;
             let new_rectangle = item("new-rectangle", "New Rectangle", None)?;
             let new_circle = item("new-circle", "New Circle", None)?;
-            let new_pixel_image = item("new-pixel-image", "New Pixel Image…", None)?;
-            let new_repeating_image = item("new-repeating-image", "New Repeating Image…", None)?;
+            let new_pixel_image = item("new-pixelimage", "New Pixel Image…", None)?;
+            let new_repeating_image = item("new-repeatingimage", "New Repeating Image…", None)?;
             let import_png = item("import-png", "Import PNG…", None)?;
             let shape_menu = Submenu::with_items(handle, "Shape", true, &[
                 &new_vector, &new_rectangle, &new_circle, &PredefinedMenuItem::separator(handle)?,
@@ -88,10 +88,13 @@ pub fn run() {
                 &item("theme-light", "Light Theme", None)?,
                 &item("theme-dark", "Dark Theme", None)?,
             ])?;
+            let help_menu = Submenu::with_items(handle, "Help", true, &[
+                &item("ui-show-keyboard-shortcuts", "Keyboard Shortcuts…", None)?,
+            ])?;
             let menu = Menu::with_items(handle, &[
                 #[cfg(target_os = "macos")]
                 &app_menu,
-                &file_menu, &edit_menu, &page_menu, &shape_menu, &appearance_menu,
+                &file_menu, &edit_menu, &page_menu, &shape_menu, &appearance_menu, &help_menu,
             ])?;
             app.set_menu(menu)?;
             app.on_menu_event(|app, event| {

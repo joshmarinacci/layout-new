@@ -1,26 +1,29 @@
-import type {Command, CommandContext, DocumentTab} from "./commands";
+import {commandRegistry, type CommandContext, type CommandId, type DocumentTab} from "./commands";
 import {MenuItem} from "./ui/controls";
-import {keybindings} from "./keybindings";
+import {shortcutLabel} from "./keybindings";
 import type {MouseEvent} from "react";
 import {useEditorStore} from "./useEditorStore";
 
-export function CommandButton({command, ctx}: {
-    command: Command,
+export function CommandButton({commandId, ctx}: {
+    commandId: CommandId,
     ctx: CommandContext
 }) {
+    const command = commandRegistry.require(commandId);
     return <button disabled={!command.enabled(ctx)}
                    onClick={() => command.run(ctx)}>{command.title}</button>
 }
 
 export function CommandMenuItem(props: {
     ctx: CommandContext,
-    command: Command
+    commandId: CommandId,
+    onRun?: () => void
 }) {
-    const {ctx, command} = props
+    const {ctx, commandId, onRun} = props;
+    const command = commandRegistry.require(commandId);
     return <MenuItem
-        disabled={!command.enabled(props.ctx)}
-        shortcut={keybindings.find(binding => binding.commandId === command.id)?.mac ?? 'foo'}
-        onClick={() => command.run(ctx)}
+        disabled={!command.enabled(ctx)}
+        shortcut={shortcutLabel(command.id)}
+        onClick={() => { command.run(ctx); onRun?.(); }}
         label={command.title}/>
 }
 
