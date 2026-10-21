@@ -4,7 +4,7 @@ function roundToTenth(value: number) {
     return Math.round((value + Number.EPSILON) * 10) / 10;
 }
 
-export function NumberInput({label, value, min, step = 0.1, shiftStep = 1, onChange, onFocus, onBlur, onKeyDown}: {
+export function NumberInput({label, value, min, step = 1, shiftStep = 10, onChange, onFocus, onBlur, onKeyDown}: {
     label: string;
     value: number | string;
     min?: number;
