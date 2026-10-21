@@ -1,9 +1,12 @@
 import type {
-    Bounds, CircleShape, Point,
+    Bounds,
+    CircleShape,
     DrawDocument,
     FillComponent,
+    Point,
     RectangleShape,
-    Shape, ShapeComponent, StrokeComponent
+    Shape,
+    StrokeComponent
 } from "./types";
 
 function gen_id(rect1: string) {
