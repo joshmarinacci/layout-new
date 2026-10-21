@@ -6,7 +6,7 @@ import {
     type DecodedPixels,
     inspectPng
 } from '../src/io/pngImport';
-import {EditorStore} from '../src/EditorStore';
+import {EditorStore} from '../src/model/EditorStore';
 import {
     fillImageRegion,
     paintImageRegion,

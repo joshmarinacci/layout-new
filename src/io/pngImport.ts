@@ -1,4 +1,4 @@
-import type {Bounds, PixelImageData} from '../types';
+import type {Bounds, PixelImageData} from '../model/types';
 
 export interface DecodedPixels {width: number; height: number; rgba: Uint8ClampedArray}
 export interface TileSize {width: number; height: number}

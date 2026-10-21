@@ -13,28 +13,28 @@ import {type MouseEvent, useEffect, useRef, useState} from 'react';
 import {isTauri} from '@tauri-apps/api/core';
 import {listen} from '@tauri-apps/api/event';
 import {DropdownMenu, Separator} from './ui/DropdownMenu';
-import {CommandPalette} from './CommandPalette';
-import {keybindings, matchesKeybinding} from './keybindings';
-import {EditorDialog} from './EditorDialog';
-import {KeyboardShortcutsDialog} from './KeyboardShortcutsDialog';
-import {makeExampleDocument} from './exampleDocument';
+import {CommandPalette} from './common/CommandPalette';
+import {keybindings, matchesKeybinding} from './common/keybindings';
+import {EditorDialog} from './common/EditorDialog';
+import {KeyboardShortcutsDialog} from './common/KeyboardShortcutsDialog';
+import {makeExampleDocument} from './model/exampleDocument';
 import {ImportPixelImage} from './shapes/ImportPixelImage';
 import {NewPixelImage} from './shapes/NewPixelImage';
 import {NewRepeatingImage} from './shapes/NewRepeatingImage';
-import {PixelAssetView} from './PixelAssetView';
+import {PixelAssetView} from './shapes/PixelAssetView';
 import {
     type PixelEditorController,
     PixelImageEditor
 } from './shapes/PixelImageEditor';
-import PropSheet from './PropSheet';
+import PropSheet from './common/PropSheet';
 import {SavedDocumentsDialog} from './io/SavedDocumentsDialog';
 import {deserializeDocument} from './io/serialization';
-import TreeView from './TreeView';
-import type {Shape} from './types';
+import TreeView from './common/TreeView';
+import type {Shape} from './model/types';
 import {IconButton, ToolbarGroup} from './ui/controls';
 import {useTheme} from './ui/theme';
-import {useEditorStore} from './useEditorStore';
-import VisualEditor from './VisualEditor';
+import {useEditorStore} from './model/useEditorStore';
+import VisualEditor from './editor/VisualEditor';
 import './app.css';
 import {
     type ClipboardState,
@@ -56,7 +56,7 @@ import {
     CommandIconButton,
     CommandMenuItem,
     DocumentTabButton
-} from "./common";
+} from "./common/common";
 
 export default function App() {
     const [theme, setTheme] = useTheme();

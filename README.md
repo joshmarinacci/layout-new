@@ -14,7 +14,20 @@ With two or more shapes selected on the active page, use **Align** in the toolba
 
 The **File** menu contains **Save to Browser** (or **Save Document** in Tauri), **Open from Browser** (or **Open Saved Document** in Tauri), **Load JSON file**, **Export JSON**, and **New Document**. Browser saves are manual and stored in this browser's local storage; Tauri saves are stored in the app's data directory. Edits do not save automatically. A dot on a tab marks changes since its last save. Use ⌘S/Ctrl+S to save the active document, ⌘⇧O/Ctrl+Shift+O to open the saved-document manager, and ⌘O/Ctrl+O to load a JSON file. The manager can open, rename, or delete saved documents. Opening one creates a new tab with its saved state; deleting its saved entry marks any open copy unsaved. **Export JSON** downloads `<document title>.json`, replacing filename-unsafe characters; a blank title uses `Untitled.json`. The JSON file picker validates data before opening; invalid files leave existing tabs intact. New Document and successful loads open a new tab. Each tab retains its own document, selection, and undo/redo history. Use Left/Right arrows or Home/End while focused on the tab bar to switch documents. Tabs remain in memory; saves from the File menu provide the persistent local copy.
 
-Use **View → Show Command Palette** or ⌘⇧P/Ctrl+Shift+P to open the searchable command palette. Search matches command names, descriptions, and keywords; use Up/Down, Enter, and Escape to navigate, run, and close it. Commands unavailable in the current editor state (for example, alignment with too few selected shapes) are omitted. Commands are defined in `src/commands.ts` and indexed by ID in `src/CommandRegistry.ts`; add new definitions to `allCommands` to make them available throughout the app. The shared shortcut registry lives in `src/keybindings.ts`; add a binding there to show a shortcut in the palette and Help shortcut list and to dispatch it from the keyboard. **New Document** is bound to ⌘N/Ctrl+N. In **View**, ⌘⇧B/Ctrl+Shift+B toggles the left sidebar and ⌘⌥⇧B/Ctrl+Alt+Shift+B toggles the right sidebar. **Help → Keyboard Shortcuts** lists all registered shortcuts, grouped by each command's first keyword and sorted alphabetically; its data comes from the command and keybinding registries.
+Use **View → Show Command Palette** or ⌘⇧P/Ctrl+Shift+P to open the searchable
+command palette. Search matches command names, descriptions, and keywords; use
+Up/Down, Enter, and Escape to navigate, run, and close it. Commands unavailable
+in the current editor state (for example, alignment with too few selected
+shapes) are omitted. Commands are defined in `src/commands.ts` and indexed by ID
+in `src/common/CommandRegistry.ts`; add new definitions to `allCommands` to make
+them available throughout the app. The shared shortcut registry lives in
+`src/common/keybindings.ts`; add a binding there to show a shortcut in the
+palette and Help shortcut list and to dispatch it from the keyboard. **New
+Document** is bound to ⌘N/Ctrl+N. In **View**, ⌘⇧B/Ctrl+Shift+B toggles the left
+sidebar and ⌘⌥⇧B/Ctrl+Alt+Shift+B toggles the right sidebar. **Help → Keyboard
+Shortcuts** lists all registered shortcuts, grouped by each command's first
+keyword and sorted alphabetically; its data comes from the command and
+keybinding registries.
 
 The document title is shown in the tree. Right-click the document row or an open document tab to rename the document or add a page. Right-clicking an inactive tab activates that document before showing its actions.
 

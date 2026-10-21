@@ -1,10 +1,10 @@
-import {PropertySection} from './ui/controls';
+import {PropertySection} from '../ui/controls';
 import type {Draft} from 'immer';
-import type {Shape, ShapeComponent} from './types';
-import type {EditorStore} from './EditorStore';
-import {useEditorStore} from './useEditorStore';
+import type {Shape, ShapeComponent} from '../model/types';
+import type {EditorStore} from '../model/EditorStore';
+import {useEditorStore} from '../model/useEditorStore';
 import {NameField} from './NameField';
-import {NumberInput} from './ui/NumberInput';
+import {NumberInput} from '../ui/NumberInput';
 
 function Field({
                    store,

@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
-import {EditorStore, emptyDocument} from '../src/EditorStore';
-import {makeExampleDocument} from '../src/exampleDocument';
+import {EditorStore, emptyDocument} from '../src/model/EditorStore';
+import {makeExampleDocument} from '../src/model/exampleDocument';
 import {deserializeDocument, serializeDocument} from '../src/io/serialization';
 import {
     floodFillPixels,
@@ -9,7 +9,7 @@ import {
     PALETTES,
     samplePixel
 } from '../src/shapes/pixelImages';
-import type {Document, PixelImageShape} from '../src/types';
+import type {Document, PixelImageShape} from '../src/model/types';
 
 function setup() {
     const store = new EditorStore();

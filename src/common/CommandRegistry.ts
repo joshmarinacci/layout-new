@@ -1,4 +1,4 @@
-import type {Command, CommandId} from './commands';
+import type {Command, CommandId} from '../commands';
 
 /** Stores command definitions by stable ID for menus, keybindings, and other UI. */
 export class CommandRegistry {

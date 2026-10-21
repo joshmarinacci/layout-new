@@ -1,13 +1,14 @@
 import {describe, expect, it} from 'vitest'
-import type {DrawDocument, RectangleShape} from "../src/types";
+import type {DrawDocument, RectangleShape} from "../src/model/types";
 import {
     appendShape,
     makeRect,
     updateDocShape,
     updateFillComp,
     updateRectName,
-    updateShapeComp, updateStrokeComp
-} from "../src/reducer";
+    updateShapeComp,
+    updateStrokeComp
+} from "../src/model/reducer";
 
 function makeRectDocument():DrawDocument {
     const rect = makeRect('rect1',{x:200,y:50,width:100, height:100});

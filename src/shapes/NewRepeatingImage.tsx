@@ -1,7 +1,7 @@
 import {SelectControl} from '../ui/controls';
 import {useState} from 'react';
-import type {EditorStore} from '../EditorStore';
-import {EditorDialog} from '../EditorDialog';
+import type {EditorStore} from '../model/EditorStore';
+import {EditorDialog} from '../common/EditorDialog';
 import {makeRepeatingImageShape} from './pixelImages';
 
 export function NewRepeatingImage({store, onClose}: {store: EditorStore; onClose: () => void}) {

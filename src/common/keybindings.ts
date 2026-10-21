@@ -1,4 +1,4 @@
-import type {CommandId} from "./commands";
+import type {CommandId} from "../commands";
 
 export type Keybinding = {
     commandId: CommandId;

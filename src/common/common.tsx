@@ -3,11 +3,11 @@ import {
     type CommandId,
     commandRegistry,
     type DocumentTab
-} from "./commands";
-import {IconButton, MenuItem} from "./ui/controls";
+} from "../commands";
+import {IconButton, MenuItem} from "../ui/controls";
 import {shortcutLabel} from "./keybindings";
 import type {MouseEvent} from "react";
-import {useEditorStore} from "./useEditorStore";
+import {useEditorStore} from "../model/useEditorStore";
 import {BugIcon} from "lucide-react";
 
 export function CommandButton({commandId, ctx}: {

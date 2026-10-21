@@ -1,8 +1,8 @@
 import {describe, expect, it, vi} from 'vitest';
-import {EditorStore, emptyDocument} from '../src/EditorStore';
-import {makeRect} from '../src/reducer';
+import {EditorStore, emptyDocument} from '../src/model/EditorStore';
+import {makeRect} from '../src/model/reducer';
 import {deserializeDocument, serializeDocument} from '../src/io/serialization';
-import {makeExampleDocument} from '../src/exampleDocument';
+import {makeExampleDocument} from '../src/model/exampleDocument';
 
 function setup() {
     const first = makeRect('first', {x: 0, y: 0, width: 100, height: 100});

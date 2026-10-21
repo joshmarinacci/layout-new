@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
-import {EditorStore} from '../src/EditorStore';
-import {makeExampleDocument} from '../src/exampleDocument';
+import {EditorStore} from '../src/model/EditorStore';
+import {makeExampleDocument} from '../src/model/exampleDocument';
 
 // Opening the same document twice deliberately reuses shape IDs and input objects.
 function setup() {

@@ -1,5 +1,5 @@
 import type {Bounds, Shape} from './types';
-import {selectionBounds} from './VisualEditor';
+import {selectionBounds} from '../editor/VisualEditor';
 
 export type ShapeAlignment = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'distribute-horizontal' | 'distribute-vertical';
 

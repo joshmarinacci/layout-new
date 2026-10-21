@@ -1,5 +1,5 @@
 import {useMemo} from 'react';
-import {commandRegistry} from './commands';
+import {commandRegistry} from '../commands';
 import {EditorDialog} from './EditorDialog';
 import {keybindings, shortcutLabel} from './keybindings';
 

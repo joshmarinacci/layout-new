@@ -1,8 +1,8 @@
 import {useRef, useState} from 'react';
-import type {EditorStore} from './EditorStore';
-import type {PixelImageData} from './types';
-import {drawPixelImage} from './shapes/pixelImages';
-import {NameField} from './NameField';
+import type {EditorStore} from '../model/EditorStore';
+import type {PixelImageData} from '../model/types';
+import {drawPixelImage} from './pixelImages';
+import {NameField} from '../common/NameField';
 
 export function PixelAssetView({store, image, onBack}: {store: EditorStore; image: PixelImageData; onBack: () => void}) {
     const canvasRef = useRef<HTMLCanvasElement>(null);

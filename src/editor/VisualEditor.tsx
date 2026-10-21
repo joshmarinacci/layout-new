@@ -9,10 +9,10 @@ import {
     circleContains,
     circleHandles,
     dragCircle
-} from './shapes/circleGeometry';
-import type {EditorStore} from './EditorStore';
-import type {PixelEditorController} from './shapes/PixelImageEditor';
-import {drawPixelImage, resizeImageBounds} from './shapes/pixelImages';
+} from '../shapes/circleGeometry';
+import type {EditorStore} from '../model/EditorStore';
+import type {PixelEditorController} from '../shapes/PixelImageEditor';
+import {drawPixelImage, resizeImageBounds} from '../shapes/pixelImages';
 import type {
     Bounds,
     CircleLikeComponent,
@@ -20,15 +20,15 @@ import type {
     PixelImageReferenceComponent,
     Shape,
     VectorNetwork
-} from './types';
-import {useEditorStore} from './useEditorStore';
-import {useVectorEditor} from './shapes/VectorEditor';
+} from '../model/types';
+import {useEditorStore} from '../model/useEditorStore';
+import {useVectorEditor} from '../shapes/VectorEditor';
 import {
     drawVector,
     resizeVector,
     vectorBounds,
     vectorHit
-} from './shapes/vectorNetworks';
+} from '../shapes/vectorNetworks';
 
 export function selectionBounds(shape: Shape): Bounds {
     switch (shape.type) {

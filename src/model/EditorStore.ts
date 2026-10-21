@@ -6,19 +6,19 @@ import {
     type Patch,
     produceWithPatches
 } from 'immer';
-import {makeImageShape, makePixelImage} from './shapes/pixelImages';
+import {makeImageShape, makePixelImage} from '../shapes/pixelImages';
 import {
     convertImportedPixels,
     type DecodedPixels,
     type TileSize
-} from './io/pngImport';
+} from '../io/pngImport';
 import {
     deserializeDocument,
     serializeDocument,
     validateDocument
-} from './io/serialization';
+} from '../io/serialization';
 import type {Document, PixelImageData, Shape, VectorNetwork} from './types';
-import {reconcileRegions} from './shapes/vectorNetworks';
+import {reconcileRegions} from '../shapes/vectorNetworks';
 
 enablePatches();
 

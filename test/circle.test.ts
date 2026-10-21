@@ -1,11 +1,11 @@
 import {describe, expect, it} from 'vitest';
-import {makeCircle} from '../src/reducer';
+import {makeCircle} from '../src/model/reducer';
 import {
     circleContains,
     circleHandles,
     dragCircle
 } from '../src/shapes/circleGeometry';
-import {EditorStore} from '../src/EditorStore';
+import {EditorStore} from '../src/model/EditorStore';
 import {deserializeDocument} from '../src/io/serialization';
 
 const circle = () => makeCircle('circle', {x: 100, y: 200}, 40);

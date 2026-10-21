@@ -1,6 +1,6 @@
 import {X} from 'lucide-react';
 import {type ReactNode, useEffect, useRef} from 'react';
-import {IconButton} from './ui/controls';
+import {IconButton} from '../ui/controls';
 
 export function EditorDialog({title, onClose, children}: {
     title: string;

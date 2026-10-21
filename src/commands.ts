@@ -1,5 +1,9 @@
-import {type EditorSnapshot, EditorStore, emptyDocument} from "./EditorStore";
-import {makeCircle, makeRect} from "./reducer";
+import {
+    type EditorSnapshot,
+    EditorStore,
+    emptyDocument
+} from "./model/EditorStore";
+import {makeCircle, makeRect} from "./model/reducer";
 
 
 import type {
@@ -7,7 +11,7 @@ import type {
     Document as DrawingDocument,
     PixelImageData,
     Shape
-} from './types';
+} from './model/types';
 import {makeVector} from "./shapes/vectorNetworks";
 import type {PixelEditorController} from "./shapes/PixelImageEditor";
 import {isTauri} from "@tauri-apps/api/core";
@@ -20,8 +24,8 @@ import {
     type ShapeAlignment,
     shapeAlignmentOffsets,
     translateShape
-} from "./shapeAlignment";
-import {CommandRegistry} from './CommandRegistry';
+} from "./model/shapeAlignment";
+import {CommandRegistry} from './common/CommandRegistry';
 import type {Theme} from './ui/theme';
 import {type LucideIcon, Redo2Icon, Undo2Icon} from 'lucide-react';
 

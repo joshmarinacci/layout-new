@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {PALETTES, resizeImageBounds} from '../src/shapes/pixelImages';
-import {EditorStore} from '../src/EditorStore';
+import {EditorStore} from '../src/model/EditorStore';
 
 describe('image resizing', () => {
     const bounds = {x: 10, y: 20, width: 100, height: 50};

@@ -5,7 +5,7 @@ import type {
     VectorSegment,
     VectorShape,
     VectorSpan
-} from '../types';
+} from '../model/types';
 
 export const VECTOR_TOLERANCE = 0.1; // document units, independent of viewport zoom
 const EPS = 1e-7;

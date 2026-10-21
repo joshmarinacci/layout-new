@@ -1,6 +1,19 @@
-import {ChevronDown, ChevronRight, File, Folder, Layers, Square} from 'lucide-react';
-import {Children, type DragEvent, type MouseEvent, type ReactNode, useState} from 'react';
-import type {DrawDocument, PixelImageData, Shape} from './types';
+import {
+    ChevronDown,
+    ChevronRight,
+    File,
+    Folder,
+    Layers,
+    Square
+} from 'lucide-react';
+import {
+    Children,
+    type DragEvent,
+    type MouseEvent,
+    type ReactNode,
+    useState
+} from 'react';
+import type {DrawDocument, PixelImageData, Shape} from '../model/types';
 
 function cls(props: Record<string, boolean>) {
     return Object.entries(props).filter(([, active]) => active).map(([name]) => name).join(' ');

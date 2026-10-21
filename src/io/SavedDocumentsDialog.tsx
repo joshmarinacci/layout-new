@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import {EditorDialog} from '../EditorDialog';
+import {EditorDialog} from '../common/EditorDialog';
 import {
     readSavedDocuments,
     type SavedDocumentRecord,

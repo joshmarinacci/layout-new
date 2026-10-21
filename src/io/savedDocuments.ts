@@ -1,4 +1,4 @@
-import type {Document} from '../types';
+import type {Document} from '../model/types';
 import {deserializeDocument} from './serialization';
 import {invoke, isTauri} from '@tauri-apps/api/core';
 

@@ -1,7 +1,7 @@
 import {type PointerEvent, useEffect, useMemo, useRef, useState} from 'react';
-import type {EditorStore} from '../EditorStore';
-import type {Bounds, Point} from '../types';
-import {useEditorStore} from '../useEditorStore';
+import type {EditorStore} from '../model/EditorStore';
+import type {Bounds, Point} from '../model/types';
+import {useEditorStore} from '../model/useEditorStore';
 import {
     fillImageRegion,
     paintImageRegion,
@@ -11,7 +11,7 @@ import {
 
 type Tool = 'pencil' | 'eraser' | 'fill' | 'picker' | 'move';
 
-function shiftImageRegion(image: import('../types').PixelImageData, region: Bounds, pixels: number[], dx: number, dy: number) {
+function shiftImageRegion(image: import('../model/types').PixelImageData, region: Bounds, pixels: number[], dx: number, dy: number) {
     const width = region.width, height = region.height;
     const shiftX = ((dx % width) + width) % width, shiftY = ((dy % height) + height) % height;
     for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {

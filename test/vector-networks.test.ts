@@ -1,6 +1,6 @@
 import {readFileSync} from 'node:fs';
 import {describe, expect, it} from 'vitest';
-import {EditorStore, emptyDocument} from '../src/EditorStore';
+import {EditorStore, emptyDocument} from '../src/model/EditorStore';
 import {deserializeDocument, serializeDocument} from '../src/io/serialization';
 import {
     addPoint,
@@ -22,7 +22,7 @@ import {
     vectorBounds,
     vectorHit
 } from '../src/shapes/vectorNetworks';
-import type {Point, VectorNetwork, VectorShape} from '../src/types';
+import type {Point, VectorNetwork, VectorShape} from '../src/model/types';
 
 function loop(n: VectorNetwork, coords: Point[]) { const ids = coords.map(p => addPoint(n, p)); ids.forEach((id, i) => connect(n, id, ids[(i + 1) % ids.length])); return ids; }
 const square = (n: VectorNetwork, x = 0, y = 0, size = 100) => loop(n, [{x,y}, {x:x+size,y}, {x:x+size,y:y+size}, {x,y:y+size}]);

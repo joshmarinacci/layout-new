@@ -1,5 +1,5 @@
 import type {KeyboardEvent} from 'react';
-import type {EditorStore} from './EditorStore';
+import type {EditorStore} from '../model/EditorStore';
 
 export function NameField({store, label, value, rename}: {
     store: EditorStore; label: string; value: string; rename: (name: string) => void;

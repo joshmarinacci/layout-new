@@ -1,6 +1,6 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
 import {shortcutLabel} from './keybindings';
-import type {Command, CommandContext} from "./commands";
+import type {Command, CommandContext} from "../commands";
 
 export function CommandPalette({commands, onClose, ctx}: {
     commands: Command[],
