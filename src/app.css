@@ -492,10 +492,27 @@
     color: var(--muted-text);
 }
 
-.number-input input {
-    width: 100%;
+.number-input > input { width: 100%; grid-column: 2; }
+.number-input-control {
     grid-column: 2;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 27px minmax(0, 1fr) 27px;
 }
+.number-input-control input { min-width: 0; width: 100%; text-align: right; }
+.number-input-control input::-webkit-inner-spin-button,
+.number-input-control input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+.number-input-control input { -moz-appearance: textfield; }
+.number-step-button {
+    min-width: 0;
+    padding: 2px 6px;
+    border-radius: 0;
+    font-size: 14px;
+    line-height: 1;
+}
+.number-input-control .number-step-button:first-child { border-radius: 4px 0 0 4px; }
+.number-input-control .number-step-button:last-child { border-radius: 0 4px 4px 0; }
+.number-input-control input { border-radius: 0; }
 
 .number-input small {
     grid-column: 2;
@@ -812,7 +829,7 @@
         grid-template-columns: 1fr;
     }
 
-    .number-input input {
+    .number-input > input, .number-input-control {
         grid-column: 1;
     }
 

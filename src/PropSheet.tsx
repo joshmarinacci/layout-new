@@ -4,23 +4,23 @@ import type {Shape, ShapeComponent} from './types';
 import type {EditorStore} from './EditorStore';
 import {useEditorStore} from './useEditorStore';
 import {NameField} from './NameField';
+import {NumberInput} from './ui/NumberInput';
 
 function Field({store, title, value, type = 'number', nonnegative = false, update}: {
     store: EditorStore; title: string; value: number | string; type?: 'number' | 'color'; nonnegative?: boolean;
     update: (value: string) => void;
 }) {
-    return <label className="number-input"><span className="title">{title}</span>{value === '' && <small>Mixed</small>}<input aria-label={title} type={type} value={value}
-        min={nonnegative ? 0 : undefined} step="any"
-        onFocus={() => store.beginTransaction(title)}
-        onBlur={() => { if (store.getSnapshot().transactionActive) store.commitTransaction(); }}
-        onKeyDown={event => {
-            if (event.key === 'Escape') { store.cancelTransaction(); event.currentTarget.blur(); }
-            if (event.key === 'Enter') event.currentTarget.blur();
-        }}
-        onChange={event => {
-            if (type === 'number' && (event.target.value === '' || !Number.isFinite(event.target.valueAsNumber) || (nonnegative && event.target.valueAsNumber < 0))) return;
-            update(event.target.value);
-        }}/></label>;
+    const onFocus = () => store.beginTransaction(title);
+    const onBlur = () => { if (store.getSnapshot().transactionActive) store.commitTransaction(); };
+    const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'Escape') { store.cancelTransaction(); event.currentTarget.blur(); }
+        if (event.key === 'Enter') event.currentTarget.blur();
+    };
+    return <div className="number-input"><span className="title">{title}</span>{value === '' && <small>Mixed</small>}
+        {type === 'number' ? <NumberInput label={title} value={value} min={nonnegative ? 0 : undefined}
+            onFocus={onFocus} onBlur={onBlur} onKeyDown={onKeyDown}
+            onChange={next => update(String(next))}/> : <input aria-label={title} type="color" value={value}
+            onFocus={onFocus} onBlur={onBlur} onChange={event => update(event.target.value)}/>}</div>;
 }
 function componentFor(shape: Draft<Shape>, key: string): Draft<ShapeComponent> {
     const entry = Object.entries(shape.components).find(([name]) => name === key);
