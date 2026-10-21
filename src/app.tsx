@@ -4,17 +4,15 @@ import {
     PanelLeftOpen,
     PanelRightClose,
     PanelRightOpen,
-    Redo2,
     SunMoon,
     Trash2,
-    Undo2,
     ZoomIn,
     ZoomOut
 } from 'lucide-react';
 import {type MouseEvent, useEffect, useRef, useState} from 'react';
 import {isTauri} from '@tauri-apps/api/core';
 import {listen} from '@tauri-apps/api/event';
-import {DropdownMenu} from './DropdownMenu';
+import {DropdownMenu, Separator} from './DropdownMenu';
 import {CommandPalette} from './CommandPalette';
 import {keybindings, matchesKeybinding} from './keybindings';
 import {EditorDialog} from './EditorDialog';
@@ -50,7 +48,12 @@ import {
     SelectionPasteCommand,
     type Workspace
 } from "./commands";
-import {CommandButton, CommandMenuItem, DocumentTabButton} from "./common";
+import {
+    CommandButton,
+    CommandIconButton,
+    CommandMenuItem,
+    DocumentTabButton
+} from "./common";
 
 export default function App() {
     const [theme, setTheme] = useTheme();
@@ -306,15 +309,13 @@ export default function App() {
             unlisten?.();
         };
     }, []);
-    const undo = <IconButton label="Undo" icon={Undo2} disabled={!state.canUndo}
-                             onClick={() => store.undo()}/>;
-    const redo = <IconButton label="Redo" icon={Redo2} disabled={!state.canRedo}
-                             onClick={() => store.redo()}/>;
+    const undo = <CommandIconButton commandId={'undo'} ctx={ctx}/>
+    const redo = <CommandIconButton commandId={'redo'} ctx={ctx}/>
     return <div className={`main-layout${isTauri() ? ' tauri-mode' : ''}`}>
         <nav className="menubar full-span">
             <DropdownMenu title="File">
                 <CommandMenuItem ctx={ctx} commandId="new-document"/>
-                <hr className="menu-separator" aria-hidden="true"/>
+                <Separator/>
                 <CommandMenuItem ctx={ctx} commandId="open-local-document"/>
                 <CommandMenuItem ctx={ctx} commandId="open-json-document"/>
                 <hr className="menu-separator" aria-hidden="true"/>

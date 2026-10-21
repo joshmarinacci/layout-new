@@ -1,8 +1,14 @@
-import {commandRegistry, type CommandContext, type CommandId, type DocumentTab} from "./commands";
-import {MenuItem} from "./ui/controls";
+import {
+    type CommandContext,
+    type CommandId,
+    commandRegistry,
+    type DocumentTab
+} from "./commands";
+import {IconButton, MenuItem} from "./ui/controls";
 import {shortcutLabel} from "./keybindings";
 import type {MouseEvent} from "react";
 import {useEditorStore} from "./useEditorStore";
+import {BugIcon} from "lucide-react";
 
 export function CommandButton({commandId, ctx}: {
     commandId: CommandId,
@@ -11,6 +17,16 @@ export function CommandButton({commandId, ctx}: {
     const command = commandRegistry.require(commandId);
     return <button disabled={!command.enabled(ctx)}
                    onClick={() => command.run(ctx)}>{command.title}</button>
+}
+
+export function CommandIconButton({commandId, ctx}: {
+    commandId: CommandId,
+    ctx: CommandContext
+}) {
+    const command = commandRegistry.require(commandId);
+    return <IconButton label="Undo" icon={command.icon ? command.icon : BugIcon}
+                       disabled={!command.enabled(ctx)}
+                       onClick={() => command.run(ctx)}/>;
 }
 
 export function CommandMenuItem(props: {

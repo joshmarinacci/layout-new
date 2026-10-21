@@ -23,6 +23,7 @@ import {
 } from "./shapeAlignment";
 import {CommandRegistry} from './CommandRegistry';
 import type {Theme} from './ui/theme';
+import {type LucideIcon, Redo2Icon, Undo2Icon} from 'lucide-react';
 
 export interface DocumentTab {
     id: string;
@@ -76,10 +77,10 @@ export type CommandContext = {
     setRenameDocumentName: Setter<string | null>
     setImageDialog: Setter<ImageDialogConfig>
     setRepeatingImageDialog: Setter<boolean>
-    setVectorId:Setter<string|null>
-    setPixelEditor:Setter<PixelEditorController|null>
-    setError:Setter<string>
-    setFileDialogOpen:Setter<boolean>
+    setVectorId: Setter<string | null>
+    setPixelEditor: Setter<PixelEditorController | null>
+    setError: Setter<string>
+    setFileDialogOpen: Setter<boolean>
     setTheme: Setter<Theme>
 }
 
@@ -135,6 +136,7 @@ export interface Command {
     keywords?: string[];
     enabled: (ctx: CommandContext) => boolean
     run: (ctx: CommandContext) => void;
+    icon?: LucideIcon
 }
 
 export const NewDocumentCommand: Command = {
@@ -152,16 +154,16 @@ export const RenameDocumentCommand: Command = {
     enabled: ctx => ctx.state.document !== undefined,
     run: ctx => ctx.setRenameDocumentName(ctx.state.document.title)
 }
-export const OpenDocumentCommand:Command = {
+export const OpenDocumentCommand: Command = {
     id: 'open-local-document',
-    title:isTauri()?'Open Saved Document':'Open from Browser',
-    description:'opens a document from local storage',
+    title: isTauri() ? 'Open Saved Document' : 'Open from Browser',
+    description: 'opens a document from local storage',
     enabled: ctx => !ctx.state.transactionActive,
-    run:ctx => {
+    run: ctx => {
         ctx.setSavedDocumentsOpen(true)
     }
 }
-export const SaveDocumentCommand:Command = {
+export const SaveDocumentCommand: Command = {
     id: 'save-local-document',
     title: isTauri() ? 'Save Document' : 'Save to Browser',
     description: 'Save the current document',
@@ -169,16 +171,16 @@ export const SaveDocumentCommand:Command = {
     keywords: ['file'],
     run: ctx => saveToBrowser(ctx)
 }
-export const OpenJsonCommand:Command = {
+export const OpenJsonCommand: Command = {
     id: 'open-json-document',
-    title:'Import JSON',
+    title: 'Import JSON',
     description: 'Imports a portable JSON file from disk',
     enabled: ctx => !ctx.state.transactionActive,
     run: ctx => ctx.setFileDialogOpen(true)
 }
-export const SaveJsonCommand:Command = {
+export const SaveJsonCommand: Command = {
     id: 'save-json-document',
-    title:'Export JSON',
+    title: 'Export JSON',
     description: 'exports current document as a portable JSON file',
     keywords: ['save', 'download', 'file'],
     enabled: ctx => !ctx.state.transactionActive,
@@ -218,7 +220,8 @@ export const UndoCommand: Command = {
     description: 'Undo the last change',
     keywords: ['history', 'edit'],
     enabled: (ctx) => ctx.state.canUndo,
-    run: ctx => ctx.store.undo()
+    run: ctx => ctx.store.undo(),
+    icon: Undo2Icon,
 }
 export const RedoCommand: Command = {
     id: 'redo',
@@ -226,7 +229,8 @@ export const RedoCommand: Command = {
     description: 'Redo the last undone change',
     keywords: ['history', 'edit'],
     enabled: ctx => ctx.state.canRedo,
-    run: ctx => ctx.store.redo()
+    run: ctx => ctx.store.redo(),
+    icon: Redo2Icon
 }
 
 export const NewRectCommand: Command = {
@@ -533,67 +537,67 @@ const saveToBrowser = async (ctx: CommandContext) => {
 };
 
 
-export const AlignLeftCommand:Command = {
+export const AlignLeftCommand: Command = {
     id: 'align-left',
-    title:'Align Left',
+    title: 'Align Left',
     description: 'Align selected shapes to their left edges',
     keywords: ['align', 'alignment', 'distribute'],
     run: ctx => applyAlignment(ctx, 'left'),
     enabled: ctx => getSelectedShapes(ctx).length >= 2,
 }
 
-export const AlignCenterCommand:Command = {
-    id:'align-center',
-    title:'Align Horizontal Center',
+export const AlignCenterCommand: Command = {
+    id: 'align-center',
+    title: 'Align Horizontal Center',
     description: 'Align selected shapes by horizontal center',
     keywords: ['align', 'alignment', 'distribute'],
     run: ctx => applyAlignment(ctx, 'center'),
     enabled: ctx => getSelectedShapes(ctx).length >= 2,
 }
-export const AlignRightCommand:Command = {
-    id:'align-right',
-    title:'Align Right',
-    description:'Align selected shapes to their right edges',
+export const AlignRightCommand: Command = {
+    id: 'align-right',
+    title: 'Align Right',
+    description: 'Align selected shapes to their right edges',
     keywords: ['align', 'alignment', 'distribute'],
     run: ctx => applyAlignment(ctx, 'right'),
     enabled: ctx => getSelectedShapes(ctx).length >= 2,
 }
-export const AlignTopCommand:Command = {
-    id:'align-top',
-    title:'Align Top',
-    description:'Align selected shapes to their top edges',
+export const AlignTopCommand: Command = {
+    id: 'align-top',
+    title: 'Align Top',
+    description: 'Align selected shapes to their top edges',
     keywords: ['align', 'alignment', 'distribute'],
     run: ctx => applyAlignment(ctx, 'top'),
     enabled: ctx => getSelectedShapes(ctx).length >= 2,
 }
-export const AlignMiddleCommand:Command = {
-    id:'align-middle',
-    title:'Align Vertical Middle',
-    description:'Align selected shapes by vertical middle',
+export const AlignMiddleCommand: Command = {
+    id: 'align-middle',
+    title: 'Align Vertical Middle',
+    description: 'Align selected shapes by vertical middle',
     keywords: ['align', 'alignment', 'distribute'],
     run: ctx => applyAlignment(ctx, 'middle'),
     enabled: ctx => getSelectedShapes(ctx).length >= 2,
 }
-export const AlignBottomCommand:Command = {
-    id:'align-bottom',
-    title:'Align Bottom',
-    description:'Align selected shapes to their bottom edges',
+export const AlignBottomCommand: Command = {
+    id: 'align-bottom',
+    title: 'Align Bottom',
+    description: 'Align selected shapes to their bottom edges',
     keywords: ['align', 'alignment', 'distribute'],
     run: ctx => applyAlignment(ctx, 'bottom'),
     enabled: ctx => getSelectedShapes(ctx).length >= 2,
 }
-export const AlignDistributeHorizontalCommand:Command = {
+export const AlignDistributeHorizontalCommand: Command = {
     id: 'align-distribute-horizontal',
-    title:    'Distribute Horizontally',
-    description:     'Space three or more shapes evenly across',
+    title: 'Distribute Horizontally',
+    description: 'Space three or more shapes evenly across',
     keywords: ['align', 'alignment', 'distribute'],
     run: ctx => applyAlignment(ctx, 'distribute-horizontal'),
     enabled: ctx => getSelectedShapes(ctx).length >= 3
 }
-export const AlignDistributeVerticalCommand:Command = {
-    id:'align-distribute-vertical',
-    title:'Distribute Vertically',
-    description:'Space three or more shapes evenly down',
+export const AlignDistributeVerticalCommand: Command = {
+    id: 'align-distribute-vertical',
+    title: 'Distribute Vertically',
+    description: 'Space three or more shapes evenly down',
     keywords: ['align', 'alignment', 'distribute'],
     run: ctx => applyAlignment(ctx, 'distribute-vertical'),
     enabled: ctx => getSelectedShapes(ctx).length >= 3
@@ -616,20 +620,20 @@ export const allCommands: Command[] = [
 export const commandRegistry = new CommandRegistry(allCommands);
 
 
-    // enabled: (ctx) => {
-        // const pageShapes = ctx.state.document.shapes.filter(shape => shape.pageId === ctx.state.selectedPageId);
-        // const selectedShapes = pageShapes.filter(shape => ctx.state.selectedIds.includes(shape.id));
-        // return !ctx.state.transactionActive && selectedShapes.length >= (alignment.startsWith('distribute') ? 3 : 2)
-    // },
-    // run: (ctx) => applyAlignment(ctx,alignment)
+// enabled: (ctx) => {
+// const pageShapes = ctx.state.document.shapes.filter(shape => shape.pageId === ctx.state.selectedPageId);
+// const selectedShapes = pageShapes.filter(shape => ctx.state.selectedIds.includes(shape.id));
+// return !ctx.state.transactionActive && selectedShapes.length >= (alignment.startsWith('distribute') ? 3 : 2)
+// },
+// run: (ctx) => applyAlignment(ctx,alignment)
 
-function getSelectedShapes(ctx:CommandContext):Array<Shape> {
+function getSelectedShapes(ctx: CommandContext): Array<Shape> {
     const pageShapes = ctx.state.document.shapes.filter(shape => shape.pageId === ctx.state.selectedPageId);
     const selectedShapes = pageShapes.filter(shape => ctx.state.selectedIds.includes(shape.id));
     return selectedShapes
 }
 
-const applyAlignment = (ctx:CommandContext, alignment: ShapeAlignment) => {
+const applyAlignment = (ctx: CommandContext, alignment: ShapeAlignment) => {
     const pageShapes = ctx.state.document.shapes.filter(shape => shape.pageId === ctx.state.selectedPageId);
     const selectedShapes = pageShapes.filter(shape => ctx.state.selectedIds.includes(shape.id));
     if (selectedShapes.length < 2) return;

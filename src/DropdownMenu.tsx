@@ -55,3 +55,7 @@ export function DropdownMenu({title, children, icon: Icon}: {
         }}>{children}</div>}
     </div>;
 }
+
+export function Separator() {
+    return <hr className="menu-separator" aria-hidden="true"/>
+}
