@@ -1,9 +1,18 @@
 import {describe, expect, it} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {inflateSync} from 'node:zlib';
-import {convertImportedPixels, inspectPng, type DecodedPixels} from '../src/pngImport';
+import {
+    convertImportedPixels,
+    type DecodedPixels,
+    inspectPng
+} from '../src/io/pngImport';
 import {EditorStore} from '../src/EditorStore';
-import {PALETTES, readImageRegion, fillImageRegion, paintImageRegion} from '../src/pixelImages';
+import {
+    fillImageRegion,
+    paintImageRegion,
+    PALETTES,
+    readImageRegion
+} from '../src/shapes/pixelImages';
 
 function source(width: number, height: number, pixel = [10, 20, 30, 255]): DecodedPixels {
     return {width, height, rgba: new Uint8ClampedArray(Array.from({length: width * height}, () => pixel).flat())};

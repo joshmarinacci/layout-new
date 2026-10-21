@@ -12,20 +12,23 @@ import {
 import {type MouseEvent, useEffect, useRef, useState} from 'react';
 import {isTauri} from '@tauri-apps/api/core';
 import {listen} from '@tauri-apps/api/event';
-import {DropdownMenu, Separator} from './DropdownMenu';
+import {DropdownMenu, Separator} from './ui/DropdownMenu';
 import {CommandPalette} from './CommandPalette';
 import {keybindings, matchesKeybinding} from './keybindings';
 import {EditorDialog} from './EditorDialog';
 import {KeyboardShortcutsDialog} from './KeyboardShortcutsDialog';
 import {makeExampleDocument} from './exampleDocument';
-import {ImportPixelImage} from './ImportPixelImage';
-import {NewPixelImage} from './NewPixelImage';
-import {NewRepeatingImage} from './NewRepeatingImage';
+import {ImportPixelImage} from './shapes/ImportPixelImage';
+import {NewPixelImage} from './shapes/NewPixelImage';
+import {NewRepeatingImage} from './shapes/NewRepeatingImage';
 import {PixelAssetView} from './PixelAssetView';
-import {type PixelEditorController, PixelImageEditor} from './PixelImageEditor';
+import {
+    type PixelEditorController,
+    PixelImageEditor
+} from './shapes/PixelImageEditor';
 import PropSheet from './PropSheet';
-import {SavedDocumentsDialog} from './SavedDocumentsDialog';
-import {deserializeDocument} from './serialization';
+import {SavedDocumentsDialog} from './io/SavedDocumentsDialog';
+import {deserializeDocument} from './io/serialization';
 import TreeView from './TreeView';
 import type {Shape} from './types';
 import {IconButton, ToolbarGroup} from './ui/controls';

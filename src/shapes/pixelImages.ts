@@ -1,4 +1,10 @@
-import type {Bounds, PixelImageData, PixelImageShape, Point, RepeatingImageShape} from './types';
+import type {
+    Bounds,
+    PixelImageData,
+    PixelImageShape,
+    Point,
+    RepeatingImageShape
+} from '../types';
 
 export const PALETTES = {
     'PICO-8': ['#000000', '#1d2b53', '#7e2553', '#008751', '#ab5236', '#5f574f', '#c2c3c7', '#fff1e8',

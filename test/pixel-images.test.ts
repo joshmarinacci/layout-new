@@ -1,8 +1,14 @@
 import {describe, expect, it} from 'vitest';
 import {EditorStore, emptyDocument} from '../src/EditorStore';
 import {makeExampleDocument} from '../src/exampleDocument';
-import {deserializeDocument, serializeDocument} from '../src/serialization';
-import {floodFillPixels, makePixelImage, paintPixelLine, PALETTES, samplePixel} from '../src/pixelImages';
+import {deserializeDocument, serializeDocument} from '../src/io/serialization';
+import {
+    floodFillPixels,
+    makePixelImage,
+    paintPixelLine,
+    PALETTES,
+    samplePixel
+} from '../src/shapes/pixelImages';
 import type {Document, PixelImageShape} from '../src/types';
 
 function setup() {

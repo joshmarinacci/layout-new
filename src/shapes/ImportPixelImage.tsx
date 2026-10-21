@@ -1,7 +1,11 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
-import {EditorDialog} from './EditorDialog';
-import {convertImportedPixels, decodePng, type DecodedPixels} from './pngImport';
-import type {EditorStore} from './EditorStore';
+import {EditorDialog} from '../EditorDialog';
+import {
+    convertImportedPixels,
+    type DecodedPixels,
+    decodePng
+} from '../io/pngImport';
+import type {EditorStore} from '../EditorStore';
 
 export function ImportPixelImage({store, onClose}: {store: EditorStore; onClose: () => void}) {
     const [source, setSource] = useState<DecodedPixels | null>(null);

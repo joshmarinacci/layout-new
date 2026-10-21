@@ -1,4 +1,11 @@
-import type {Bounds, Point, VectorNetwork, VectorSegment, VectorShape, VectorSpan} from './types';
+import type {
+    Bounds,
+    Point,
+    VectorNetwork,
+    VectorSegment,
+    VectorShape,
+    VectorSpan
+} from '../types';
 
 export const VECTOR_TOLERANCE = 0.1; // document units, independent of viewport zoom
 const EPS = 1e-7;

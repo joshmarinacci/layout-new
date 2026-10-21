@@ -1,6 +1,10 @@
 import {useEffect, useState} from 'react';
-import {EditorDialog} from './EditorDialog';
-import {readSavedDocuments, writeSavedDocuments, type SavedDocumentRecord} from './savedDocuments';
+import {EditorDialog} from '../EditorDialog';
+import {
+    readSavedDocuments,
+    type SavedDocumentRecord,
+    writeSavedDocuments
+} from './savedDocuments';
 
 export function SavedDocumentsDialog({onClose, onOpen, onChanged}: {
     onClose: () => void; onOpen: (record: SavedDocumentRecord) => void; onChanged: (records: SavedDocumentRecord[]) => void;

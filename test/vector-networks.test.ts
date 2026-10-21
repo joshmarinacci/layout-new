@@ -1,9 +1,29 @@
 import {readFileSync} from 'node:fs';
 import {describe, expect, it} from 'vitest';
 import {EditorStore, emptyDocument} from '../src/EditorStore';
-import {deserializeDocument, serializeDocument} from '../src/serialization';
-import {addPoint, connect, joinCrossing, curvePoint, deleteParts, deriveFaces, faceContains, makeVector, mergePoints, movePoints, moveHandle, smoothPair, nearestSegment, reconcileRegions, resizeVector, splitSegment, vectorBounds, vectorHit} from '../src/vectorNetworks';
+import {deserializeDocument, serializeDocument} from '../src/io/serialization';
+import {
+    addPoint,
+    connect,
+    curvePoint,
+    deleteParts,
+    deriveFaces,
+    faceContains,
+    joinCrossing,
+    makeVector,
+    mergePoints,
+    moveHandle,
+    movePoints,
+    nearestSegment,
+    reconcileRegions,
+    resizeVector,
+    smoothPair,
+    splitSegment,
+    vectorBounds,
+    vectorHit
+} from '../src/shapes/vectorNetworks';
 import type {Point, VectorNetwork, VectorShape} from '../src/types';
+
 function loop(n: VectorNetwork, coords: Point[]) { const ids = coords.map(p => addPoint(n, p)); ids.forEach((id, i) => connect(n, id, ids[(i + 1) % ids.length])); return ids; }
 const square = (n: VectorNetwork, x = 0, y = 0, size = 100) => loop(n, [{x,y}, {x:x+size,y}, {x:x+size,y:y+size}, {x,y:y+size}]);
 function fixture() { const shape = makeVector(), n = shape.components.network; const ids = square(n); reconcileRegions(n, makeVector().components.network); const store = new EditorStore(); store.addShape(shape); return {shape, ids, store, get: () => (store.getSnapshot().document.shapes[0] as VectorShape).components.network}; }

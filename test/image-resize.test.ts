@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {resizeImageBounds, PALETTES} from '../src/pixelImages';
+import {PALETTES, resizeImageBounds} from '../src/shapes/pixelImages';
 import {EditorStore} from '../src/EditorStore';
 
 describe('image resizing', () => {

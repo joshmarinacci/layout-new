@@ -1,8 +1,8 @@
-import {SelectControl} from './ui/controls';
+import {SelectControl} from '../ui/controls';
 import {useState} from 'react';
-import {EditorDialog} from './EditorDialog';
+import {EditorDialog} from '../EditorDialog';
 import {PALETTES} from './pixelImages';
-import type {EditorStore} from './EditorStore';
+import type {EditorStore} from '../EditorStore';
 
 export function NewPixelImage({store, onClose, onCreated}: {store: EditorStore; onClose: () => void; onCreated: (imageId: string) => void}) {
     const [size, setSize] = useState(16);

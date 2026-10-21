@@ -1,8 +1,18 @@
-import {type MouseEvent, type PointerEvent, useEffect, useRef, useState} from 'react';
-import {circleContains, circleHandles, dragCircle} from './circleGeometry';
+import {
+    type MouseEvent,
+    type PointerEvent,
+    useEffect,
+    useRef,
+    useState
+} from 'react';
+import {
+    circleContains,
+    circleHandles,
+    dragCircle
+} from './shapes/circleGeometry';
 import type {EditorStore} from './EditorStore';
-import type {PixelEditorController} from './PixelImageEditor';
-import {drawPixelImage, resizeImageBounds} from './pixelImages';
+import type {PixelEditorController} from './shapes/PixelImageEditor';
+import {drawPixelImage, resizeImageBounds} from './shapes/pixelImages';
 import type {
     Bounds,
     CircleLikeComponent,
@@ -12,8 +22,13 @@ import type {
     VectorNetwork
 } from './types';
 import {useEditorStore} from './useEditorStore';
-import {useVectorEditor} from './VectorEditor';
-import {drawVector, resizeVector, vectorBounds, vectorHit} from './vectorNetworks';
+import {useVectorEditor} from './shapes/VectorEditor';
+import {
+    drawVector,
+    resizeVector,
+    vectorBounds,
+    vectorHit
+} from './shapes/vectorNetworks';
 
 export function selectionBounds(shape: Shape): Bounds {
     switch (shape.type) {

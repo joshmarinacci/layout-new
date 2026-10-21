@@ -1,7 +1,7 @@
 import {useRef, useState} from 'react';
 import type {EditorStore} from './EditorStore';
 import type {PixelImageData} from './types';
-import {drawPixelImage} from './pixelImages';
+import {drawPixelImage} from './shapes/pixelImages';
 import {NameField} from './NameField';
 
 export function PixelAssetView({store, image, onBack}: {store: EditorStore; image: PixelImageData; onBack: () => void}) {

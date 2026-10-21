@@ -1,6 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
-import type {EditorStore} from './EditorStore';
-import type {Point, VectorNetwork, VectorShape} from './types';
+import type {EditorStore} from '../EditorStore';
+import type {Point, VectorNetwork, VectorShape} from '../types';
 import {
     addPoint,
     connect,

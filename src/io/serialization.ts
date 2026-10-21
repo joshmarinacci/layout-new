@@ -1,5 +1,5 @@
-import {deriveFaces} from './vectorNetworks';
-import type {Document} from './types';
+import {deriveFaces} from '../shapes/vectorNetworks';
+import type {Document} from '../types';
 
 type ObjectValue = Record<string, unknown>;
 function object(value: unknown): ObjectValue {

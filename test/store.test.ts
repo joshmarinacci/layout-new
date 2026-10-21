@@ -1,7 +1,7 @@
-import {describe, it, expect, vi} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {EditorStore, emptyDocument} from '../src/EditorStore';
 import {makeRect} from '../src/reducer';
-import {deserializeDocument, serializeDocument} from '../src/serialization';
+import {deserializeDocument, serializeDocument} from '../src/io/serialization';
 import {makeExampleDocument} from '../src/exampleDocument';
 
 function setup() {

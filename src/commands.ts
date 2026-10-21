@@ -8,14 +8,14 @@ import type {
     PixelImageData,
     Shape
 } from './types';
-import {makeVector} from "./vectorNetworks";
-import type {PixelEditorController} from "./PixelImageEditor";
+import {makeVector} from "./shapes/vectorNetworks";
+import type {PixelEditorController} from "./shapes/PixelImageEditor";
 import {isTauri} from "@tauri-apps/api/core";
 import {
     readSavedDocuments,
     type SavedDocumentRecord,
     writeSavedDocuments
-} from "./savedDocuments";
+} from "./io/savedDocuments";
 import {
     type ShapeAlignment,
     shapeAlignmentOffsets,

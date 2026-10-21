@@ -1,4 +1,4 @@
-import type {CircleLikeComponent, Point} from './types';
+import type {CircleLikeComponent, Point} from '../types';
 
 export function circleContains(circle: CircleLikeComponent, point: Point): boolean {
     return Math.hypot(point.x - circle.center.x, point.y - circle.center.y) <= circle.radius;
