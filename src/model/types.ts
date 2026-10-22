@@ -204,7 +204,7 @@ export interface Page {
 }
 
 export interface Document {
-    version: 6
+    version: 7
     title: string
     shapes: Shape[];
     images: PixelImageData[];

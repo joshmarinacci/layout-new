@@ -202,7 +202,10 @@ describe('shared sprite sheets', () => {
         const store = new EditorStore();
         const id = store.createPixelImage(16, 16, PALETTES['PICO-8']);
         store.linkImageShape(id);
-        const legacy = JSON.parse(store.toJSON()); legacy.version = 1;
+        const current = JSON.parse(store.toJSON());
+        const legacy = {...current, version: 1, pages: undefined, palettes: undefined,
+            images: current.images.map((image: Record<string, unknown>) => { const {originalName, ...rest} = image; void originalName; return rest; }),
+            shapes: current.shapes.map((shape: Record<string, any>) => { const {pageId, ...rest} = shape; void pageId; return rest; })};
         for (const shape of legacy.shapes) delete shape.components.image.source;
         const loaded = new EditorStore(); loaded.loadJSON(JSON.stringify(legacy));
         expect(loaded.getSnapshot().document).toEqual(store.getSnapshot().document);

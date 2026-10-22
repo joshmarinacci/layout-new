@@ -25,6 +25,8 @@ fn write_saved_documents(app: tauri::AppHandle, records: Vec<serde_json::Value>)
 #[cfg_attr(mobile, export_name = "mobile_entry")]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .invoke_handler(tauri::generate_handler![read_saved_documents, write_saved_documents])
         .setup(|app| {
             let handle = app.handle();
@@ -48,11 +50,13 @@ pub fn run() {
             let new_document = item("new-document", "New Document", Some("CmdOrCtrl+N"))?;
             let open_saved = item("open-local-document", "Open Saved Document…", Some("CmdOrCtrl+Shift+O"))?;
             let load_json = item("open-json-document", "Load JSON File…", None)?;
+            let open_png_document = item("open-png-document", "Open Draw PNG…", None)?;
             let save_document = item("save-local-document", "Save Document", Some("CmdOrCtrl+S"))?;
             let export_json = item("save-json-document", "Export JSON…", None)?;
+            let save_png_document = item("save-png-document", "Save as JSON PNG…", None)?;
             let file_menu = Submenu::with_items(handle, "File", true, &[
-                &new_document, &open_saved, &load_json, &PredefinedMenuItem::separator(handle)?,
-                &save_document, &export_json,
+                &new_document, &open_saved, &load_json, &open_png_document, &PredefinedMenuItem::separator(handle)?,
+                &save_document, &export_json, &save_png_document,
             ])?;
 
             let undo = item("undo", "Undo", Some("CmdOrCtrl+Z"))?;

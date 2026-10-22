@@ -29,6 +29,7 @@ import {CommandRegistry} from './common/CommandRegistry';
 import type {Theme} from './ui/theme';
 import {type LucideIcon, Redo2Icon, Undo2Icon} from 'lucide-react';
 import {newPalette, pico8Colors} from './shapes/palettes';
+import {downloadDocumentPng, encodeDocumentPng, openDocumentPngWithTauri, renderDocumentPreview, saveDocumentPngWithTauri} from './io/pngDocument';
 
 export interface DocumentTab {
     id: string;
@@ -85,7 +86,7 @@ export type CommandContext = {
     setVectorId: Setter<string | null>
     setPixelEditor: Setter<PixelEditorController | null>
     setError: Setter<string>
-    setFileDialogOpen: Setter<boolean>
+    setFileDialogOpen: (open: boolean, kind?: 'json' | 'png') => void
     setTheme: Setter<Theme>
     setSelectedAssetId: Setter<string | null>
     setSelectedPaletteId: Setter<string | null>
@@ -101,6 +102,8 @@ export type CommandId =
     | 'save-local-document'
     | 'open-json-document'
     | 'save-json-document'
+    | 'open-png-document'
+    | 'save-png-document'
     | 'export-json'
 
     | 'new-page'
@@ -185,7 +188,7 @@ export const OpenJsonCommand: Command = {
     title: 'Import JSON',
     description: 'Imports a portable JSON file from disk',
     enabled: ctx => !ctx.state.transactionActive,
-    run: ctx => ctx.setFileDialogOpen(true)
+    run: ctx => ctx.setFileDialogOpen(true, 'json')
 }
 export const SaveJsonCommand: Command = {
     id: 'save-json-document',
@@ -342,6 +345,33 @@ export const NewColorPaletteCommand: Command = {
             ctx.setSelectedPaletteId(palette.id);
             ctx.setError('');
         } catch (error) { ctx.setError(error instanceof Error ? error.message : 'Unable to create palette'); }
+    }
+};
+export const OpenPngDocumentCommand: Command = {
+    id: 'open-png-document', title: 'Open Draw PNG', description: 'Open a document embedded in a PNG file',
+    keywords: ['open', 'import', 'png', 'document'], enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => {
+        if (!isTauri()) { ctx.setFileDialogOpen(true, 'png'); return; }
+        void openDocumentPngWithTauri().then(result => {
+            if (result) { openDocument(ctx, result.document); ctx.setError(''); }
+        }).catch(reason => ctx.setError(reason instanceof Error ? reason.message : 'Unable to open document PNG'));
+    }
+};
+export const SavePngDocumentCommand: Command = {
+    id: 'save-png-document', title: 'Save as JSON PNG', description: 'Save a PNG preview with the full document embedded',
+    keywords: ['save', 'export', 'png', 'document'], enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => {
+        try {
+            const preview = renderDocumentPreview(ctx.state.document);
+            const png = encodeDocumentPng(preview, ctx.state.document);
+            const safeTitle = ctx.state.document.title.trim().replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').replace(/\s+/g, ' ').replace(/\.+$/g, '') || 'Untitled';
+            const filename = `${safeTitle}.json.png`;
+            if (isTauri()) void saveDocumentPngWithTauri(png, filename).then(() => ctx.setError(''))
+                .catch(reason => ctx.setError(reason instanceof Error ? reason.message : 'Unable to save document PNG'));
+            else { downloadDocumentPng(png, filename); ctx.setError(''); }
+        } catch (reason) {
+            ctx.setError(reason instanceof Error ? reason.message : 'Unable to save document PNG');
+        }
     }
 };
 export const ImportColorPaletteCommand: Command = {
@@ -642,7 +672,7 @@ export const AlignDistributeVerticalCommand: Command = {
 /** Canonical command definitions used by the palette, shortcuts, menus, and native menu events. */
 export const allCommands: Command[] = [
     NewDocumentCommand, RenameDocumentCommand, OpenDocumentCommand, SaveDocumentCommand,
-    OpenJsonCommand, SaveJsonCommand, NewPageCommand, RenamePageCommand, DeletePageCommand,
+    OpenJsonCommand, SaveJsonCommand, OpenPngDocumentCommand, SavePngDocumentCommand, NewPageCommand, RenamePageCommand, DeletePageCommand,
     UndoCommand, RedoCommand, NewRectCommand, NewCircleCommand, NewPageRectangleCommand,
     NewPageCircleCommand, NewVectorNetworkCommand, NewPixelImageCommand, NewRepeatingImageCommand,
     ImportPNGCommand, NewColorPaletteCommand, ImportColorPaletteCommand, NewPico8PaletteCommand,

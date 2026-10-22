@@ -15,3 +15,5 @@ name = "layout_new_lib"
 tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"

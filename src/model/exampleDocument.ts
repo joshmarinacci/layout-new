@@ -63,7 +63,7 @@ export function makeExampleDocument(): DrawDocument {
         }
     }
     return {
-        version: 6, images: [], palettes: [], pages: [{id: 'page_1', name: 'Page 1', groups: []}],
+        version: 7, images: [], palettes: [], pages: [{id: 'page_1', name: 'Page 1', groups: []}],
         title: 'test doc',
         shapes: [rect, circle],
     }

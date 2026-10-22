@@ -22,7 +22,7 @@ function component(value: unknown, kind: string, fields: string[]) {
     if (c.kind !== kind) throw new Error(`Expected ${kind}`);
     return c;
 }
-function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6): asserts value is Document {
+function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7): asserts value is Document {
     const doc = object(value); keys(doc, version >= 6 ? ['version', 'title', 'shapes', 'images', 'palettes', 'pages'] : version >= 4 ? ['version', 'title', 'shapes', 'images', 'pages'] : ['version', 'title', 'shapes', 'images']);
     if (doc.version !== version) throw new Error('Unsupported document version');
     text(doc.title);
@@ -168,7 +168,7 @@ function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6): asserts
     }
 }
 export function validateDocument(value: unknown): asserts value is Document {
-    validateSchema(value, 6);
+    validateSchema(value, 7);
 }
 export function serializeDocument(document: Document): string {
     const normalized = structuredClone(document) as Document;
@@ -207,6 +207,7 @@ export function deserializeDocument(json: string): Document {
     }
     if (source.version === 4) { validateSchema(source, 4); source = {...source, version: 5}; }
     if (source.version === 5) { validateSchema(source, 5); source = {...source, version: 6, palettes: []}; }
+    if (source.version === 6) { validateSchema(source, 6); source = {...source, version: 7}; }
     validateDocument(source);
     for (const shape of source.shapes) if (shape.type === 'vector') {
         const n = shape.components.network, faces = deriveFaces(n);
