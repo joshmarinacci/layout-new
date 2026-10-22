@@ -626,6 +626,9 @@ export default function App() {
                 <CommandMenuItem ctx={ctx} commandId="selection-cut"/>
                 <CommandMenuItem ctx={ctx} commandId="selection-copy"/>
                 <CommandMenuItem ctx={ctx} commandId="selection-paste"/>
+                <hr className="menu-separator" aria-hidden="true"/>
+                <CommandMenuItem ctx={ctx} commandId="export-selection-png"/>
+                <CommandMenuItem ctx={ctx} commandId="export-selection-svg"/>
                 {selectedShapes.length > 1 && <>
                     <hr className="menu-separator" aria-hidden="true"/>
                     <CommandMenuItem ctx={ctx} commandId="align-left"/>
@@ -661,6 +664,10 @@ export default function App() {
                           onPointerDown={event => event.stopPropagation()}>
             <CommandMenuItem ctx={ctx} commandId="rename-page"/>
             <CommandMenuItem ctx={ctx} commandId="delete-page"/>
+            <hr className="menu-separator" aria-hidden="true"/>
+            <CommandMenuItem ctx={ctx} commandId="export-page-png"/>
+            <CommandMenuItem ctx={ctx} commandId="export-page-svg"/>
+            <hr className="menu-separator" aria-hidden="true"/>
             <CommandMenuItem ctx={ctx} commandId="new-page-rectangle"/>
             <CommandMenuItem ctx={ctx} commandId="new-page-circle"/>
             <CommandMenuItem ctx={ctx} commandId="new-vector-network"/>

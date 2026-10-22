@@ -30,6 +30,7 @@ import type {Theme} from './ui/theme';
 import {type LucideIcon, Redo2Icon, Undo2Icon} from 'lucide-react';
 import {newPalette, pico8Colors} from './shapes/palettes';
 import {downloadDocumentPng, encodeDocumentPng, openDocumentPngWithTauri, renderDocumentPreview, saveDocumentPngWithTauri} from './io/pngDocument';
+import {exportArtwork, type ArtworkFormat} from './io/exportArtwork';
 
 export interface DocumentTab {
     id: string;
@@ -104,6 +105,8 @@ export type CommandId =
     | 'save-json-document'
     | 'open-png-document'
     | 'save-png-document'
+    | 'export-selection-png' | 'export-selection-svg'
+    | 'export-page-png' | 'export-page-svg'
     | 'export-json'
 
     | 'new-page'
@@ -374,6 +377,43 @@ export const SavePngDocumentCommand: Command = {
         }
     }
 };
+function exportSelection(format: ArtworkFormat): Command {
+    return {
+        id: format === 'png' ? 'export-selection-png' : 'export-selection-svg',
+        title: `Export Selection as ${format.toUpperCase()}`,
+            description: `Export selected shapes as ${format.toUpperCase()}`,
+        keywords: ['export', 'selection', 'shapes', format],
+        enabled: ctx => !ctx.state.transactionActive && ctx.state.selectedIds.length > 0,
+        run: ctx => {
+            const shapes = ctx.state.document.shapes.filter(shape => ctx.state.selectedIds.includes(shape.id));
+            const title = shapes.length === 1 ? shapes[0].name : `${shapes.length}-shapes`;
+            void exportArtwork(ctx.state.document, shapes, `${ctx.state.document.title}-${title}`, format)
+                .then(() => ctx.setError(''))
+                .catch(reason => ctx.setError(reason instanceof Error ? reason.message : `Unable to export ${format.toUpperCase()}`));
+        }
+    };
+}
+function exportPage(format: ArtworkFormat): Command {
+    return {
+        id: format === 'png' ? 'export-page-png' : 'export-page-svg',
+        title: `Export Page as ${format.toUpperCase()}`,
+        description: `Export the active page as ${format.toUpperCase()}`,
+        keywords: ['export', 'page', format],
+        enabled: ctx => !ctx.state.transactionActive && !!ctx.state.document.pages.find(page => page.id === ctx.state.selectedPageId),
+        run: ctx => {
+            const page = ctx.state.document.pages.find(item => item.id === ctx.state.selectedPageId);
+            if (!page) return;
+            const shapes = ctx.state.document.shapes.filter(shape => shape.pageId === page.id);
+            void exportArtwork(ctx.state.document, shapes, `${ctx.state.document.title}-${page.name}`, format, true)
+                .then(() => ctx.setError(''))
+                .catch(reason => ctx.setError(reason instanceof Error ? reason.message : `Unable to export ${format.toUpperCase()}`));
+        }
+    };
+}
+export const ExportSelectionPngCommand = exportSelection('png');
+export const ExportSelectionSvgCommand = exportSelection('svg');
+export const ExportPagePngCommand = exportPage('png');
+export const ExportPageSvgCommand = exportPage('svg');
 export const ImportColorPaletteCommand: Command = {
     id: 'import-color-palette', title: 'Import Color Palette', description: 'Import a GIMP, JSON, or hex-list palette',
     keywords: ['asset', 'palette', 'colors', 'gpl', 'json', 'import'],
@@ -672,7 +712,9 @@ export const AlignDistributeVerticalCommand: Command = {
 /** Canonical command definitions used by the palette, shortcuts, menus, and native menu events. */
 export const allCommands: Command[] = [
     NewDocumentCommand, RenameDocumentCommand, OpenDocumentCommand, SaveDocumentCommand,
-    OpenJsonCommand, SaveJsonCommand, OpenPngDocumentCommand, SavePngDocumentCommand, NewPageCommand, RenamePageCommand, DeletePageCommand,
+    OpenJsonCommand, SaveJsonCommand, OpenPngDocumentCommand, SavePngDocumentCommand,
+    ExportSelectionPngCommand, ExportSelectionSvgCommand, ExportPagePngCommand, ExportPageSvgCommand,
+    NewPageCommand, RenamePageCommand, DeletePageCommand,
     UndoCommand, RedoCommand, NewRectCommand, NewCircleCommand, NewPageRectangleCommand,
     NewPageCircleCommand, NewVectorNetworkCommand, NewPixelImageCommand, NewRepeatingImageCommand,
     ImportPNGCommand, NewColorPaletteCommand, ImportColorPaletteCommand, NewPico8PaletteCommand,
