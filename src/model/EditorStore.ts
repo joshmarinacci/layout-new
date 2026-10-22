@@ -17,7 +17,7 @@ import {
     serializeDocument,
     validateDocument
 } from '../io/serialization';
-import type {Document, PixelImageData, Shape, VectorNetwork} from './types';
+import type {Document, PixelImageData, Shape, VectorNetwork, VectorShape} from './types';
 import {reconcileRegions} from '../shapes/vectorNetworks';
 
 enablePatches();
@@ -200,6 +200,23 @@ export class EditorStore {
             page.groups.push(group);
         });
         return group.id;
+    }
+
+    importVectorNetworks(shapes: readonly VectorShape[], pageId: string, groupName = 'Imported SVG') {
+        this.requireIdle();
+        if (!this.document.pages.some(page => page.id === pageId)) throw new Error('Unknown page');
+        if (!shapes.length) return [];
+        const copies = structuredClone(shapes);
+        copies.forEach(shape => { shape.pageId = pageId; });
+        const ids = copies.map(shape => shape.id);
+        this.edit('Import SVG', draft => {
+            draft.shapes.push(...copies);
+            if (copies.length > 1) draft.pages.find(page => page.id === pageId)!.groups.push({
+                id: crypto.randomUUID(), name: groupName, shapeIds: ids
+            });
+        });
+        this.setSelection(ids);
+        return ids;
     }
 
     ungroup(id: string) {

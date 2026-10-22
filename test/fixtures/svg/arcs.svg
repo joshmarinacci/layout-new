@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 100">
+  <path id="elliptical-arcs" fill="none" stroke="#123456"
+        d="M10 50 A40 20 30 0 1 90 50 a0 15 0 0 1 10 0"/>
+  <path id="large-arc" fill="none" stroke="#654321"
+        d="M20 20 A30 25 -20 1 0 80 20"/>
+</svg>

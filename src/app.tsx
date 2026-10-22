@@ -32,6 +32,7 @@ import PropSheet from './common/PropSheet';
 import {SavedDocumentsDialog} from './io/SavedDocumentsDialog';
 import {deserializeDocument} from './io/serialization';
 import {decodeDocumentPng} from './io/pngDocument';
+import {importSvg} from './io/svgImport';
 import TreeView from './common/TreeView';
 import type {Shape} from './model/types';
 import {IconButton, MenuItem, ToolbarGroup} from './ui/controls';
@@ -90,7 +91,7 @@ export default function App() {
     const pageShapes = doc.shapes.filter(shape => shape.pageId === state.selectedPageId);
     const selectedShapes = pageShapes.filter(shape => state.selectedIds.includes(shape.id));
     const file = useRef<HTMLInputElement>(null);
-    const [fileKind, setFileKind] = useState<'json' | 'png'>('json');
+    const [fileKind, setFileKind] = useState<'json' | 'png' | 'svg'>('json');
     const paletteFile = useRef<HTMLInputElement>(null);
     const [error, setError] = useState('');
     const [canvasZoom, setCanvasZoom] = useState(1);
@@ -166,9 +167,7 @@ export default function App() {
         setError,
         setFileDialogOpen: (open, kind = 'json') => {
             setFileKind(kind);
-            if (file.current) file.current.accept = kind === 'png'
-                ? '.png,image/png'
-                : '.json,application/json';
+            if (file.current) file.current.accept = kind === 'png' ? '.png,image/png' : kind === 'svg' ? '.svg,image/svg+xml' : '.json,application/json';
             file.current?.click()
         },
         setTheme,
@@ -339,6 +338,7 @@ export default function App() {
                 <Separator/>
                 <CommandMenuItem ctx={ctx} commandId="open-local-document"/>
                 <CommandMenuItem ctx={ctx} commandId="open-json-document"/>
+                <CommandMenuItem ctx={ctx} commandId="import-svg"/>
                 <CommandMenuItem ctx={ctx} commandId="open-png-document"/>
                 <hr className="menu-separator" aria-hidden="true"/>
                 <CommandButton commandId="save-json-document" ctx={ctx}/>
@@ -402,16 +402,22 @@ export default function App() {
                 <CommandMenuItem ctx={ctx}
                                  commandId="ui-show-keyboard-shortcuts"/>
             </DropdownMenu>
-            <input hidden ref={file} type="file" accept={fileKind === 'png' ? '.png,image/png' : '.json,application/json'}
+            <input hidden ref={file} type="file" accept={fileKind === 'png' ? '.png,image/png' : fileKind === 'svg' ? '.svg,image/svg+xml' : '.json,application/json'}
                    onChange={async event => {
                        const chosen = event.target.files?.[0];
                        event.target.value = '';
                        if (!chosen) return;
                        try {
-                           const loaded = fileKind === 'png'
-                               ? decodeDocumentPng(new Uint8Array(await chosen.arrayBuffer()))
-                               : deserializeDocument(await chosen.text());
-                           openDocument(ctx, loaded);
+                           if (fileKind === 'svg') {
+                               const result=importSvg(await chosen.text());
+                               store.importVectorNetworks(result.shapes,state.selectedPageId,chosen.name.replace(/\.svg$/i,'')||'Imported SVG');
+                               setError(result.warnings.join(' · '));
+                           } else {
+                               const loaded = fileKind === 'png'
+                                   ? decodeDocumentPng(new Uint8Array(await chosen.arrayBuffer()))
+                                   : deserializeDocument(await chosen.text());
+                               openDocument(ctx, loaded);
+                           }
                            setError('');
                        } catch (error) {
                            setError(error instanceof Error ? error.message : 'Unable to load document');

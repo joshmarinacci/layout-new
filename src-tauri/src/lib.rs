@@ -51,11 +51,12 @@ pub fn run() {
             let open_saved = item("open-local-document", "Open Saved Document…", Some("CmdOrCtrl+Shift+O"))?;
             let load_json = item("open-json-document", "Load JSON File…", None)?;
             let open_png_document = item("open-png-document", "Open Draw PNG…", None)?;
+            let import_svg = item("import-svg", "Import SVG…", None)?;
             let save_document = item("save-local-document", "Save Document", Some("CmdOrCtrl+S"))?;
             let export_json = item("save-json-document", "Export JSON…", None)?;
             let save_png_document = item("save-png-document", "Save as JSON PNG…", None)?;
             let file_menu = Submenu::with_items(handle, "File", true, &[
-                &new_document, &open_saved, &load_json, &open_png_document, &PredefinedMenuItem::separator(handle)?,
+                &new_document, &open_saved, &load_json, &open_png_document, &import_svg, &PredefinedMenuItem::separator(handle)?,
                 &save_document, &export_json, &save_png_document,
             ])?;
 

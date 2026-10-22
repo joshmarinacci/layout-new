@@ -48,4 +48,14 @@ Model tests cover branches, disconnected paths, adjacent faces, nested holes/isl
 
 Browser checks verified creation with click and drag, independent fills, a transparent hole, double-click reentry, curve conversion and handle dragging, fill and handle undo/redo, loading the example through the JSON picker, and editing at 80% and 100% zoom. Store cancellation is tested; browser pointer-cancel/lost-capture events and complex tangencies have not received an exhaustive browser audit.
 
-Gradients, SVG interchange, boolean operations between shapes, variable-width strokes, and conversion of existing rectangles/circles to networks are not part of this version.
+## SVG import
+
+Choose **File → Import SVG** in the browser or desktop app. Supported artwork is converted to editable vector networks on the selected page. Each SVG path or basic shape becomes a network; compound path contours stay together so nested contours can produce transparent holes according to SVG's `nonzero` (default) or `evenodd` fill rule. If the import creates more than one network, the networks are placed in a group named after the imported file. The entire import is one undoable change. Unsupported elements or path commands are skipped with a warning; malformed or empty imports leave the document unchanged.
+
+The importer handles path commands `M`, `L`, `H`, `V`, `C`, `S`, `Q`, `T`, `A`, and `Z` (including relative forms), plus `rect`, `circle`, `ellipse`, `line`, `polyline`, and `polygon`. It applies nested `matrix`, `translate`, `scale`, `rotate`, `skewX`, and `skewY` transforms and reads presentation attributes and inline styles for solid fill, stroke, stroke width, and fill rule. SVG's implicit closing edge is used for fills, without adding a closing edge to an open stroke.
+
+This is a geometry importer, not a full browser SVG renderer. Text and fonts, CSS stylesheets/classes, gradients, patterns, clipping paths, masks, filters, images, `use`, external references, and SVG-specific opacity compositing are not preserved. Unsupported path commands skip that path, and unsupported elements produce warnings. Imports are limited to 5 MB and 5,000 XML elements. Converted curves and intersections are subject to the vector-network limits and tolerances above, so very detailed illustrations may be slow or exceed the network's geometry limits. The imported artwork can be edited and exported with the existing shape/page PNG and SVG export commands.
+
+Unit tests cover basic shapes, path commands and arcs, transforms, implicit fill closure, compound-path holes for both fill rules, unsupported content, import grouping, and undo.
+
+Boolean operations between shapes, variable-width strokes, and conversion of existing rectangles/circles to networks are not part of this version.

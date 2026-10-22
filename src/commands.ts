@@ -31,6 +31,7 @@ import {type LucideIcon, Redo2Icon, Undo2Icon} from 'lucide-react';
 import {newPalette, pico8Colors} from './shapes/palettes';
 import {downloadDocumentPng, encodeDocumentPng, openDocumentPngWithTauri, renderDocumentPreview, saveDocumentPngWithTauri} from './io/pngDocument';
 import {exportArtwork, type ArtworkFormat} from './io/exportArtwork';
+import {importSvg} from './io/svgImport';
 
 export interface DocumentTab {
     id: string;
@@ -87,7 +88,7 @@ export type CommandContext = {
     setVectorId: Setter<string | null>
     setPixelEditor: Setter<PixelEditorController | null>
     setError: Setter<string>
-    setFileDialogOpen: (open: boolean, kind?: 'json' | 'png') => void
+    setFileDialogOpen: (open: boolean, kind?: 'json' | 'png' | 'svg') => void
     setTheme: Setter<Theme>
     setSelectedAssetId: Setter<string | null>
     setSelectedPaletteId: Setter<string | null>
@@ -107,6 +108,7 @@ export type CommandId =
     | 'save-png-document'
     | 'export-selection-png' | 'export-selection-svg'
     | 'export-page-png' | 'export-page-svg'
+    | 'import-svg'
     | 'export-json'
 
     | 'new-page'
@@ -348,6 +350,21 @@ export const NewColorPaletteCommand: Command = {
             ctx.setSelectedPaletteId(palette.id);
             ctx.setError('');
         } catch (error) { ctx.setError(error instanceof Error ? error.message : 'Unable to create palette'); }
+    }
+};
+export const ImportSVGCommand: Command = {
+    id: 'import-svg', title: 'Import SVG', description: 'Import SVG geometry as vector networks',
+    keywords: ['import', 'svg', 'vector'], enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => {
+        if (!isTauri()) { ctx.setFileDialogOpen(true, 'svg'); return; }
+        void (async () => {
+            const [{open}, {readTextFile}] = await Promise.all([import('@tauri-apps/plugin-dialog'), import('@tauri-apps/plugin-fs')]);
+            const selected = await open({multiple:false,filters:[{name:'SVG image',extensions:['svg']}]});
+            if (!selected || Array.isArray(selected)) return;
+            const result=importSvg(await readTextFile(selected));
+            ctx.store.importVectorNetworks(result.shapes,ctx.state.selectedPageId,selected.split(/[\\/]/).pop()?.replace(/\.svg$/i,'')||'Imported SVG');
+            ctx.setError(result.warnings.join(' · '));
+        })().catch(error=>ctx.setError(error instanceof Error?error.message:'Unable to import SVG'));
     }
 };
 export const OpenPngDocumentCommand: Command = {
@@ -717,7 +734,7 @@ export const allCommands: Command[] = [
     NewPageCommand, RenamePageCommand, DeletePageCommand,
     UndoCommand, RedoCommand, NewRectCommand, NewCircleCommand, NewPageRectangleCommand,
     NewPageCircleCommand, NewVectorNetworkCommand, NewPixelImageCommand, NewRepeatingImageCommand,
-    ImportPNGCommand, NewColorPaletteCommand, ImportColorPaletteCommand, NewPico8PaletteCommand,
+    ImportPNGCommand, ImportSVGCommand, NewColorPaletteCommand, ImportColorPaletteCommand, NewPico8PaletteCommand,
     SelectionGroupCommand, SelectionUngroupCommand, SelectionDuplicateCommand,
     SelectionDeleteCommand, SelectionCopyCommand, SelectionCutCommand, SelectionPasteCommand,
     ShowCommandPaletteCommand, ShowKeyboardShortcutsCommand, ToggleLeftSidebar, ToggleRightSidebar, SystemThemeCommand,
