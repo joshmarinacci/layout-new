@@ -29,6 +29,8 @@ import {
     vectorBounds,
     vectorHit
 } from '../shapes/vectorNetworks';
+import {drawTextShape} from '../shapes/text';
+import {installDocumentFonts} from '../shapes/googleFonts';
 
 export function selectionBounds(shape: Shape): Bounds {
     switch (shape.type) {
@@ -39,6 +41,8 @@ export function selectionBounds(shape: Shape): Bounds {
         case 'repeating-image':
             return shape.components.rect.bounds;
         case 'rectangle':
+            return shape.components.rect.bounds;
+        case 'text':
             return shape.components.rect.bounds;
         case 'oval':
             return shape.components.oval.bounds;
@@ -103,6 +107,16 @@ export default function VisualEditor({
         duplicateStarted?: boolean
     } | null>(null);
     const [marquee, setMarquee] = useState<Bounds | null>(null);
+    const [fontEpoch, setFontEpoch] = useState(0);
+    useEffect(() => {
+        let active = true;
+        const fonts = state.document.fonts;
+        installDocumentFonts(fonts);
+        void Promise.all(fonts.map(font => document.fonts.load(`400 16px ${JSON.stringify(font.family)}`))).then(() => {
+            if (active) setFontEpoch(value => value + 1);
+        });
+        return () => { active = false; };
+    }, [state.document.fonts]);
     useEffect(() => {
         const canvas = ref.current;
         const ctx = canvas?.getContext('2d');
@@ -131,6 +145,8 @@ export default function VisualEditor({
             const b = selectionBounds(shape);
             if (shape.type === 'vector') {
                 drawVector(ctx, shape);
+            } else if (shape.type === 'text') {
+                drawTextShape(ctx, shape, state.document.fonts);
             } else if (shape.type === 'pixel-image') {
                 const bitmap = images.get(shape.components.image.imageId);
                 if (bitmap) {
@@ -191,7 +207,7 @@ export default function VisualEditor({
                     ctx.fillStyle = '#1684e8';
                     circleHandles(shape.components.circle).forEach(handle => ctx.fillRect(handle.x - 5 / zoom, handle.y - 5 / zoom, 10 / zoom, 10 / zoom));
                 }
-                if (shape.id === state.selectedId && (shape.type === 'vector' || shape.type === 'rectangle' || shape.type === 'pixel-image' || shape.type === 'repeating-image')) {
+                if (shape.id === state.selectedId && (shape.type === 'vector' || shape.type === 'rectangle' || shape.type === 'text' || shape.type === 'pixel-image' || shape.type === 'repeating-image')) {
                     ctx.fillStyle = 'yellow';
                     ctx.fillRect(b.x + b.width - 5 / zoom, b.y + b.height - 5 / zoom, 10 / zoom, 10 / zoom);
                 }
@@ -229,7 +245,7 @@ export default function VisualEditor({
             ctx.strokeRect(marquee.x, marquee.y, marquee.width, marquee.height);
             ctx.restore();
         }
-    }, [state.document, state.selectedId, state.selectedIds, state.selectedPageId, marquee, zoom, pixelEditor, vector]);
+    }, [state.document, state.selectedId, state.selectedIds, state.selectedPageId, marquee, zoom, pixelEditor, vector, fontEpoch]);
     useEffect(() => () => {
         if (gesture.current) {
             gesture.current = null;
@@ -424,7 +440,7 @@ export default function VisualEditor({
                     const circleHandle = selected?.type === 'circle' && circleHandles(selected.components.circle)
                         .some(handle => Math.abs(p.x - handle.x) <= hitTolerance && Math.abs(p.y - handle.y) <= hitTolerance);
                     const selectedBounds = selected ? selectionBounds(selected) : null;
-                    const boxHandle = (selected?.type === 'vector' || selected?.type === 'rectangle' || selected?.type === 'pixel-image' || selected?.type === 'repeating-image') && selectedBounds &&
+                    const boxHandle = (selected?.type === 'vector' || selected?.type === 'rectangle' || selected?.type === 'text' || selected?.type === 'pixel-image' || selected?.type === 'repeating-image') && selectedBounds &&
                         Math.abs(p.x - selectedBounds.x - selectedBounds.width) <= hitTolerance && Math.abs(p.y - selectedBounds.y - selectedBounds.height) <= hitTolerance;
                     const shape = circleHandle || boxHandle ? selected : [...state.document.shapes].reverse().filter(s => s.pageId === state.selectedPageId).find(s => {
                         if (s.type === 'vector') return vectorHit(s, p, 8 / zoom);
@@ -524,7 +540,7 @@ export default function VisualEditor({
                             shape.components.circle = dragCircle(circle, g, p, g.kind === 'resize' && g.ids.length === 1);
                             return;
                         }
-                        if (shape.type === 'rectangle' || shape.type === 'pixel-image' || shape.type === 'repeating-image') shape.components.rect.bounds = g.kind === 'resize'
+                        if (shape.type === 'rectangle' || shape.type === 'text' || shape.type === 'pixel-image' || shape.type === 'repeating-image') shape.components.rect.bounds = g.kind === 'resize'
                             ? resizeImageBounds(bounds, dx, dy, (shape.type === 'pixel-image' || shape.type === 'repeating-image') && event.shiftKey)
                             : {...bounds, x: bounds.x + dx, y: bounds.y + dy};
                     }));

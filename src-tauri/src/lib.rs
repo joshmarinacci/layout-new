@@ -80,11 +80,12 @@ pub fn run() {
             let new_vector = item("new-vector-network", "New Vector Network", None)?;
             let new_rectangle = item("new-rectangle", "New Rectangle", None)?;
             let new_circle = item("new-circle", "New Circle", None)?;
+            let new_text = item("new-text", "New Text", None)?;
             let new_pixel_image = item("new-pixelimage", "New Pixel Image…", None)?;
             let new_repeating_image = item("new-repeatingimage", "New Repeating Image…", None)?;
             let import_png = item("import-png", "Import PNG…", None)?;
             let shape_menu = Submenu::with_items(handle, "Shape", true, &[
-                &new_vector, &new_rectangle, &new_circle, &PredefinedMenuItem::separator(handle)?,
+                &new_vector, &new_rectangle, &new_circle, &new_text, &PredefinedMenuItem::separator(handle)?,
                 &new_pixel_image, &new_repeating_image, &import_png,
             ])?;
 

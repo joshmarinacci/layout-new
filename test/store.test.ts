@@ -112,12 +112,13 @@ describe('serialization', () => {
         document.shapes.push({id: 'oval', name: 'oval', type: 'oval', pageId: 'page_1', components: {oval: rectangle.components.rect, fill: rectangle.components.fill, stroke: rectangle.components.stroke}});
         expect(deserializeDocument(serializeDocument(document))).toEqual(document);
         const store = new EditorStore(document); store.select(document.shapes[0].id); store.setTitle('updated');
-        expect(Object.keys(JSON.parse(store.toJSON()))).toEqual(['version', 'images', 'palettes', 'pages', 'title', 'shapes']);
+        expect(Object.keys(JSON.parse(store.toJSON()))).toEqual(['version', 'images', 'palettes', 'fonts', 'pages', 'title', 'shapes']);
         store.loadJSON(serializeDocument(document)); expect(store.getSnapshot()).toMatchObject({document, selectedId: null, canUndo: false, canRedo: false});
     });
     it('migrates version 5 documents to an empty palette collection', () => {
         const old = {...makeExampleDocument(), version: 5} as Record<string, unknown>;
         delete old.palettes;
+        delete old.fonts;
         expect(deserializeDocument(JSON.stringify(old)).palettes).toEqual([]);
     });
     it.each(['{', 'null', '{"version":1,"title":"x","shapes":[]}', '{"version":0,"title":"x","shapes":[{}]}'])('rejects malformed input: %s', json => {

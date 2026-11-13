@@ -17,7 +17,7 @@ import {
     serializeDocument,
     validateDocument
 } from '../io/serialization';
-import type {Document, PixelImageData, Shape, VectorNetwork, VectorShape} from './types';
+import type {Document, FontAsset, PixelImageData, Shape, VectorNetwork, VectorShape} from './types';
 import {reconcileRegions} from '../shapes/vectorNetworks';
 
 enablePatches();
@@ -39,9 +39,10 @@ export interface EditorSnapshot {
 }
 
 export const emptyDocument = (): Document => ({
-    version: 7,
+    version: 8,
     images: [],
     palettes: [],
+    fonts: [],
     title: 'Untitled',
     shapes: [],
     pages: [{id: 'page_1', name: 'Page 1', groups: []}]
@@ -318,6 +319,9 @@ export class EditorStore {
                 const bounds = copy.components.oval.bounds;
                 bounds.x += 20;
                 bounds.y += 20;
+            } else if (copy.type === 'text') {
+                copy.components.rect.bounds.x += 20;
+                copy.components.rect.bounds.y += 20;
             }
             return copy;
         });
@@ -336,7 +340,7 @@ export class EditorStore {
         return copies.map(shape => shape.id);
     }
 
-    pasteShapes(shapes: readonly Shape[], images: readonly PixelImageData[]) {
+    pasteShapes(shapes: readonly Shape[], images: readonly PixelImageData[], fonts: readonly FontAsset[] = []) {
         this.requireIdle();
         const referencedImageIds = new Set(shapes.filter((shape): shape is Extract<Shape, {
             type: 'pixel-image' | 'repeating-image'
@@ -348,6 +352,11 @@ export class EditorStore {
             ...structuredClone(image),
             id: imageMap.get(image.id)!
         }));
+        const referencedFontIds = new Set(shapes.filter((shape): shape is Extract<Shape, {type: 'text'}> => shape.type === 'text')
+            .map(shape => shape.components.text.fontId).filter((id): id is string => !!id));
+        const requiredFonts = fonts.filter(font => referencedFontIds.has(font.id));
+        const fontMap = new Map(requiredFonts.map(font => [font.id, crypto.randomUUID()]));
+        const fontCopies = requiredFonts.map(font => ({...structuredClone(font), id: fontMap.get(font.id)!}));
         const copies = shapes.map(original => {
             const copy = structuredClone(original);
             copy.id = crypto.randomUUID();
@@ -357,6 +366,11 @@ export class EditorStore {
                 const mapped = imageMap.get(copy.components.image.imageId);
                 if (!mapped) throw new Error('Clipboard is missing a pixel image asset');
                 copy.components.image.imageId = mapped;
+            }
+            if (copy.type === 'text' && copy.components.text.fontId) {
+                const mapped = fontMap.get(copy.components.text.fontId);
+                if (!mapped) throw new Error('Clipboard is missing a font asset');
+                copy.components.text.fontId = mapped;
             }
             if (copy.type === 'vector') {
                 copy.components.network.origin.x += 20;
@@ -379,6 +393,7 @@ export class EditorStore {
         if (!copies.length) return [];
         this.edit('Paste shapes', draft => {
             draft.images.push(...imageCopies);
+            draft.fonts.push(...fontCopies);
             draft.shapes.push(...copies);
         });
         this.setSelection(copies.map(shape => shape.id));
@@ -420,6 +435,12 @@ export class EditorStore {
             draft.shapes.push(shape);
         });
         return shape.id;
+    }
+
+    addFontAsset(font: FontAsset) {
+        if (this.document.fonts.some(item => item.family.toLocaleLowerCase() === font.family.toLocaleLowerCase()))
+            throw new Error('This Google Fonts family is already in the document');
+        this.edit('Add Google Font', draft => { draft.fonts.push(structuredClone(font)); });
     }
 
     renameShape(id: string, name: string) {

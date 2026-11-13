@@ -64,6 +64,13 @@ export interface ColorPalette {
     colors: PaletteColor[];
 }
 
+/** A self-contained Google Fonts stylesheet with its WOFF2 sources embedded. */
+export interface FontAsset {
+    id: string;
+    family: string;
+    css: string;
+}
+
 /* ========== components ========= */
 
 export type ShapeComponent =
@@ -74,7 +81,8 @@ export type ShapeComponent =
     | StrokeComponent
     | CircleLikeComponent
     | PixelImageReferenceComponent
-    | PatternSizeComponent;
+    | PatternSizeComponent
+    | TextComponent;
 
 export interface ResizableBoundsComponent {
     kind: 'resizable-bounds-component'
@@ -181,6 +189,26 @@ export interface RepeatingImageShape extends BaseShape {
     };
 }
 
+export interface TextComponent {
+    kind: 'text-component';
+    text: string;
+    fontId: string | null;
+    fontSize: number;
+    fontWeight: number;
+    italic: boolean;
+    color: string;
+    align: 'left' | 'center' | 'right';
+    lineHeight: number;
+}
+
+export interface TextShape extends BaseShape {
+    type: 'text';
+    components: {
+        rect: ResizableBoundsComponent;
+        text: TextComponent;
+    };
+}
+
 /* ========== document ======== */
 
 export type Shape =
@@ -189,7 +217,8 @@ export type Shape =
     | CircleShape
     | OvalShape
     | PixelImageShape
-    | RepeatingImageShape;
+    | RepeatingImageShape
+    | TextShape;
 
 export interface ShapeGroup {
     id: string;
@@ -204,11 +233,12 @@ export interface Page {
 }
 
 export interface Document {
-    version: 7
+    version: 8
     title: string
     shapes: Shape[];
     images: PixelImageData[];
     palettes: ColorPalette[];
+    fonts: FontAsset[];
     pages: Page[];
 }
 

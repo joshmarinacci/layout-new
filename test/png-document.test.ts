@@ -40,10 +40,11 @@ describe('document PNG metadata', () => {
         expect(() => encodeDocumentPng(new Uint8Array([1, 2, 3]), emptyDocument())).toThrow(/valid PNG/);
     });
 
-    it('upgrades version 6 documents to version 7 when loading', () => {
+    it('upgrades version 6 documents to version 8 when loading', () => {
         const version6 = {...emptyDocument(), version: 6} as unknown as Record<string, unknown>;
+        delete version6.fonts;
         const loaded = deserializeDocument(JSON.stringify(version6));
-        expect(loaded.version).toBe(7);
-        expect(JSON.parse(serializeDocument(loaded)).version).toBe(7);
+        expect(loaded.version).toBe(8);
+        expect(JSON.parse(serializeDocument(loaded)).version).toBe(8);
     });
 });

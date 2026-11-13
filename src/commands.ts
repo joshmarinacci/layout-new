@@ -3,13 +3,14 @@ import {
     EditorStore,
     emptyDocument
 } from "./model/EditorStore";
-import {makeCircle, makeRect} from "./model/reducer";
+import {makeCircle, makeRect, makeText} from "./model/reducer";
 
 
 import type {
     Bounds,
     Document as DrawingDocument,
     PixelImageData,
+    FontAsset,
     Shape
 } from './model/types';
 import {makeVector} from "./shapes/vectorNetworks";
@@ -32,6 +33,7 @@ import {newPalette, pico8Colors} from './shapes/palettes';
 import {downloadDocumentPng, encodeDocumentPng, openDocumentPngWithTauri, renderDocumentPreview, saveDocumentPngWithTauri} from './io/pngDocument';
 import {exportArtwork, type ArtworkFormat} from './io/exportArtwork';
 import {importSvg} from './io/svgImport';
+import {waitForTextFont} from './shapes/googleFonts';
 
 export interface DocumentTab {
     id: string;
@@ -47,6 +49,7 @@ export type Workspace = {
 export type ClipboardState = {
     shapes: Shape[]
     images: PixelImageData[]
+    fonts: FontAsset[]
 }
 export type RenamePageState = {
     pageId: string
@@ -116,6 +119,7 @@ export type CommandId =
     | 'delete-page'
     | 'new-rectangle'
     | 'new-circle'
+    | 'new-text'
 
     | 'selection-group'
     | 'selection-ungroup'
@@ -275,6 +279,12 @@ export const NewCircleCommand: Command = {
     }
 }
 
+export const NewTextCommand: Command = {
+    id: 'new-text', title: 'New Text', description: 'Add a wrapping text shape to the current page',
+    keywords: ['shape', 'text', 'type', 'create'], enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => { const shape = makeText('Text', {x: 50, y: 50, width: 280, height: 120}); ctx.store.addShape(shape); ctx.store.select(shape.id); }
+}
+
 export const NewPageRectangleCommand: Command = {
     id: 'new-page-rectangle',
     title: 'New Rectangle',
@@ -381,7 +391,9 @@ export const SavePngDocumentCommand: Command = {
     id: 'save-png-document', title: 'Save as JSON PNG', description: 'Save a PNG preview with the full document embedded',
     keywords: ['save', 'export', 'png', 'document'], enabled: ctx => !ctx.state.transactionActive,
     run: ctx => {
+        void (async () => {
         try {
+            await Promise.all(ctx.state.document.shapes.filter((shape): shape is Extract<Shape, {type: 'text'}> => shape.type === 'text').map(shape => waitForTextFont(ctx.state.document.fonts, shape.components.text)));
             const preview = renderDocumentPreview(ctx.state.document);
             const png = encodeDocumentPng(preview, ctx.state.document);
             const safeTitle = ctx.state.document.title.trim().replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').replace(/\s+/g, ' ').replace(/\.+$/g, '') || 'Untitled';
@@ -392,6 +404,7 @@ export const SavePngDocumentCommand: Command = {
         } catch (reason) {
             ctx.setError(reason instanceof Error ? reason.message : 'Unable to save document PNG');
         }
+        })();
     }
 };
 function exportSelection(format: ArtworkFormat): Command {
@@ -503,9 +516,12 @@ export const SelectionCopyCommand: Command = {
             type: 'pixel-image' | 'repeating-image'
         }> => shape.type === 'pixel-image' || shape.type === 'repeating-image')
             .map(shape => shape.components.image.imageId));
+        const fontIds = new Set(shapes.filter((shape): shape is Extract<Shape, {type: 'text'}> => shape.type === 'text')
+            .map(shape => shape.components.text.fontId).filter((id): id is string => !!id));
         ctx.setClipboard({
             shapes: structuredClone(shapes),
-            images: structuredClone(ctx.store.getSnapshot().document.images.filter(image => ids.has(image.id)))
+            images: structuredClone(ctx.store.getSnapshot().document.images.filter(image => ids.has(image.id))),
+            fonts: structuredClone(ctx.store.getSnapshot().document.fonts.filter(font => fontIds.has(font.id)))
         });
     }
 }
@@ -525,7 +541,7 @@ export const SelectionPasteCommand: Command = {
     description: 'Paste shapes from clipboard',
     enabled: ctx => ctx.clipboard.shapes.length > 0 && !ctx.state.transactionActive,
     run: ctx => {
-        if (ctx.clipboard.shapes.length) ctx.store.pasteShapes(ctx.clipboard.shapes, ctx.clipboard.images);
+        if (ctx.clipboard.shapes.length) ctx.store.pasteShapes(ctx.clipboard.shapes, ctx.clipboard.images, ctx.clipboard.fonts);
     }
 }
 
@@ -732,7 +748,7 @@ export const allCommands: Command[] = [
     OpenJsonCommand, SaveJsonCommand, OpenPngDocumentCommand, SavePngDocumentCommand,
     ExportSelectionPngCommand, ExportSelectionSvgCommand, ExportPagePngCommand, ExportPageSvgCommand,
     NewPageCommand, RenamePageCommand, DeletePageCommand,
-    UndoCommand, RedoCommand, NewRectCommand, NewCircleCommand, NewPageRectangleCommand,
+    UndoCommand, RedoCommand, NewRectCommand, NewCircleCommand, NewTextCommand, NewPageRectangleCommand,
     NewPageCircleCommand, NewVectorNetworkCommand, NewPixelImageCommand, NewRepeatingImageCommand,
     ImportPNGCommand, ImportSVGCommand, NewColorPaletteCommand, ImportColorPaletteCommand, NewPico8PaletteCommand,
     SelectionGroupCommand, SelectionUngroupCommand, SelectionDuplicateCommand,

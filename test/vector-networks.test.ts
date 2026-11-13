@@ -140,7 +140,7 @@ describe('vector documents', () => {
         const json=store.toJSON(); expect(serializeDocument(deserializeDocument(json))).toBe(json);
     });
     it('migrates version 4 and rejects malformed references, fields, and numbers', () => {
-        const old={...emptyDocument(),version:4}; delete (old as Partial<typeof old>).palettes; expect(deserializeDocument(JSON.stringify(old)).version).toBe(7);
+        const old={...emptyDocument(),version:4}; delete (old as Partial<typeof old>).palettes; delete (old as Partial<typeof old>).fonts; expect(deserializeDocument(JSON.stringify(old)).version).toBe(8);
         const {store}=fixture();
         for(const corrupt of [(s:any)=>s.components.network.segments[0].a='missing',(s:any)=>s.components.network.points.push(s.components.network.points[0]),(s:any)=>s.components.network.points[0].x=null,(s:any)=>s.components.network.regions[0].loops[0][0].segment='missing',(s:any)=>s.components.network.extra=true,(s:any)=>s.components.network.regions[0].loops[0].pop(),(s:any)=>s.components.network.smooth=[{point:s.components.network.points[0].id,segments:['missing','other']}]]) {const doc=JSON.parse(store.toJSON());corrupt(doc.shapes[0]);expect(()=>deserializeDocument(JSON.stringify(doc))).toThrow();}
     });

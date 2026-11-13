@@ -930,3 +930,23 @@
 .vector-tools .vector-hex {
     width: 72px;
 }
+
+.text-content-field {
+    align-items: flex-start;
+}
+
+.text-content-field textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 88px;
+    resize: vertical;
+    font: inherit;
+}
+
+.google-font-preview {
+    border: 1px solid var(--panel-border-color);
+    border-radius: 4px;
+    padding: 10px;
+    font-size: 24px;
+    overflow-wrap: anywhere;
+}

@@ -33,8 +33,9 @@ import {SavedDocumentsDialog} from './io/SavedDocumentsDialog';
 import {deserializeDocument} from './io/serialization';
 import {decodeDocumentPng} from './io/pngDocument';
 import {importSvg} from './io/svgImport';
+import {fetchGoogleFont, installDocumentFonts} from './shapes/googleFonts';
 import TreeView from './common/TreeView';
-import type {Shape} from './model/types';
+import type {FontAsset, Shape} from './model/types';
 import {IconButton, MenuItem, ToolbarGroup} from './ui/controls';
 import {useTheme} from './ui/theme';
 import {useEditorStore} from './model/useEditorStore';
@@ -98,6 +99,12 @@ export default function App() {
     const [leftPanelVisible, setLeftPanelVisible] = useState(true);
     const [rightPanelVisible, setRightPanelVisible] = useState(true);
     const [imageDialog, setImageDialog] = useState<ImageDialogConfig>(null)
+    const [googleFontDialog, setGoogleFontDialog] = useState(false);
+    const [googleFontName, setGoogleFontName] = useState('');
+    const [googleFontError, setGoogleFontError] = useState('');
+    const [googleFontLoading, setGoogleFontLoading] = useState(false);
+    const [googleFontPreview, setGoogleFontPreview] = useState<FontAsset | null>(null);
+    useEffect(() => { installDocumentFonts(googleFontPreview ? [...doc.fonts, googleFontPreview] : doc.fonts); }, [doc.fonts, googleFontPreview]);
     const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
     const [selectedPaletteId, setSelectedPaletteId] = useState<string | null>(null);
     const [vectorId, setVectorId] = useState<string | null>(null);
@@ -113,7 +120,8 @@ export default function App() {
     const [repeatingImageDialog, setRepeatingImageDialog] = useState(false);
     const [clipboard, setClipboard] = useState<ClipboardState>({
         shapes: [],
-        images: []
+        images: [],
+        fonts: []
     });
     const [contextMenu, setContextMenu] = useState<{
         x: number;
@@ -309,7 +317,7 @@ export default function App() {
     });
     nativeMenuAction.current = id => {
         if (store.getSnapshot().transactionActive) return;
-        if ((selectedAssetId || selectedPaletteId) && ['new-vector-network', 'new-rectangle', 'new-circle', 'new-pixelimage', 'new-repeatingimage', 'import-png'].includes(id)) return;
+        if ((selectedAssetId || selectedPaletteId) && ['new-vector-network', 'new-rectangle', 'new-circle', 'new-text', 'new-pixelimage', 'new-repeatingimage', 'import-png'].includes(id)) return;
         if (id === 'new-repeatingimage' && !doc.images.length) return;
         const command = commandRegistry.get(id);
         if (command?.enabled(ctx)) command.run(ctx);
@@ -366,6 +374,7 @@ export default function App() {
                 <CommandButton ctx={ctx} commandId="new-vector-network"/>
                 <CommandButton ctx={ctx} commandId="new-rectangle"/>
                 <CommandButton ctx={ctx} commandId="new-circle"/>
+                <CommandButton ctx={ctx} commandId="new-text"/>
                 <CommandButton ctx={ctx} commandId="new-pixelimage"/>
                 <CommandButton ctx={ctx} commandId="new-repeatingimage"/>
                 <CommandButton ctx={ctx} commandId="import-png"/>
@@ -373,6 +382,8 @@ export default function App() {
             <DropdownMenu title="Assets">
                 <CommandMenuItem ctx={ctx} commandId="new-color-palette"/>
                 <CommandMenuItem ctx={ctx} commandId="import-color-palette"/>
+                <Separator/>
+                <MenuItem label="Add Google Font…" onClick={() => {setGoogleFontName(''); setGoogleFontError(''); setGoogleFontDialog(true);}}/>
                 <Separator/>
                 <CommandMenuItem ctx={ctx} commandId="new-pico8-palette"/>
             </DropdownMenu>
@@ -596,7 +607,7 @@ export default function App() {
                     <div className="right scroll-container"><h2
                         className="panel-heading">Properties</h2><PropSheet
                         key={activeTab.id}
-                        store={store}/></div>
+                        store={store} onAddGoogleFont={() => {setGoogleFontName(''); setGoogleFontError(''); setGoogleFontDialog(true);}}/></div>
                 </>}
         </div>
         <div className="statusbar full-span">
@@ -676,6 +687,7 @@ export default function App() {
             <hr className="menu-separator" aria-hidden="true"/>
             <CommandMenuItem ctx={ctx} commandId="new-page-rectangle"/>
             <CommandMenuItem ctx={ctx} commandId="new-page-circle"/>
+            <CommandMenuItem ctx={ctx} commandId="new-text"/>
             <CommandMenuItem ctx={ctx} commandId="new-vector-network"/>
             <CommandMenuItem ctx={ctx} commandId="new-pixelimage"/>
             <CommandMenuItem ctx={ctx} commandId="new-repeatingimage"/>
@@ -696,6 +708,8 @@ export default function App() {
                             onPointerDown={event => event.stopPropagation()}>
             <CommandMenuItem ctx={ctx} commandId="new-color-palette" onRun={() => setAssetsMenu(null)}/>
             <CommandMenuItem ctx={ctx} commandId="import-color-palette" onRun={() => setAssetsMenu(null)}/>
+            <hr className="menu-separator" aria-hidden="true"/>
+            <MenuItem label="Add Google Font…" onClick={() => {setAssetsMenu(null); setGoogleFontName(''); setGoogleFontError(''); setGoogleFontDialog(true);}}/>
             <hr className="menu-separator" aria-hidden="true"/>
             <CommandMenuItem ctx={ctx} commandId="new-pico8-palette" onRun={() => setAssetsMenu(null)}/>
         </div>}
@@ -772,6 +786,32 @@ export default function App() {
                             disabled={!renameDocumentName.trim()}>Rename
                     </button>
                 </div>
+            </form>
+        </EditorDialog>}
+        {googleFontDialog && <EditorDialog title="Add Google Font" onClose={() => {setGoogleFontDialog(false); setGoogleFontPreview(null);}}>
+            <form className="rename-page-form" onSubmit={async event => {
+                event.preventDefault(); setGoogleFontLoading(true); setGoogleFontError('');
+                try {
+                    const font = googleFontPreview?.family.toLocaleLowerCase() === googleFontName.trim().toLocaleLowerCase()
+                        ? googleFontPreview : await fetchGoogleFont(googleFontName);
+                    store.addFontAsset(font); setGoogleFontPreview(null); setGoogleFontDialog(false);
+                }
+                catch (reason) { setGoogleFontError(reason instanceof Error ? reason.message : 'Unable to add this Google Font'); }
+                finally { setGoogleFontLoading(false); }
+            }}>
+                <label htmlFor="google-font-family">Google Fonts family name</label>
+                <input id="google-font-family" autoFocus data-dialog-autofocus value={googleFontName} onChange={event => {setGoogleFontName(event.target.value); setGoogleFontPreview(null);}} placeholder="e.g. Roboto"/>
+                <p>Enter a family name from Google Fonts. The font files are saved with this document.</p>
+                <button type="button" disabled={!googleFontName.trim() || googleFontLoading} onClick={async () => {
+                    setGoogleFontLoading(true); setGoogleFontError('');
+                    try { const font = await fetchGoogleFont(googleFontName); setGoogleFontPreview(font); installDocumentFonts([...doc.fonts, font]); await document.fonts.load(`24px ${JSON.stringify(font.family)}`); }
+                    catch (reason) { setGoogleFontError(reason instanceof Error ? reason.message : 'Unable to preview this Google Font'); }
+                    finally { setGoogleFontLoading(false); }
+                }}>Preview family</button>
+                {googleFontPreview && <p className="google-font-preview" style={{fontFamily: JSON.stringify(googleFontPreview.family)}}>The quick brown fox jumps over the lazy dog</p>}
+                {googleFontError && <p role="alert">{googleFontError}</p>}
+                <div className="dialog-actions"><button type="button" onClick={() => {setGoogleFontDialog(false); setGoogleFontPreview(null);}}>Cancel</button>
+                    <button type="submit" disabled={!googleFontName.trim() || googleFontLoading}>{googleFontLoading ? 'Loading…' : 'Add font'}</button></div>
             </form>
         </EditorDialog>}
         {imageDialog?.kind === 'import' &&

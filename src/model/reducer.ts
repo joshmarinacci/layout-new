@@ -6,7 +6,8 @@ import type {
     Point,
     RectangleShape,
     Shape,
-    StrokeComponent
+    StrokeComponent,
+    TextShape
 } from "./types";
 
 function gen_id(rect1: string) {
@@ -52,6 +53,16 @@ export function makeCircle(name: string, center: Point, radius: number): CircleS
             fill: {kind: 'fill-component', fill: {kind: 'solid', color: '#ff0000'}},
             stroke: {kind: 'stroke-component', width: 1, color: '#000000'},
         },
+    };
+}
+
+export function makeText(name: string, bounds: Bounds): TextShape {
+    return {
+        id: gen_id('text'), pageId: 'page_1', name, type: 'text',
+        components: {
+            rect: {kind: 'resizable-bounds-component', bounds: {...bounds}},
+            text: {kind: 'text-component', text: 'Text', fontId: null, fontSize: 32, fontWeight: 400, italic: false, color: '#111111', align: 'left', lineHeight: 1.2}
+        }
     };
 }
 

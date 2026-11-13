@@ -18,13 +18,14 @@ describe('Save as JSON PNG command', () => {
         const setError = vi.fn();
         SavePngDocumentCommand.run({
             store, state, finishEditing: vi.fn(), workspace: {tabs: [], activeId: ''}, setWorkspace: vi.fn(),
-            clipboard: {shapes: [], images: []}, setClipboard: vi.fn(), commandPaletteOpen: false,
+            clipboard: {shapes: [], images: [], fonts: []}, setClipboard: vi.fn(), commandPaletteOpen: false,
             setCommandPaletteOpen: vi.fn(), setKeyboardShortcutsOpen: vi.fn(), setSavedDocumentsOpen: vi.fn(),
             leftPanelVisible: true, setLeftPanelVisible: vi.fn(), rightPanelVisible: true, setRightPanelVisible: vi.fn(),
             setRenamePageDialog: vi.fn(), setRenameDocumentName: vi.fn(), setImageDialog: vi.fn(), setRepeatingImageDialog: vi.fn(),
             setVectorId: vi.fn(), setPixelEditor: vi.fn(), setError, setFileDialogOpen: vi.fn(), setTheme: vi.fn(),
             setSelectedAssetId: vi.fn(), setSelectedPaletteId: vi.fn(), openPaletteImport: vi.fn()
         });
+        await vi.waitFor(() => expect(mocks.download).toHaveBeenCalledOnce());
         expect(mocks.download).toHaveBeenCalledOnce();
         expect(mocks.download.mock.calls[0][1]).toBe('My drawing.json.png');
         expect(mocks.download.mock.calls[0][0]).toEqual(new Uint8Array([2]));
