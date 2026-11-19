@@ -1,5 +1,6 @@
 import type {Document, Shape} from '../model/types';
 import {deserializeDocument, serializeDocument} from './serialization';
+import {drawTextShape} from '../shapes/text';
 
 const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 export const DOCUMENT_CHUNK_KEYWORD = 'DrawDocument';
@@ -125,6 +126,7 @@ function shapeBounds(shape: Shape) {
             return {x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2};
         }
         case 'rectangle': return shape.components.rect.bounds;
+        case 'text': return shape.components.rect.bounds;
         case 'oval': return shape.components.oval.bounds;
         case 'pixel-image': case 'repeating-image': return shape.components.rect.bounds;
     }
@@ -132,6 +134,7 @@ function shapeBounds(shape: Shape) {
 
 function renderShape(ctx: CanvasRenderingContext2D, shape: Shape, document: Document) {
     const bounds = shapeBounds(shape);
+    if (shape.type === 'text') { drawTextShape(ctx, shape, document.fonts); return; }
     if (shape.type === 'vector') {
         const {network, stroke} = shape.components;
         ctx.save();

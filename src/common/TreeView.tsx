@@ -183,6 +183,7 @@ export default function TreeView(props: {
                 </TreeNode>)}
             </TreeNode>
             <TreeNode label="Assets" depth={1} onContextMenu={props.onAssetsContextMenu}>
+                {doc.fonts.map(font => <TreeNode key={font.id} label={`${font.family} (Google Font)`} depth={2}/>) }
                 {doc.palettes.map(palette => <TreeNode key={palette.id} label={`${palette.name} (${palette.colors.length} colors)`} depth={2}
                                                         selected={palette.id === props.selectedPaletteId}
                                                         onSelect={() => props.onSelectPalette(palette)}

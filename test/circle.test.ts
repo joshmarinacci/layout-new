@@ -56,7 +56,7 @@ describe('circles', () => {
     });
     it.each([false, true])('groups circle gesture updates, undo/redo and cancellation (resize=%s)', resize => {
         const shape = circle();
-        const store = new EditorStore({version: 7, images: [], palettes: [], title: 'circles', shapes: [shape], pages: [{id: 'page-1', name: 'Page 1', groups: []}]});
+        const store = new EditorStore({version: 9, images: [], palettes: [], fonts: [], title: 'circles', shapes: [shape], pages: [{id: 'page-1', name: 'Page 1', groups: []}]});
         const original = store.getSnapshot().document;
         const geometry = shape.components.circle;
         const start = circleHandles(geometry)[1];
@@ -84,7 +84,7 @@ describe('circles', () => {
     });
     it('rejects invalid circle geometry atomically', () => {
         const shape = circle();
-        const store = new EditorStore({version: 7, images: [], palettes: [], title: 'circles', shapes: [shape], pages: [{id: 'page-1', name: 'Page 1', groups: []}]});
+        const store = new EditorStore({version: 9, images: [], palettes: [], fonts: [], title: 'circles', shapes: [shape], pages: [{id: 'page-1', name: 'Page 1', groups: []}]});
         const before = store.getSnapshot();
         for (const radius of [-1, Infinity, NaN]) {
             expect(() => store.updateShape(shape.id, draft => {

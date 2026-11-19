@@ -22,8 +22,8 @@ function component(value: unknown, kind: string, fields: string[]) {
     if (c.kind !== kind) throw new Error(`Expected ${kind}`);
     return c;
 }
-function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7): asserts value is Document {
-    const doc = object(value); keys(doc, version >= 6 ? ['version', 'title', 'shapes', 'images', 'palettes', 'pages'] : version >= 4 ? ['version', 'title', 'shapes', 'images', 'pages'] : ['version', 'title', 'shapes', 'images']);
+function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9): asserts value is Document {
+    const doc = object(value); keys(doc, version >= 8 ? ['version', 'title', 'shapes', 'images', 'palettes', 'pages', 'fonts'] : version >= 6 ? ['version', 'title', 'shapes', 'images', 'palettes', 'pages'] : version >= 4 ? ['version', 'title', 'shapes', 'images', 'pages'] : ['version', 'title', 'shapes', 'images']);
     if (doc.version !== version) throw new Error('Unsupported document version');
     text(doc.title);
     if (!Array.isArray(doc.shapes)) throw new Error('Expected shapes array');
@@ -45,6 +45,16 @@ function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7): ass
                 try { normalizeColor(color.value as string); } catch { throw new Error('Invalid palette color value'); }
                 colorIds.add(color.id as string);
             }
+        }
+    }
+    const fontIds = new Set<string>();
+    if (version >= 8) {
+        if (!Array.isArray(doc.fonts) || doc.fonts.length > 256) throw new Error('Expected a valid font asset list');
+        for (const value of doc.fonts) {
+            const font = object(value); keys(font, ['id', 'family', 'css']);
+            text(font.id); text(font.family); text(font.css);
+            if (!font.id || fontIds.has(font.id as string) || !(font.family as string).trim() || (font.family as string).length > 200 || (font.css as string).length > 20_000_000 || !(font.css as string).includes('@font-face')) throw new Error('Invalid font asset');
+            fontIds.add(font.id as string);
         }
     }
     const imageIds = new Set<string>();
@@ -97,6 +107,7 @@ function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7): ass
     for (const item of doc.shapes) {
         const s = object(item);
         if (s.type === 'repeating-image' && version < 4) throw new Error('Repeating image shapes require document version 4');
+        if (s.type === 'text' && version < 8) throw new Error('Text shapes require document version 8');
         const expectedShapeKeys = version >= 4 ? ['id', 'name', 'type', 'components', 'pageId'] : ['id', 'name', 'type', 'components'];
         if (version < 4 && Object.hasOwn(s, 'pageId')) expectedShapeKeys.push('pageId');
         keys(s, expectedShapeKeys);
@@ -139,6 +150,18 @@ function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7): ass
             }
             continue;
         }
+        if (s.type === 'text') {
+            keys(c, ['rect', 'text']);
+            const bounds = object(component(c.rect, 'resizable-bounds-component', ['bounds']).bounds);
+            keys(bounds, ['x', 'y', 'width', 'height']);
+            number(bounds.x); number(bounds.y); number(bounds.width, true); number(bounds.height, true);
+            const textValue = component(c.text, 'text-component', version >= 9 ? ['text', 'fontId', 'fontSize', 'fontWeight', 'italic', 'color', 'align', 'verticalAlign', 'lineHeight'] : ['text', 'fontId', 'fontSize', 'fontWeight', 'italic', 'color', 'align', 'lineHeight']);
+            text(textValue.text); text(textValue.color);
+            if (textValue.fontId !== null && (typeof textValue.fontId !== 'string' || !fontIds.has(textValue.fontId))) throw new Error('Text shape references a missing font');
+            number(textValue.fontSize); number(textValue.fontWeight); number(textValue.lineHeight);
+            if ((textValue.fontSize as number) <= 0 || !Number.isInteger(textValue.fontWeight) || (textValue.fontWeight as number) < 100 || (textValue.fontWeight as number) > 900 || (textValue.lineHeight as number) <= 0 || typeof textValue.italic !== 'boolean' || !['left', 'center', 'right'].includes(textValue.align as string) || (version >= 9 && !['top', 'middle', 'bottom'].includes(textValue.verticalAlign as string))) throw new Error('Invalid text style');
+            continue;
+        }
         if (s.type === 'rectangle') keys(c, ['rect', 'fill', 'stroke', 'cornerRadius']);
         else if (s.type === 'circle') keys(c, ['circle', 'fill', 'stroke']);
         else if (s.type === 'oval') keys(c, ['oval', 'fill', 'stroke']);
@@ -168,7 +191,7 @@ function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7): ass
     }
 }
 export function validateDocument(value: unknown): asserts value is Document {
-    validateSchema(value, 7);
+    validateSchema(value, 9);
 }
 export function serializeDocument(document: Document): string {
     const normalized = structuredClone(document) as Document;
@@ -208,6 +231,14 @@ export function deserializeDocument(json: string): Document {
     if (source.version === 4) { validateSchema(source, 4); source = {...source, version: 5}; }
     if (source.version === 5) { validateSchema(source, 5); source = {...source, version: 6, palettes: []}; }
     if (source.version === 6) { validateSchema(source, 6); source = {...source, version: 7}; }
+    if (source.version === 7) { validateSchema(source, 7); source = {...source, version: 8, fonts: []}; }
+    if (source.version === 8) {
+        validateSchema(source, 8);
+        const legacy = source as unknown as Document;
+        source = {...legacy, version: 9, shapes: legacy.shapes.map(shape => shape.type === 'text'
+            ? {...shape, components: {...shape.components, text: {...shape.components.text, verticalAlign: 'top' as const}}}
+            : shape)};
+    }
     validateDocument(source);
     for (const shape of source.shapes) if (shape.type === 'vector') {
         const n = shape.components.network, faces = deriveFaces(n);
