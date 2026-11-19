@@ -1,0 +1,7 @@
+dist
+docs
+examples
+src-tauri
+node_modules
+package-lock.json
+test/fixtures

@@ -483,7 +483,7 @@ export const SelectionDuplicateCommand: Command = {
     keywords: ['copy'],
     enabled: ctx => !!ctx.state.selectedIds.length && !ctx.state.transactionActive,
     run: (ctx) => {
-        let shapes = getSelected(ctx.store)
+        const shapes = getSelected(ctx.store)
         if (shapes.length) {
             ctx.store.duplicateShapes(shapes.map(shape => shape.id))
         }
@@ -496,7 +496,7 @@ export const SelectionDeleteCommand: Command = {
     keywords: ['selection', 'remove', 'edit'],
     enabled: ctx => !!ctx.state.selectedIds.length && !ctx.state.transactionActive,
     run: (ctx) => {
-        let shapes = getSelected(ctx.store)
+        const shapes = getSelected(ctx.store)
         if (!shapes.length) return;
         ctx.store.beginTransaction('Delete selection');
         shapes.forEach(shape => ctx.store.removeShape(shape.id));

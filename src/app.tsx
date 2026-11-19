@@ -64,7 +64,7 @@ import {
 } from "./common/common";
 
 export default function App() {
-    const [theme, setTheme] = useTheme();
+    const [, setTheme] = useTheme();
     const [workspace, setWorkspace] = useState<Workspace>(() => {
         const tab = makeTab(makeExampleDocument());
         return {tabs: [tab], activeId: tab.id};
@@ -524,7 +524,8 @@ export default function App() {
                 onSelect={(shape, additive) => {
                     setSelectedAssetId(null);
                     setSelectedPaletteId(null);
-                    additive ? store.toggleSelection(shape.id) : store.select(shape.id);
+                    if (additive) store.toggleSelection(shape.id);
+                    else store.select(shape.id);
                 }}
                 onSelectAsset={image => {
                     finishEditing();

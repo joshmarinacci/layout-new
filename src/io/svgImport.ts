@@ -27,7 +27,8 @@ function arcSegments(from:Point,rxInput:number,ryInput:number,rotation:number,la
     const cxp=coef*(rx*yp/ry),cyp=coef*(-ry*xp/rx);
     const cx=cos*cxp-sin*cyp+(from.x+to.x)/2,cy=sin*cxp+cos*cyp+(from.y+to.y)/2;
     const ux=(xp-cxp)/rx,uy=(yp-cyp)/ry,vx=(-xp-cxp)/rx,vy=(-yp-cyp)/ry;
-    let startAngle=Math.atan2(uy,ux),delta=Math.atan2(ux*vy-uy*vx,ux*vx+uy*vy);
+    const startAngle=Math.atan2(uy,ux);
+    let delta=Math.atan2(ux*vy-uy*vx,ux*vx+uy*vy);
     if(!sweep&&delta>0)delta-=2*Math.PI;else if(sweep&&delta<0)delta+=2*Math.PI;
     const count=Math.ceil(Math.abs(delta)/(Math.PI/2)),step=delta/count;
     const at=(angle:number)=>point(cx+rx*cos*Math.cos(angle)-ry*sin*Math.sin(angle),cy+rx*sin*Math.cos(angle)+ry*cos*Math.sin(angle));
@@ -41,7 +42,7 @@ function parseTransform(value: string): Matrix {
     let matrix = IDENTITY;
     for (const match of value.matchAll(/([a-zA-Z]+)\s*\(([^)]*)\)/g)) {
         const args = numbers(match[2]), name = match[1];
-        let next: Matrix = IDENTITY;
+        let next: Matrix;
         if (name === 'matrix' && args.length === 6) next = args as Matrix;
         else if (name === 'translate') next = [1,0,0,1,args[0]??0,args[1]??0];
         else if (name === 'scale') next = [args[0]??1,0,0,args[1]??args[0]??1,0,0];

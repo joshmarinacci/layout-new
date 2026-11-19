@@ -205,7 +205,7 @@ describe('shared sprite sheets', () => {
         const current = JSON.parse(store.toJSON());
         const legacy = {...current, version: 1, pages: undefined, palettes: undefined, fonts: undefined,
             images: current.images.map((image: Record<string, unknown>) => { const {originalName, ...rest} = image; void originalName; return rest; }),
-            shapes: current.shapes.map((shape: Record<string, any>) => { const {pageId, ...rest} = shape; void pageId; return rest; })};
+            shapes: current.shapes.map((shape: {pageId: string; components: {image: {source?: unknown}}}) => { const {pageId, ...rest} = shape; void pageId; return rest; })};
         for (const shape of legacy.shapes) delete shape.components.image.source;
         const loaded = new EditorStore(); loaded.loadJSON(JSON.stringify(legacy));
         expect(loaded.getSnapshot().document).toEqual(store.getSnapshot().document);
