@@ -13,6 +13,8 @@ function Field({
                    value,
                    type = 'number',
                    nonnegative = false,
+                   step,
+                   shiftStep,
                    palettes = [],
                    update
                }: {
@@ -21,6 +23,8 @@ function Field({
     value: number | string;
     type?: 'number' | 'color';
     nonnegative?: boolean;
+    step?: number;
+    shiftStep?: number;
     palettes?: ColorPalette[];
     update: (value: string) => void;
 }) {
@@ -39,6 +43,7 @@ function Field({
         className="title">{title}</span>{value === '' && <small>Mixed</small>}
         {type === 'number' ? <NumberInput label={title} value={value}
                                           min={nonnegative ? 0 : undefined}
+                                          step={step} shiftStep={shiftStep}
                                           onFocus={onFocus} onBlur={onBlur}
                                           onKeyDown={onKeyDown}
                                           onChange={next => update(String(next))}/> :
@@ -74,10 +79,12 @@ export default function PropSheet({store, onAddGoogleFont}: { store: EditorStore
         return values.every(value => value === values[0]) ? values[0] : '';
     };
     const field = (key: string, title: string, read: (component: ShapeComponent) => number | string,
-                   write: (component: Draft<ShapeComponent>, value: string) => void, type: 'number' | 'color' = 'number', nonnegative = false) =>
+                   write: (component: Draft<ShapeComponent>, value: string) => void, type: 'number' | 'color' = 'number', nonnegative = false,
+                   steps: {step?: number; shiftStep?: number} = {}) =>
         <Field key={`${key}.${title}`} store={store} title={title}
                value={fieldValue(key, read)} type={type}
                nonnegative={nonnegative}
+               step={steps.step} shiftStep={steps.shiftStep}
                palettes={type === 'color' ? state.document.palettes : []}
                update={value => update(key, component => write(component, value))}/>;
     return <div className="prop-sheet">
@@ -151,7 +158,7 @@ export default function PropSheet({store, onAddGoogleFont}: { store: EditorStore
                     {[100, 200, 300, 400, 500, 600, 700, 800, 900].map(weight => <option key={weight} value={weight}>{weight}</option>)}
                 </select></label>
                 {field(key, 'Text color', c => c.kind === 'text-component' ? c.color : '', (c, value) => {if (c.kind === 'text-component') c.color = value;}, 'color')}
-                {field(key, 'Line spacing', c => c.kind === 'text-component' ? c.lineHeight : '', (c, value) => {if (c.kind === 'text-component') c.lineHeight = Math.max(0.1, Number(value));}, 'number', true)}
+                {field(key, 'Line spacing', c => c.kind === 'text-component' ? c.lineHeight : '', (c, value) => {if (c.kind === 'text-component') c.lineHeight = Math.max(0.1, Number(value));}, 'number', true, {step: 0.1, shiftStep: 1})}
                 <label className="number-input"><span className="title">Alignment</span><select aria-label="Text alignment" value={fieldValue(key, c => c.kind === 'text-component' ? c.align : '') as string}
                     onChange={event => update(key, c => {if (c.kind === 'text-component' && ['left', 'center', 'right'].includes(event.target.value)) c.align = event.target.value as 'left' | 'center' | 'right';})}>
                     <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
