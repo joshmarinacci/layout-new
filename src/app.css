@@ -58,10 +58,23 @@
 }
 
 .statusbar {
-    min-height: 34px;
-    padding: 2px 8px;
+    min-height: 24px;
+    padding: 0 6px;
     gap: 12px;
     border-top: 1px solid var(--panel-border-color);
+}
+
+.statusbar .icon-button {
+    width: 24px;
+    height: 24px;
+    min-height: 0;
+    flex-basis: 24px;
+    padding: 3px;
+}
+
+.statusbar .icon-button .lucide {
+    width: 16px;
+    height: 16px;
 }
 
 .status-hint {
@@ -215,8 +228,47 @@
 }
 
 .left, .right, .center, .asset-center {
+    grid-row: 2;
     min-height: 0;
     min-width: 0;
+}
+
+/* Drag handles straddle the panel edges; they share the panel's grid cell. */
+.panel-resizer {
+    grid-row: 2;
+    position: relative;
+    z-index: 6;
+    width: 8px;
+    cursor: col-resize;
+    touch-action: none;
+}
+
+.panel-resizer-left {
+    grid-column: 1;
+    justify-self: end;
+    margin-right: -4px;
+}
+
+.panel-resizer-right {
+    grid-column: 3;
+    justify-self: start;
+    margin-left: -4px;
+}
+
+.panel-resizer::after {
+    content: '';
+    position: absolute;
+    inset: 0 3px;
+    transition: background-color 120ms;
+}
+
+.panel-resizer:hover::after, .panel-resizer:active::after {
+    background: var(--selection-stroke);
+}
+
+.panel-resizer:focus-visible {
+    outline: 2px solid var(--selection-stroke);
+    outline-offset: -2px;
 }
 
 .center {
@@ -388,6 +440,15 @@
     background: var(--selected-background-color);
 }
 
+/* The open page while something else (a shape, the document, an asset) is selected. */
+.tree-row.current {
+    background: color-mix(in srgb, var(--selected-background-color) 16%, transparent);
+}
+
+.tree-row.current:hover {
+    background: color-mix(in srgb, var(--selected-background-color) 26%, transparent);
+}
+
 .tree-row.selected:hover {
     background: var(--selected-background-color-hover);
 }
@@ -415,6 +476,22 @@
     text-align: left;
     padding: 4px;
     overflow-wrap: anywhere;
+}
+
+.tree-label-editing {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tree-rename {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    padding: 1px 4px;
+    /* Inputs inherit color; don't pick up the selected row's white text. */
+    color: var(--panel-text);
+    background: var(--control-background);
 }
 
 .tree-label .lucide {

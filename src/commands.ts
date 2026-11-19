@@ -143,7 +143,6 @@ export type CommandId =
     | 'ui-show-command-palette'
     | 'ui-show-keyboard-shortcuts'
     | 'new-vector-network' | 'new-pixelimage' | 'new-repeatingimage'
-    | 'new-page-rectangle' | 'new-page-circle'
     | 'import-png'
     | 'new-color-palette' | 'import-color-palette' | 'new-pico8-palette'
     | 'theme-system' | 'theme-light' | 'theme-dark'
@@ -256,12 +255,12 @@ export const RedoCommand: Command = {
 
 export const NewRectCommand: Command = {
     id: 'new-rectangle',
-    title: 'New Rectangle xx',
+    title: 'New Rectangle',
     description: 'Add a rectangle to the current page',
     keywords: ['shape', 'rect', 'create'],
     enabled: ctx => !ctx.state.transactionActive,
     run: ctx => {
-        const shape = makeRect('rect', {x: 50, y: 250, width: 50, height: 50});
+        const shape = makeRect('Rectangle', {x: 50, y: 50, width: 100, height: 80});
         ctx.store.addShape(shape);
         ctx.store.select(shape.id);
     }
@@ -273,7 +272,7 @@ export const NewCircleCommand: Command = {
     keywords: ['shape', 'oval', 'create'],
     enabled: ctx => !ctx.state.transactionActive,
     run: ctx => {
-        const shape = makeCircle('circle', {x: 100, y: 300}, 40);
+        const shape = makeCircle('Circle', {x: 100, y: 100}, 40);
         ctx.store.addShape(shape);
         ctx.store.select(shape.id);
     }
@@ -285,35 +284,6 @@ export const NewTextCommand: Command = {
     run: ctx => { const shape = makeText('Text', {x: 50, y: 50, width: 280, height: 120}); ctx.store.addShape(shape); ctx.store.select(shape.id); }
 }
 
-export const NewPageRectangleCommand: Command = {
-    id: 'new-page-rectangle',
-    title: 'New Rectangle',
-    description: 'create a new rectangle o the page',
-    enabled: ctx => !ctx.state.transactionActive,
-    run: ctx => {
-        ctx.store.selectPage(ctx.state.selectedPageId);
-        const shape = makeRect('Rectangle', {
-            x: 50,
-            y: 50,
-            width: 100,
-            height: 80
-        });
-        ctx.store.addShape(shape);
-        ctx.store.select(shape.id);
-    }
-}
-export const NewPageCircleCommand: Command = {
-    id: 'new-page-circle',
-    title: 'New Circle',
-    enabled: ctx => !ctx.state.transactionActive,
-    description: 'Create a new circle on the page',
-    run: ctx => {
-        ctx.store.selectPage(ctx.state.selectedPageId);
-        const shape = makeCircle('Circle', {x: 100, y: 100}, 40);
-        ctx.store.addShape(shape);
-        ctx.store.select(shape.id);
-    }
-}
 export const NewVectorNetworkCommand: Command = {
     id: 'new-vector-network',
     title: 'New Vector Network',
@@ -341,8 +311,8 @@ export const NewRepeatingImageCommand: Command = {
 }
 export const ImportPNGCommand: Command = {
     id: 'import-png',
-    title: 'Import PNG',
-    description: 'import a png into pixel art',
+    title: 'New Image from PNG',
+    description: 'Create a pixel image from a PNG file',
     enabled: () => true,
     run: ctx => ctx.setImageDialog({kind: 'import'})
 }
@@ -748,8 +718,8 @@ export const allCommands: Command[] = [
     OpenJsonCommand, SaveJsonCommand, OpenPngDocumentCommand, SavePngDocumentCommand,
     ExportSelectionPngCommand, ExportSelectionSvgCommand, ExportPagePngCommand, ExportPageSvgCommand,
     NewPageCommand, RenamePageCommand, DeletePageCommand,
-    UndoCommand, RedoCommand, NewRectCommand, NewCircleCommand, NewTextCommand, NewPageRectangleCommand,
-    NewPageCircleCommand, NewVectorNetworkCommand, NewPixelImageCommand, NewRepeatingImageCommand,
+    UndoCommand, RedoCommand, NewRectCommand, NewCircleCommand, NewTextCommand,
+    NewVectorNetworkCommand, NewPixelImageCommand, NewRepeatingImageCommand,
     ImportPNGCommand, ImportSVGCommand, NewColorPaletteCommand, ImportColorPaletteCommand, NewPico8PaletteCommand,
     SelectionGroupCommand, SelectionUngroupCommand, SelectionDuplicateCommand,
     SelectionDeleteCommand, SelectionCopyCommand, SelectionCutCommand, SelectionPasteCommand,

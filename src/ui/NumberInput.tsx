@@ -1,4 +1,4 @@
-import {type KeyboardEvent, useEffect, useRef, useState} from 'react';
+import {type KeyboardEvent, useEffect, useEffectEvent, useRef, useState} from 'react';
 
 function roundToTenth(value: number) {
     return Math.round((value + Number.EPSILON) * 10) / 10;
@@ -26,33 +26,58 @@ export function NumberInput({
     onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
 }) {
     const [draft, setDraft] = useState(String(value));
+    // Mirrors draft so rapid wheel events that land before a re-render still accumulate.
+    const latestDraft = useRef(draft);
     const editing = useRef(false);
     const skipBlurCommit = useRef(false);
     const input = useRef<HTMLInputElement>(null);
+    const control = useRef<HTMLDivElement>(null);
+    const updateDraft = (next: string) => {
+        latestDraft.current = next;
+        setDraft(next);
+    };
 
     useEffect(() => {
-        if (!editing.current) setDraft(String(value));
+        if (!editing.current) {
+            latestDraft.current = String(value);
+            setDraft(String(value));
+        }
     }, [value]);
 
     const adjust = (amount: number) => {
         if (!editing.current) {
+            // Step buttons keep focus where it was; commit any other field's edit
+            // session before this field starts its own.
+            const focused = document.activeElement;
+            if (focused instanceof HTMLElement && focused !== input.current) focused.blur();
             onFocus?.();
             editing.current = true;
         }
-        const current = draft === '' ? 0 : Number(draft);
+        const current = latestDraft.current === '' ? 0 : Number(latestDraft.current);
         const next = Math.max(min ?? -Infinity, roundToTenth(current + amount));
-        setDraft(String(next));
+        updateDraft(String(next));
         onChange(next);
         input.current?.focus();
     };
 
-    const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
-        if (event.deltaY === 0) return;
+    const onWheel = useEffectEvent((event: WheelEvent) => {
+        // Holding Shift turns vertical wheel motion into horizontal on many platforms.
+        const delta = event.deltaY !== 0 ? event.deltaY : event.shiftKey ? event.deltaX : 0;
+        if (delta === 0) return;
         event.preventDefault();
-        adjust(event.deltaY < 0 ? step : -step);
-    };
+        const amount = event.shiftKey ? shiftStep : step;
+        adjust(delta < 0 ? amount : -amount);
+    });
+    useEffect(() => {
+        const element = control.current;
+        if (!element) return;
+        // React's onWheel is passive, so preventDefault needs a native listener.
+        const listener = (event: WheelEvent) => onWheel(event);
+        element.addEventListener('wheel', listener, {passive: false});
+        return () => element.removeEventListener('wheel', listener);
+    }, []);
 
-    return <div className="number-input-control" onWheel={handleWheel}>
+    return <div className="number-input-control" ref={control}>
         <button type="button" className="number-step-button"
                 aria-label={`Decrease ${label}`}
                 title={`Decrease ${label}`}
@@ -76,7 +101,7 @@ export function NumberInput({
                    const parsed = Number(draft);
                    if (draft !== '' && Number.isFinite(parsed)) {
                        const rounded = Math.max(min ?? -Infinity, roundToTenth(parsed));
-                       setDraft(String(rounded));
+                       updateDraft(String(rounded));
                        onChange(rounded);
                    }
                    editing.current = false;
@@ -92,7 +117,7 @@ export function NumberInput({
                }}
                onChange={event => {
                    const next = event.currentTarget.value;
-                   setDraft(next);
+                   updateDraft(next);
                    if (next === '') return;
                    const parsed = event.currentTarget.valueAsNumber;
                    if (Number.isFinite(parsed) && (min === undefined || parsed >= min)) onChange(parsed);

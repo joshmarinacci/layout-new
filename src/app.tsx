@@ -9,12 +9,15 @@ import {
     ZoomIn,
     ZoomOut
 } from 'lucide-react';
-import {type MouseEvent, useEffect, useEffectEvent, useLayoutEffect, useRef, useState} from 'react';
+import {type CSSProperties, type MouseEvent, useEffect, useEffectEvent, useLayoutEffect, useRef, useState} from 'react';
 import {isTauri} from '@tauri-apps/api/core';
 import {listen} from '@tauri-apps/api/event';
 import {DropdownMenu, Separator} from './ui/DropdownMenu';
 import {CommandPalette} from './common/CommandPalette';
 import {keybindings, matchesKeybinding} from './common/keybindings';
+import {ContextMenu} from './ui/ContextMenu';
+import {PanelResizer} from './ui/PanelResizer';
+import {usePanelWidths} from './ui/usePanelWidths';
 import {EditorDialog} from './common/EditorDialog';
 import {KeyboardShortcutsDialog} from './common/KeyboardShortcutsDialog';
 import {makeExampleDocument} from './model/exampleDocument';
@@ -100,6 +103,8 @@ export default function App() {
     const [canvasZoom, setCanvasZoom] = useState(1);
     const [leftPanelVisible, setLeftPanelVisible] = useState(true);
     const [rightPanelVisible, setRightPanelVisible] = useState(true);
+    const [panelWidths, setPanelWidth] = usePanelWidths();
+    const documentEditor = useRef<HTMLDivElement>(null);
     const [imageDialog, setImageDialog] = useState<ImageDialogConfig>(null)
     const [googleFontDialog, setGoogleFontDialog] = useState(false);
     const [googleFontName, setGoogleFontName] = useState('');
@@ -113,13 +118,17 @@ export default function App() {
     const [pixelEditor, setPixelEditor] = useState<PixelEditorController | null>(null);
     // Leave image and vector editing when the active document or page changes.
     const [editingScope, setEditingScope] = useState({store, pageId: state.selectedPageId});
+    // True only after the document row is clicked; any other selection replaces it.
+    const [documentSelected, setDocumentSelected] = useState(false);
     if (editingScope.store !== store || editingScope.pageId !== state.selectedPageId) {
         setEditingScope({store, pageId: state.selectedPageId});
+        setDocumentSelected(false);
         setVectorId(null);
         setImageDialog(null);
         setPixelEditor(null);
     }
     // Stop vector editing once its shape is deleted or deselected, or an asset is opened.
+    if (documentSelected && (state.selectedIds.length || selectedAssetId || selectedPaletteId)) setDocumentSelected(false);
     if (vectorId && (!doc.shapes.some(s => s.id === vectorId) || !state.selectedIds.includes(vectorId) || selectedAssetId)) setVectorId(null);
     const [repeatingImageDialog, setRepeatingImageDialog] = useState(false);
     const [clipboard, setClipboard] = useState<ClipboardState>({
@@ -468,7 +477,8 @@ export default function App() {
         </div>
         <div id="document-editor"
              className={`document-editor full-span${leftPanelVisible ? '' : ' hide-left'}${rightPanelVisible ? '' : ' hide-right'}`}
-             role="tabpanel" aria-labelledby={`tab-${activeTab.id}`}>
+             role="tabpanel" aria-labelledby={`tab-${activeTab.id}`} ref={documentEditor}
+             style={{'--left-width': `${panelWidths.left}px`, '--right-width': `${panelWidths.right}px`} as CSSProperties}>
             <div className="toolbar full-span" key={activeTab.id}>
                 {(selectedAsset || selectedPalette) &&
                     <button onClick={() => {setSelectedAssetId(null); setSelectedPaletteId(null);}}>Back to
@@ -512,6 +522,8 @@ export default function App() {
                                 onClick={() => SelectionDeleteCommand.run(ctx)}/>}
 
             </div>
+            {leftPanelVisible && <PanelResizer side="left" label="Resize layers panel" width={panelWidths.left}
+                                               target={documentEditor} onCommit={width => setPanelWidth('left', width)}/>}
             <div className="left scroll-container"><h2 className="panel-heading">Layers &amp; assets</h2><input ref={paletteFile} hidden type="file" accept=".gpl,.json,.txt,.hex" onChange={async event => {const chosen = event.target.files?.[0]; event.target.value = ''; if (!chosen) return; try {const palette = parsePalette(await chosen.text(), chosen.name); store.edit('Import palette', draft => { draft.palettes.push(palette); }); store.select(null); setSelectedAssetId(null); setSelectedPaletteId(palette.id); setError('');} catch (error) {setError(error instanceof Error ? error.message : 'Unable to import palette');}}}/><TreeView
                 document={doc}
                 selectedIds={state.selectedIds}
@@ -524,6 +536,13 @@ export default function App() {
                     setPagesMenu(null);
                     setDocumentMenu({x: event.clientX, y: event.clientY});
                 }}
+                documentSelected={documentSelected}
+                onSelectDocument={() => {finishEditing(); store.select(null); setSelectedAssetId(null); setSelectedPaletteId(null); setDocumentSelected(true);}}
+                onRenameDocument={name => store.setTitle(name)}
+                onRenamePage={(id, name) => store.renamePage(id, name)}
+                onRenameShape={(id, name) => store.renameShape(id, name)}
+                onRenamePalette={(id, name) => store.edit('Rename palette', draft => { const item = draft.palettes.find(value => value.id === id); if (item) item.name = name; })}
+                onRenameImage={(id, name) => store.renamePixelImage(id, name)}
                 onSelect={(shape, additive) => {
                     setSelectedAssetId(null);
                     setSelectedPaletteId(null);
@@ -544,7 +563,7 @@ export default function App() {
                 }}
                 onShapeContextMenu={(event, shape) => showShapeContextMenu(event, shape)}
                 selectedPageId={state.selectedPageId}
-                onSelectPage={id => {setSelectedAssetId(null); setSelectedPaletteId(null); store.selectPage(id);}}
+                onSelectPage={id => {setSelectedAssetId(null); setSelectedPaletteId(null); setDocumentSelected(false); store.selectPage(id);}}
                 onUngroup={id => store.ungroup(id)}
                 onRenameGroup={(id, name) => store.renameGroup(id, name)}
                 onSelectGroup={ids => store.setSelection(ids)}
@@ -608,15 +627,13 @@ export default function App() {
                                               setImageDialog(null);
                                               setPixelEditor(null);
                                           }}/>}</div>
+                    {rightPanelVisible && <PanelResizer side="right" label="Resize properties panel" width={panelWidths.right}
+                                                        target={documentEditor} onCommit={width => setPanelWidth('right', width)}/>}
                     <div className="right scroll-container"><h2
                         className="panel-heading">Properties</h2><PropSheet
                         key={activeTab.id}
                         store={store} onAddGoogleFont={() => {setGoogleFontName(''); setGoogleFontError(''); setGoogleFontDialog(true);}}/></div>
                 </>}
-        </div>
-        <div className="statusbar full-span">
-            <span role="alert">{error}</span>
-            <span className="spacer"/>
         </div>
         <footer className="statusbar full-span">
             <IconButton
@@ -634,10 +651,7 @@ export default function App() {
                 onClick={() => setRightPanelVisible(value => !value)}/>
         </footer>
         {contextMenu &&
-            <div className="shape-context-menu"
-                 style={{left: contextMenu.x, top: contextMenu.y}}
-                 role="menu" onContextMenu={event => event.preventDefault()}
-                 onPointerDown={event => event.stopPropagation()}>
+            <ContextMenu x={contextMenu.x} y={contextMenu.y} label="Shape actions" onClose={() => setContextMenu(null)}>
                 {selectedUngrouped && <CommandMenuItem ctx={ctx}
                                                        commandId="selection-group"/>}
                 {selectedGrouped && <CommandMenuItem ctx={ctx}
@@ -667,83 +681,57 @@ export default function App() {
                     <CommandMenuItem ctx={ctx}
                                      commandId="align-distribute-vertical"/>
                 </>}
-            </div>}
-        {documentMenu && <div className="shape-context-menu" style={{
-            left: documentMenu.x,
-            top: documentMenu.y
-        }}
-                              role="menu" aria-label="Document actions"
-                              onContextMenu={event => event.preventDefault()}
-                              onPointerDown={event => event.stopPropagation()}>
+            </ContextMenu>}
+        {documentMenu && <ContextMenu x={documentMenu.x} y={documentMenu.y} label="Document actions" onClose={() => setDocumentMenu(null)}>
             <CommandMenuItem ctx={ctx} commandId="rename-document"/>
             <CommandMenuItem ctx={ctx} commandId="new-page"/>
-        </div>}
-        {pageMenu && <div className="shape-context-menu"
-                          style={{left: pageMenu.x, top: pageMenu.y}}
-                          role="menu" aria-label="Page actions"
-                          onContextMenu={event => event.preventDefault()}
-                          onPointerDown={event => event.stopPropagation()}>
+        </ContextMenu>}
+        {pageMenu && <ContextMenu x={pageMenu.x} y={pageMenu.y} label="Page actions" onClose={() => setPageMenu(null)}>
             <CommandMenuItem ctx={ctx} commandId="rename-page"/>
             <CommandMenuItem ctx={ctx} commandId="delete-page"/>
             <hr className="menu-separator" aria-hidden="true"/>
             <CommandMenuItem ctx={ctx} commandId="export-page-png"/>
             <CommandMenuItem ctx={ctx} commandId="export-page-svg"/>
             <hr className="menu-separator" aria-hidden="true"/>
-            <CommandMenuItem ctx={ctx} commandId="new-page-rectangle"/>
-            <CommandMenuItem ctx={ctx} commandId="new-page-circle"/>
+            <CommandMenuItem ctx={ctx} commandId="new-rectangle"/>
+            <CommandMenuItem ctx={ctx} commandId="new-circle"/>
             <CommandMenuItem ctx={ctx} commandId="new-text"/>
             <CommandMenuItem ctx={ctx} commandId="new-vector-network"/>
             <CommandMenuItem ctx={ctx} commandId="new-pixelimage"/>
             <CommandMenuItem ctx={ctx} commandId="new-repeatingimage"/>
             <CommandMenuItem ctx={ctx} commandId="import-png"/>
-        </div>}
-        {pagesMenu &&
-            <div className="shape-context-menu"
-                 style={{left: pagesMenu.x, top: pagesMenu.y}}
-                 role="menu" aria-label="Pages actions"
-                 onContextMenu={event => event.preventDefault()}
-                 onPointerDown={event => event.stopPropagation()}>
-                <CommandMenuItem ctx={ctx} commandId="new-page"
-                                 onRun={() => setPagesMenu(null)}/>
-            </div>}
-        {assetsMenu && <div className="shape-context-menu" style={{left: assetsMenu.x, top: assetsMenu.y}}
-                            role="menu" aria-label="Assets actions"
-                            onContextMenu={event => event.preventDefault()}
-                            onPointerDown={event => event.stopPropagation()}>
-            <CommandMenuItem ctx={ctx} commandId="new-color-palette" onRun={() => setAssetsMenu(null)}/>
-            <CommandMenuItem ctx={ctx} commandId="import-color-palette" onRun={() => setAssetsMenu(null)}/>
+        </ContextMenu>}
+        {pagesMenu && <ContextMenu x={pagesMenu.x} y={pagesMenu.y} label="Pages actions" onClose={() => setPagesMenu(null)}>
+            <CommandMenuItem ctx={ctx} commandId="new-page"/>
+        </ContextMenu>}
+        {assetsMenu && <ContextMenu x={assetsMenu.x} y={assetsMenu.y} label="Assets actions" onClose={() => setAssetsMenu(null)}>
+            <CommandMenuItem ctx={ctx} commandId="new-color-palette"/>
+            <CommandMenuItem ctx={ctx} commandId="import-color-palette"/>
             <hr className="menu-separator" aria-hidden="true"/>
-            <MenuItem label="Add Google Font…" onClick={() => {setAssetsMenu(null); setGoogleFontName(''); setGoogleFontError(''); setGoogleFontDialog(true);}}/>
+            <MenuItem label="Add Google Font…" onClick={() => {setGoogleFontName(''); setGoogleFontError(''); setGoogleFontDialog(true);}}/>
             <hr className="menu-separator" aria-hidden="true"/>
-            <CommandMenuItem ctx={ctx} commandId="new-pico8-palette" onRun={() => setAssetsMenu(null)}/>
-        </div>}
+            <CommandMenuItem ctx={ctx} commandId="new-pico8-palette"/>
+        </ContextMenu>}
         {paletteMenu && (() => {
             const palette = doc.palettes.find(item => item.id === paletteMenu.paletteId);
             if (!palette) return null;
-            const close = () => setPaletteMenu(null);
-            return <div className="shape-context-menu" style={{left: paletteMenu.x, top: paletteMenu.y}}
-                        role="menu" aria-label={`${palette.name} palette actions`}
-                        onContextMenu={event => event.preventDefault()}
-                        onPointerDown={event => event.stopPropagation()}>
+            return <ContextMenu x={paletteMenu.x} y={paletteMenu.y} label={`${palette.name} palette actions`} onClose={() => setPaletteMenu(null)}>
                 <MenuItem label="Rename" onClick={() => {
                     const name = window.prompt('Palette name', palette.name)?.trim();
                     if (name) store.edit('Rename palette', draft => { const item = draft.palettes.find(value => value.id === palette.id); if (item) item.name = name; });
-                    close();
                 }}/>
                 <MenuItem label="Duplicate" onClick={() => {
                     const copy = structuredClone(palette);
                     copy.id = crypto.randomUUID(); copy.name += ' copy'; copy.colors.forEach(color => color.id = crypto.randomUUID());
                     store.edit('Duplicate palette', draft => { draft.palettes.push(copy); });
-                    close();
                 }}/>
                 <MenuItem label="Delete" className="danger" onClick={() => {
                     if (window.confirm(`Delete palette “${palette.name}”?`)) {
                         store.edit('Delete palette', draft => { draft.palettes = draft.palettes.filter(item => item.id !== palette.id); });
                         if (selectedPaletteId === palette.id) setSelectedPaletteId(null);
                     }
-                    close();
                 }}/>
-            </div>;
+            </ContextMenu>;
         })()}
         {renamePageDialog && <EditorDialog title="Rename Page"
                                            onClose={() => setRenamePageDialog(null)}>
