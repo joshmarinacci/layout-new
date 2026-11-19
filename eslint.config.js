@@ -20,11 +20,8 @@ export default tseslint.config(
         rules: {
             // Sanitizers intentionally match \u0000-\u001f in filenames and font names.
             'no-control-regex': 'off',
-            // React Compiler rules flag existing editor/pan-zoom patterns that need dedicated
-            // refactors; report them as warnings until those are addressed.
-            'react-hooks/refs': 'warn',
-            'react-hooks/set-state-in-effect': 'warn',
-            'react-hooks/immutability': 'warn',
+            // The recommended preset only warns on missing deps; fail the lint instead.
+            'react-hooks/exhaustive-deps': 'error',
         },
     },
     // Must stay last: turns off rules that conflict with Prettier's formatting.

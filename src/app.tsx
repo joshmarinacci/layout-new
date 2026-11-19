@@ -9,7 +9,7 @@ import {
     ZoomIn,
     ZoomOut
 } from 'lucide-react';
-import {type MouseEvent, useEffect, useRef, useState} from 'react';
+import {type MouseEvent, useEffect, useEffectEvent, useLayoutEffect, useRef, useState} from 'react';
 import {isTauri} from '@tauri-apps/api/core';
 import {listen} from '@tauri-apps/api/event';
 import {DropdownMenu, Separator} from './ui/DropdownMenu';
@@ -72,7 +72,9 @@ export default function App() {
     const activeTab = workspace.tabs.find(tab => tab.id === workspace.activeId)!;
     const store = activeTab.store;
     const activeStore = useRef(store);
-    activeStore.current = store;
+    useLayoutEffect(() => {
+        activeStore.current = store;
+    }, [store]);
     const finishEditing = () => {
         if (document.activeElement instanceof HTMLElement && document.activeElement.closest('#document-editor')) {
             document.activeElement.blur();
@@ -108,15 +110,17 @@ export default function App() {
     const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
     const [selectedPaletteId, setSelectedPaletteId] = useState<string | null>(null);
     const [vectorId, setVectorId] = useState<string | null>(null);
-    useEffect(() => {
+    const [pixelEditor, setPixelEditor] = useState<PixelEditorController | null>(null);
+    // Leave image and vector editing when the active document or page changes.
+    const [editingScope, setEditingScope] = useState({store, pageId: state.selectedPageId});
+    if (editingScope.store !== store || editingScope.pageId !== state.selectedPageId) {
+        setEditingScope({store, pageId: state.selectedPageId});
         setVectorId(null);
         setImageDialog(null);
         setPixelEditor(null);
-    }, [store, state.selectedPageId]);
-    useEffect(() => {
-        if (vectorId && (!doc.shapes.some(s => s.id === vectorId) || !state.selectedIds.includes(vectorId) || selectedAssetId)) setVectorId(null);
-    }, [doc, state.selectedIds, vectorId, selectedAssetId]);
-    const [pixelEditor, setPixelEditor] = useState<PixelEditorController | null>(null);
+    }
+    // Stop vector editing once its shape is deleted or deselected, or an asset is opened.
+    if (vectorId && (!doc.shapes.some(s => s.id === vectorId) || !state.selectedIds.includes(vectorId) || selectedAssetId)) setVectorId(null);
     const [repeatingImageDialog, setRepeatingImageDialog] = useState(false);
     const [clipboard, setClipboard] = useState<ClipboardState>({
         shapes: [],
@@ -183,101 +187,102 @@ export default function App() {
         setSelectedPaletteId,
         openPaletteImport: () => paletteFile.current?.click()
     }
-    useEffect(() => {
-        const keydown = (event: KeyboardEvent) => {
-            if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'ui-show-command-palette')!)) {
+    const onWindowKeyDown = useEffectEvent((event: KeyboardEvent) => {
+        if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'ui-show-command-palette')!)) {
+            event.preventDefault();
+            commandRegistry.require('ui-show-command-palette').run(ctx)
+            return;
+        }
+        if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'ui-toggle-left-sidebar')!)) {
+            event.preventDefault();
+            commandRegistry.require('ui-toggle-left-sidebar').run(ctx)
+            return;
+        }
+        if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'ui-toggle-right-sidebar')!)) {
+            event.preventDefault();
+            commandRegistry.require('ui-toggle-right-sidebar').run(ctx)
+            return;
+        }
+        if (commandPaletteOpen) {
+            if (event.key === 'Escape') {
                 event.preventDefault();
-                commandRegistry.require('ui-show-command-palette').run(ctx)
-                return;
+                setCommandPaletteOpen(false);
             }
-            if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'ui-toggle-left-sidebar')!)) {
-                event.preventDefault();
-                commandRegistry.require('ui-toggle-left-sidebar').run(ctx)
-                return;
-            }
-            if (matchesKeybinding(event, keybindings.find(binding => binding.commandId === 'ui-toggle-right-sidebar')!)) {
-                event.preventDefault();
-                commandRegistry.require('ui-toggle-right-sidebar').run(ctx)
-                return;
-            }
-            if (commandPaletteOpen) {
-                if (event.key === 'Escape') {
-                    event.preventDefault();
-                    setCommandPaletteOpen(false);
-                }
-                return;
-            }
-            if (event.target instanceof HTMLElement && (event.target.matches('input, textarea, select') || event.target.isContentEditable)) return;
-            if (imageDialog?.kind === 'edit') {
-                const key = event.key.toLowerCase();
-                if (key === 'escape') {
-                    event.preventDefault();
-                    pixelEditor?.cancel();
-                    setImageDialog(null);
-                    setPixelEditor(null);
-                    return;
-                }
-                const shortcuts = {
-                    b: 'pencil',
-                    e: 'eraser',
-                    g: 'fill',
-                    i: 'picker',
-                    m: 'move'
-                } as const;
-                if (key in shortcuts && !event.metaKey && !event.ctrlKey && !event.altKey && !store.getSnapshot().transactionActive) {
-                    event.preventDefault();
-                    pixelEditor?.setTool(shortcuts[key as keyof typeof shortcuts]);
-                    return;
-                }
-            }
-            if (store.getSnapshot().transactionActive) return;
-            if (event.target instanceof HTMLElement && (event.target.matches('input, textarea, select') || event.target.isContentEditable)) return;
-            const boundCommand = keybindings.find(binding => binding.commandId !== 'ui-show-command-palette' && matchesKeybinding(event, binding));
-            if (boundCommand) {
-                const command = commandRegistry.get(boundCommand.commandId);
-                if (command && command.enabled && command.enabled(ctx)) {
-                    event.preventDefault();
-                    command.run(ctx);
-                    return;
-                }
-            }
+            return;
+        }
+        if (event.target instanceof HTMLElement && (event.target.matches('input, textarea, select') || event.target.isContentEditable)) return;
+        if (imageDialog?.kind === 'edit') {
             const key = event.key.toLowerCase();
-            if ((event.metaKey || event.ctrlKey) && !event.altKey && key === 'o') {
+            if (key === 'escape') {
                 event.preventDefault();
-                if (!store.getSnapshot().transactionActive) {
-                    if (event.shiftKey) setSavedDocumentsOpen(true);
-                    else file.current?.click();
-                }
+                pixelEditor?.cancel();
+                setImageDialog(null);
+                setPixelEditor(null);
                 return;
             }
-            if ((event.metaKey || event.ctrlKey) && !event.altKey && key === 's') {
+            const shortcuts = {
+                b: 'pencil',
+                e: 'eraser',
+                g: 'fill',
+                i: 'picker',
+                m: 'move'
+            } as const;
+            if (key in shortcuts && !event.metaKey && !event.ctrlKey && !event.altKey && !store.getSnapshot().transactionActive) {
                 event.preventDefault();
-                if (!store.getSnapshot().transactionActive) SaveDocumentCommand.run(ctx)
+                pixelEditor?.setTool(shortcuts[key as keyof typeof shortcuts]);
                 return;
             }
-            if (vectorId && (key === 'delete' || key === 'backspace' || ((event.metaKey || event.ctrlKey) && ['d', 'x', 'c', 'v'].includes(key)))) return;
-            if (key === 'delete' || key === 'backspace') {
-                if (!store.getSnapshot().selectedIds.length || store.getSnapshot().transactionActive) return;
+        }
+        if (store.getSnapshot().transactionActive) return;
+        if (event.target instanceof HTMLElement && (event.target.matches('input, textarea, select') || event.target.isContentEditable)) return;
+        const boundCommand = keybindings.find(binding => binding.commandId !== 'ui-show-command-palette' && matchesKeybinding(event, binding));
+        if (boundCommand) {
+            const command = commandRegistry.get(boundCommand.commandId);
+            if (command && command.enabled && command.enabled(ctx)) {
                 event.preventDefault();
-                SelectionDeleteCommand.run(ctx)
+                command.run(ctx);
                 return;
             }
-            if ((event.metaKey || event.ctrlKey) && !event.altKey && ['d', 'x', 'c', 'v'].includes(key)) {
-                event.preventDefault();
-                if (key === 'd') SelectionDuplicateCommand.run(ctx)
-                if (key === 'c') SelectionCopyCommand.run(ctx)
-                if (key === 'x') SelectionCutCommand.run(ctx)
-                if (key === 'v') SelectionPasteCommand.run(ctx);
-                return;
+        }
+        const key = event.key.toLowerCase();
+        if ((event.metaKey || event.ctrlKey) && !event.altKey && key === 'o') {
+            event.preventDefault();
+            if (!store.getSnapshot().transactionActive) {
+                if (event.shiftKey) setSavedDocumentsOpen(true);
+                else file.current?.click();
             }
-            if ((event.metaKey || event.ctrlKey) && ['z', 'y'].includes(event.key.toLowerCase())) {
-                event.preventDefault();
-                if (event.shiftKey || event.key.toLowerCase() === 'y') store.redo(); else store.undo();
-            }
-        };
+            return;
+        }
+        if ((event.metaKey || event.ctrlKey) && !event.altKey && key === 's') {
+            event.preventDefault();
+            if (!store.getSnapshot().transactionActive) SaveDocumentCommand.run(ctx)
+            return;
+        }
+        if (vectorId && (key === 'delete' || key === 'backspace' || ((event.metaKey || event.ctrlKey) && ['d', 'x', 'c', 'v'].includes(key)))) return;
+        if (key === 'delete' || key === 'backspace') {
+            if (!store.getSnapshot().selectedIds.length || store.getSnapshot().transactionActive) return;
+            event.preventDefault();
+            SelectionDeleteCommand.run(ctx)
+            return;
+        }
+        if ((event.metaKey || event.ctrlKey) && !event.altKey && ['d', 'x', 'c', 'v'].includes(key)) {
+            event.preventDefault();
+            if (key === 'd') SelectionDuplicateCommand.run(ctx)
+            if (key === 'c') SelectionCopyCommand.run(ctx)
+            if (key === 'x') SelectionCutCommand.run(ctx)
+            if (key === 'v') SelectionPasteCommand.run(ctx);
+            return;
+        }
+        if ((event.metaKey || event.ctrlKey) && ['z', 'y'].includes(event.key.toLowerCase())) {
+            event.preventDefault();
+            if (event.shiftKey || event.key.toLowerCase() === 'y') store.redo(); else store.undo();
+        }
+    });
+    useEffect(() => {
+        const keydown = (event: KeyboardEvent) => onWindowKeyDown(event);
         window.addEventListener('keydown', keydown);
         return () => window.removeEventListener('keydown', keydown);
-    }, [store, selectedAssetId, state.selectedIds, doc, activeTab, workspace, imageDialog, pixelEditor, vectorId, commandPaletteOpen]);
+    }, []);
     useEffect(() => {
         const close = () => {
             setContextMenu(null);
@@ -313,20 +318,18 @@ export default function App() {
         setPageMenu({x: event.clientX, y: event.clientY, pageId});
     };
     const commands = commandRegistry.getAll();
-    const nativeMenuAction = useRef<(id: string) => void>(() => {
-    });
-    nativeMenuAction.current = id => {
+    const onNativeMenuAction = useEffectEvent((id: string) => {
         if (store.getSnapshot().transactionActive) return;
         if ((selectedAssetId || selectedPaletteId) && ['new-vector-network', 'new-rectangle', 'new-circle', 'new-text', 'new-pixelimage', 'new-repeatingimage', 'import-png'].includes(id)) return;
         if (id === 'new-repeatingimage' && !doc.images.length) return;
         const command = commandRegistry.get(id);
         if (command?.enabled(ctx)) command.run(ctx);
-    };
+    });
     useEffect(() => {
         if (!isTauri()) return;
         let unlisten: (() => void) | undefined;
         let disposed = false;
-        void listen<string>('native-menu-action', event => nativeMenuAction.current(event.payload))
+        void listen<string>('native-menu-action', event => onNativeMenuAction(event.payload))
             .then(dispose => {
                 if (disposed) dispose();
                 else unlisten = dispose;
