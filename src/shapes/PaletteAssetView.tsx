@@ -9,8 +9,12 @@ import {NameField} from '../common/NameField';
 function PaletteColorFields({color, index, space, update, rename}: {color: PaletteColor; index: number; space: 'rgb'|'hsl'|'oklch'|'oklab'; update: (value: string) => void; rename: (value: string) => void}) {
     const [colorSpaceText, setColorSpaceText] = useState(() => convertColor(color.value, space));
     const [nameText, setNameText] = useState(color.name ?? '');
-    useEffect(() => setColorSpaceText(convertColor(color.value, space)), [color.value, color.space, space]);
-    useEffect(() => setNameText(color.name ?? ''), [color.id, color.name]);
+    // Re-sync the editable text when the color changes from outside (undo, import, another field).
+    const colorKey = `${color.value}|${color.space}|${space}`, nameKey = `${color.id}|${color.name ?? ''}`;
+    const [syncedColorKey, setSyncedColorKey] = useState(colorKey);
+    const [syncedNameKey, setSyncedNameKey] = useState(nameKey);
+    if (syncedColorKey !== colorKey) { setSyncedColorKey(colorKey); setColorSpaceText(convertColor(color.value, space)); }
+    if (syncedNameKey !== nameKey) { setSyncedNameKey(nameKey); setNameText(color.name ?? ''); }
     return <div className="palette-color-fields"><label>Name<input value={nameText} placeholder={`Color ${index+1}`} onChange={event => setNameText(event.target.value)} onBlur={() => {if (nameText !== (color.name ?? '')) rename(nameText);}}/></label>
         <label>Hex<input type="color" value={normalizeColor(color.value)} onChange={event => update(event.target.value)}/><code>{normalizeColor(color.value)}</code></label>
         <label>{space.toUpperCase()}<input value={colorSpaceText} onChange={event => setColorSpaceText(event.target.value)} onBlur={() => {try {normalizeColor(colorSpaceText); update(colorSpaceText);} catch {setColorSpaceText(convertColor(color.value, space));}}}/></label>
@@ -100,8 +104,8 @@ export function PaletteAssetView({store, palette, onBack}: {store: EditorStore; 
             <div className="palette-actions"><button onClick={() => addColor()}><Plus/>Add color</button><button onClick={() => { const copy = structuredClone(palette); copy.id = crypto.randomUUID(); copy.name += ' copy'; copy.colors.forEach(color => color.id = crypto.randomUUID()); store.edit('Duplicate palette', draft => { draft.palettes.push(copy); }); }}><Copy/>Duplicate</button><button onClick={() => picker.current?.click()}><Upload/>Import</button><button onClick={() => store.edit('Create PICO-8 palette', draft => { draft.palettes.push(newPalette('PICO-8', pico8Colors)); })}>PICO-8</button><button className="danger" title="Delete palette" onClick={() => {if ((!colorsInUse || window.confirm('Some colors match shape fills or strokes. Delete this palette? Shapes will keep their current colors.')) && window.confirm(`Delete palette “${palette.name}”?`)) store.edit('Delete palette', draft => { draft.palettes = draft.palettes.filter(item => item.id !== palette.id); });}}><Trash2/>Delete</button><input ref={picker} hidden type="file" accept=".gpl,.json,.txt,.hex" onChange={event => { const file = event.target.files?.[0]; if (file) void importFile(file); event.target.value = ''; }}/></div>
         </header>
         <div className="palette-colors">{palette.colors.map((color, index) => {
-            const drag = pointerDrag.current;
-            const isDragged = dragPosition?.id === color.id && drag?.active;
+            // dragPosition is only set once a pointer drag passes its movement threshold.
+            const isDragged = dragPosition?.id === color.id;
             const style: CSSProperties | undefined = isDragged && dragPosition ? {position: 'fixed', left: dragPosition.left, top: dragPosition.top, width: dragPosition.width, height: dragPosition.height, zIndex: 1000, pointerEvents: 'none'} : undefined;
             return <div className="palette-color-slot" key={color.id}>
             {isDragged && <div className="palette-color-placeholder" style={{height: dragPosition.height}} aria-hidden="true"/>}
