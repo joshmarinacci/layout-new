@@ -3,6 +3,7 @@ import {deserializeDocument, serializeDocument} from '../src/io/serialization';
 import {EditorStore, emptyDocument} from '../src/model/EditorStore';
 import {makeText} from '../src/model/reducer';
 import type {FontAsset} from '../src/model/types';
+import {fontFamilyFor} from '../src/shapes/googleFonts';
 import {wrapText} from '../src/shapes/text';
 
 const font: FontAsset = {id: 'font-1', family: 'Example Sans', css: '@font-face{font-family:"Example Sans";src:url("data:font/woff2;base64,AA==") format("woff2")}'};
@@ -11,6 +12,12 @@ describe('text shapes', () => {
     it('wraps words, preserves explicit newlines, and breaks long words', () => {
         const context = {measureText: (value: string) => ({width: value.length * 10})} as Pick<CanvasRenderingContext2D, 'measureText'>;
         expect(wrapText(context, 'one two three\nextraordinary', 70)).toEqual(['one two', 'three', 'extraor', 'dinary']);
+    });
+
+    it('leaves the generic fallback family unquoted', () => {
+        expect(fontFamilyFor([], null)).toBe('sans-serif');
+        expect(fontFamilyFor([font], 'missing')).toBe('sans-serif');
+        expect(fontFamilyFor([font], font.id)).toBe('"Example Sans", sans-serif');
     });
 
     it('round trips text and embedded font assets', () => {

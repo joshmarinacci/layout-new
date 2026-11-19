@@ -48,6 +48,8 @@ export async function waitForTextFont(fonts: readonly FontAsset[], text: TextCom
     await document.fonts.load(`${style}${text.fontWeight} ${text.fontSize}px ${JSON.stringify(font.family)}`);
 }
 
+/** CSS font-family list; generic families must stay unquoted or they're treated as named fonts. */
 export function fontFamilyFor(fonts: readonly FontAsset[], fontId: string | null) {
-    return JSON.stringify(fonts.find(font => font.id === fontId)?.family ?? 'sans-serif');
+    const family = fonts.find(font => font.id === fontId)?.family;
+    return family ? `${JSON.stringify(family)}, sans-serif` : 'sans-serif';
 }
