@@ -11,8 +11,13 @@ export function SavedDocumentsDialog({onClose, onOpen, onChanged}: {
 }) {
     const [records, setRecords] = useState<SavedDocumentRecord[]>([]);
     const [error, setError] = useState('');
-    const refresh = async () => { try { setRecords(await readSavedDocuments()); setError(''); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to read saved documents'); } };
-    useEffect(() => { void refresh(); }, []);
+    useEffect(() => {
+        let cancelled = false;
+        readSavedDocuments().then(
+            loaded => { if (!cancelled) { setRecords(loaded); setError(''); } },
+            reason => { if (!cancelled) setError(reason instanceof Error ? reason.message : 'Unable to read saved documents'); });
+        return () => { cancelled = true; };
+    }, []);
     const mutate = async (next: SavedDocumentRecord[]) => {
         try { await writeSavedDocuments(next); setRecords(next); setError(''); onChanged(next); }
         catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to update saved documents'); }

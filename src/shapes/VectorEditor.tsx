@@ -43,7 +43,8 @@ const COLORS = {
     UNSELECTED_LINE: 'black'
 }
 export function useVectorEditor(store: EditorStore, shape: VectorShape | undefined, zoom: number, onClose: () => void) {
-    const [tool, setTool] = useState<Tool>('select'), [color, setColor] = useState('#4f9fff'), [erase, setErase] = useState(false);
+    const shapeId = shape?.id;
+    const [tool, setTool] = useState<Tool>(() => shape && !shape.components.network.points.length ? 'pen' : 'select'), [color, setColor] = useState('#4f9fff'), [erase, setErase] = useState(false);
     const [colorText, setColorText] = useState('#4f9fff');
     const [points, setPoints] = useState<string[]>([]), [segments, setSegments] = useState<string[]>([]);
     const [pen, setPen] = useState<string | null>(null), [hover, setHover] = useState<Point | null>(null);
@@ -57,15 +58,20 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
     } | null>(null);
     const gesture = useRef<Gesture | null>(null);
     const penHandle = useRef<{ id: string; point: Point } | null>(null);
-    useEffect(() => {
+    // Reset tool state when a different vector shape is opened for editing.
+    const [editedShapeId, setEditedShapeId] = useState(shapeId);
+    if (editedShapeId !== shapeId) {
+        setEditedShapeId(shapeId);
         setTool(shape && !shape.components.network.points.length ? 'pen' : 'select');
         setPoints([]);
         setSegments([]);
         setPen(null);
         setHover(null);
         setPosition({x: 12, y: 12});
+    }
+    useEffect(() => {
         penHandle.current = null;
-    }, [shape?.id]);
+    }, [shapeId]);
     const local = (p: Point): Point => ({
         x: p.x - (shape?.components.network.origin.x ?? 0),
         y: p.y - (shape?.components.network.origin.y ?? 0)

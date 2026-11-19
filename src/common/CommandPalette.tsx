@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useRef, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {shortcutLabel} from './keybindings';
 import type {Command, CommandContext} from "../commands";
 
@@ -10,28 +10,23 @@ export function CommandPalette({commands, onClose, ctx}: {
     const [query, setQuery] = useState('');
     const [activeIndex, setActiveIndex] = useState(0);
     const input = useRef<HTMLInputElement>(null);
-    const matches = useMemo(() => {
-        const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-        return commands
-            .filter(command => command.enabled && command.enabled(ctx))
-            .map(command => ({
-                command,
-                score: terms.reduce((score, term) => {
-                    const name = command.title.toLowerCase();
-                    const haystack = `${name} ${command.description} ${(command.keywords ?? []).join(' ')}`.toLowerCase();
-                    return score + (name === term ? 8 : name.startsWith(term) ? 5 : name.includes(term) ? 3 : haystack.includes(term) ? 1 : -100);
-                }, 0)
-            })).filter(item => item.score >= 0)
-            .sort((a, b) => b.score - a.score || a.command.title.localeCompare(b.command.title))
-            .map(item => item.command);
-    }, [commands, query]);
+    const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const matches = commands
+        .filter(command => command.enabled && command.enabled(ctx))
+        .map(command => ({
+            command,
+            score: terms.reduce((score, term) => {
+                const name = command.title.toLowerCase();
+                const haystack = `${name} ${command.description} ${(command.keywords ?? []).join(' ')}`.toLowerCase();
+                return score + (name === term ? 8 : name.startsWith(term) ? 5 : name.includes(term) ? 3 : haystack.includes(term) ? 1 : -100);
+            }, 0)
+        })).filter(item => item.score >= 0)
+        .sort((a, b) => b.score - a.score || a.command.title.localeCompare(b.command.title))
+        .map(item => item.command);
 
     useEffect(() => {
         input.current?.focus();
     }, []);
-    useEffect(() => {
-        setActiveIndex(0);
-    }, [query]);
 
     const run = (command?: Command) => {
         if (!command) return;
@@ -48,7 +43,10 @@ export function CommandPalette({commands, onClose, ctx}: {
                    placeholder="Search commands…"
                    aria-label="Search commands" aria-controls="command-results"
                    aria-activedescendant={matches[activeIndex] ? `command-${matches[activeIndex].id}` : undefined}
-                   onChange={event => setQuery(event.target.value)}
+                   onChange={event => {
+                       setQuery(event.target.value);
+                       setActiveIndex(0);
+                   }}
                    onKeyDown={event => {
                        if (event.key === 'Escape') {
                            event.preventDefault();

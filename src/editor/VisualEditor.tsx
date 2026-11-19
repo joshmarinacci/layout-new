@@ -2,6 +2,7 @@ import {
     type MouseEvent,
     type PointerEvent,
     useEffect,
+    useEffectEvent,
     useRef,
     useState
 } from 'react';
@@ -245,7 +246,7 @@ export default function VisualEditor({
             ctx.strokeRect(marquee.x, marquee.y, marquee.width, marquee.height);
             ctx.restore();
         }
-    }, [state.document, state.selectedId, state.selectedIds, state.selectedPageId, marquee, zoom, pixelEditor, vector, fontEpoch]);
+    }, [state.document, state.selectedId, state.selectedIds, state.selectedPageId, marquee, zoom, pixelEditor, vector, vectorShape, fontEpoch]);
     useEffect(() => () => {
         if (gesture.current) {
             gesture.current = null;
@@ -284,17 +285,18 @@ export default function VisualEditor({
             });
         } else onZoomChange(next);
     };
+    const onWheelZoom = useEffectEvent((event: WheelEvent) => {
+        if (!event.ctrlKey && !event.metaKey) return;
+        event.preventDefault();
+        setZoomAt(zoom * Math.exp(-event.deltaY * 0.002), event.clientX, event.clientY);
+    });
     useEffect(() => {
         const element = viewport.current;
         if (!element) return;
-        const handleWheel = (event: WheelEvent) => {
-            if (!event.ctrlKey && !event.metaKey) return;
-            event.preventDefault();
-            setZoomAt(zoom * Math.exp(-event.deltaY * 0.002), event.clientX, event.clientY);
-        };
+        const handleWheel = (event: WheelEvent) => onWheelZoom(event);
         element.addEventListener('wheel', handleWheel, {passive: false});
         return () => element.removeEventListener('wheel', handleWheel);
-    }, [zoom, onZoomChange]);
+    }, []);
     return <div className="canvas-viewport" ref={viewport}>
         <canvas aria-label="Drawing canvas" tabIndex={0} ref={ref}
                 width={1024 * zoom * (window.devicePixelRatio || 1)}

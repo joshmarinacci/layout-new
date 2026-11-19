@@ -1,4 +1,4 @@
-import {type PointerEvent, useEffect, useMemo, useRef, useState} from 'react';
+import {type PointerEvent, useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import type {EditorStore} from '../model/EditorStore';
 import type {Bounds, Point} from '../model/types';
 import {useEditorStore} from '../model/useEditorStore';
@@ -44,9 +44,11 @@ export function PixelImageEditor({store, imageId, source, initialPosition, image
     const paletteDrag = useRef<{pointer: number; x: number; y: number; left: number; top: number} | null>(null);
     const palette = useRef<HTMLDivElement>(null);
     const options = useRef({tool, color, image, region});
-    options.current = {tool, color, image, region};
-    const controller = useRef<PixelEditorController | null>(null);
-    if (!controller.current) controller.current = {
+    useLayoutEffect(() => {
+        options.current = {tool, color, image, region};
+    }, [tool, color, image, region]);
+    // Created once; its methods read the latest options from the ref at event time.
+    const [controller] = useState<PixelEditorController>(() => ({
         imageId,
         get image() { return options.current.image!; },
         get grid() { return true; },
@@ -93,10 +95,10 @@ export function PixelImageEditor({store, imageId, source, initialPosition, image
         isActive: pointer => stroke.current?.pointer === pointer,
         sample: point => { const current = options.current; if (current.image) { const p = {x: Math.max(0, Math.min(current.image.width - 1, Math.floor(point.x))), y: Math.max(0, Math.min(current.image.height - 1, Math.floor(point.y)))}; setColor(samplePixel(current.image, p) ?? -1); setTool('pencil'); } },
         setTool,
-    };
-    useEffect(() => { onController(controller.current); return () => { controller.current?.cancel(); onController(null); }; }, [onController, store]);
+    }));
+    useEffect(() => { onController(controller); return () => { controller.cancel(); onController(null); }; }, [onController, store, controller]);
     useEffect(() => () => { if (stroke.current) { stroke.current = null; store.cancelTransaction(); } }, [store]);
-    const close = () => { controller.current?.cancel(); onClose(); };
+    const close = () => { controller.cancel(); onClose(); };
     useEffect(() => {
         const element = palette.current;
         const bounds = element?.parentElement?.getBoundingClientRect();
@@ -138,7 +140,7 @@ export function PixelImageEditor({store, imageId, source, initialPosition, image
     const linked = state.document.shapes.filter(shape => shape.type === 'pixel-image' && shape.components.image.imageId === imageId).length;
     if (!image) return <div className="pixel-floating-palette"><strong>Image unavailable</strong><button onClick={close}>Close</button></div>;
     return <div ref={palette} className="pixel-floating-palette" style={{left: palettePosition.x, top: palettePosition.y}} onKeyDown={event => {
-        if (event.key === 'Escape') { event.preventDefault(); controller.current?.cancel(); close(); return; }
+        if (event.key === 'Escape') { event.preventDefault(); controller.cancel(); close(); return; }
         if (event.target instanceof HTMLElement && event.target.matches('input, select, textarea')) return;
         if ((event.metaKey || event.ctrlKey) && ['z', 'y'].includes(event.key.toLowerCase())) {
             event.preventDefault(); if (!state.transactionActive) { if (event.shiftKey || event.key.toLowerCase() === 'y') store.redo(); else store.undo(); } return;
