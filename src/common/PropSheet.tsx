@@ -1,6 +1,6 @@
 import {PropertySection} from '../ui/controls';
 import type {Draft} from 'immer';
-import type {ColorPalette, FontAsset, Shape, ShapeComponent} from '../model/types';
+import type {ColorPalette, FontAsset, Shape, ShapeComponent, TextComponent} from '../model/types';
 import type {EditorStore} from '../model/EditorStore';
 import {useEditorStore} from '../model/useEditorStore';
 import {NameField} from './NameField';
@@ -46,6 +46,10 @@ function Field({
                    onFocus={onFocus} onBlur={onBlur}
                    onChange={event => update(event.target.value)}/>
                 {palettes.length > 0 && <select aria-label={`${title} palette color`} value="" onChange={event => {if (event.target.value) update(event.target.value);}}><option value="">Choose from palette…</option>{palettes.map(palette => <optgroup key={palette.id} label={palette.name}>{palette.colors.map((color, index) => <option key={color.id} value={normalizeColor(color.value)}>{color.name || `Color ${index+1}`} · {normalizeColor(color.value)}</option>)}</optgroup>)}</select>}</>}</div>;
+}
+
+function isVerticalAlign(value: string): value is TextComponent['verticalAlign'] {
+    return value === 'top' || value === 'middle' || value === 'bottom';
 }
 
 function componentFor(shape: Draft<Shape>, key: string): Draft<ShapeComponent> {
@@ -151,6 +155,10 @@ export default function PropSheet({store, onAddGoogleFont}: { store: EditorStore
                 <label className="number-input"><span className="title">Alignment</span><select aria-label="Text alignment" value={fieldValue(key, c => c.kind === 'text-component' ? c.align : '') as string}
                     onChange={event => update(key, c => {if (c.kind === 'text-component' && ['left', 'center', 'right'].includes(event.target.value)) c.align = event.target.value as 'left' | 'center' | 'right';})}>
                     <option value="left">Left</option><option value="center">Center</option><option value="right">Right</option>
+                </select></label>
+                <label className="number-input"><span className="title">Vertical</span><select aria-label="Vertical alignment" value={fieldValue(key, c => c.kind === 'text-component' ? c.verticalAlign : '') as string}
+                    onChange={event => {const value = event.target.value; update(key, c => {if (c.kind === 'text-component' && isVerticalAlign(value)) c.verticalAlign = value;});}}>
+                    <option value="top">Top</option><option value="middle">Middle</option><option value="bottom">Bottom</option>
                 </select></label>
                 <label className="number-input"><span className="title">Italic</span><input aria-label="Italic" type="checkbox" checked={fieldValue(key, c => c.kind === 'text-component' ? (c.italic ? 1 : 0) : '') === 1}
                     onChange={event => update(key, c => {if (c.kind === 'text-component') c.italic = event.target.checked;})}/></label>

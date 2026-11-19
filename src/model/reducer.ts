@@ -61,7 +61,7 @@ export function makeText(name: string, bounds: Bounds): TextShape {
         id: gen_id('text'), pageId: 'page_1', name, type: 'text',
         components: {
             rect: {kind: 'resizable-bounds-component', bounds: {...bounds}},
-            text: {kind: 'text-component', text: 'Text', fontId: null, fontSize: 32, fontWeight: 400, italic: false, color: '#111111', align: 'left', lineHeight: 1.2}
+            text: {kind: 'text-component', text: 'Text', fontId: null, fontSize: 32, fontWeight: 400, italic: false, color: '#111111', align: 'left', verticalAlign: 'top', lineHeight: 1.2}
         }
     };
 }

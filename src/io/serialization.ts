@@ -22,7 +22,7 @@ function component(value: unknown, kind: string, fields: string[]) {
     if (c.kind !== kind) throw new Error(`Expected ${kind}`);
     return c;
 }
-function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8): asserts value is Document {
+function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9): asserts value is Document {
     const doc = object(value); keys(doc, version >= 8 ? ['version', 'title', 'shapes', 'images', 'palettes', 'pages', 'fonts'] : version >= 6 ? ['version', 'title', 'shapes', 'images', 'palettes', 'pages'] : version >= 4 ? ['version', 'title', 'shapes', 'images', 'pages'] : ['version', 'title', 'shapes', 'images']);
     if (doc.version !== version) throw new Error('Unsupported document version');
     text(doc.title);
@@ -155,11 +155,11 @@ function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8):
             const bounds = object(component(c.rect, 'resizable-bounds-component', ['bounds']).bounds);
             keys(bounds, ['x', 'y', 'width', 'height']);
             number(bounds.x); number(bounds.y); number(bounds.width, true); number(bounds.height, true);
-            const textValue = component(c.text, 'text-component', ['text', 'fontId', 'fontSize', 'fontWeight', 'italic', 'color', 'align', 'lineHeight']);
+            const textValue = component(c.text, 'text-component', version >= 9 ? ['text', 'fontId', 'fontSize', 'fontWeight', 'italic', 'color', 'align', 'verticalAlign', 'lineHeight'] : ['text', 'fontId', 'fontSize', 'fontWeight', 'italic', 'color', 'align', 'lineHeight']);
             text(textValue.text); text(textValue.color);
             if (textValue.fontId !== null && (typeof textValue.fontId !== 'string' || !fontIds.has(textValue.fontId))) throw new Error('Text shape references a missing font');
             number(textValue.fontSize); number(textValue.fontWeight); number(textValue.lineHeight);
-            if ((textValue.fontSize as number) <= 0 || !Number.isInteger(textValue.fontWeight) || (textValue.fontWeight as number) < 100 || (textValue.fontWeight as number) > 900 || (textValue.lineHeight as number) <= 0 || typeof textValue.italic !== 'boolean' || !['left', 'center', 'right'].includes(textValue.align as string)) throw new Error('Invalid text style');
+            if ((textValue.fontSize as number) <= 0 || !Number.isInteger(textValue.fontWeight) || (textValue.fontWeight as number) < 100 || (textValue.fontWeight as number) > 900 || (textValue.lineHeight as number) <= 0 || typeof textValue.italic !== 'boolean' || !['left', 'center', 'right'].includes(textValue.align as string) || (version >= 9 && !['top', 'middle', 'bottom'].includes(textValue.verticalAlign as string))) throw new Error('Invalid text style');
             continue;
         }
         if (s.type === 'rectangle') keys(c, ['rect', 'fill', 'stroke', 'cornerRadius']);
@@ -191,7 +191,7 @@ function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8):
     }
 }
 export function validateDocument(value: unknown): asserts value is Document {
-    validateSchema(value, 8);
+    validateSchema(value, 9);
 }
 export function serializeDocument(document: Document): string {
     const normalized = structuredClone(document) as Document;
@@ -232,6 +232,13 @@ export function deserializeDocument(json: string): Document {
     if (source.version === 5) { validateSchema(source, 5); source = {...source, version: 6, palettes: []}; }
     if (source.version === 6) { validateSchema(source, 6); source = {...source, version: 7}; }
     if (source.version === 7) { validateSchema(source, 7); source = {...source, version: 8, fonts: []}; }
+    if (source.version === 8) {
+        validateSchema(source, 8);
+        const legacy = source as unknown as Document;
+        source = {...legacy, version: 9, shapes: legacy.shapes.map(shape => shape.type === 'text'
+            ? {...shape, components: {...shape.components, text: {...shape.components.text, verticalAlign: 'top' as const}}}
+            : shape)};
+    }
     validateDocument(source);
     for (const shape of source.shapes) if (shape.type === 'vector') {
         const n = shape.components.network, faces = deriveFaces(n);

@@ -31,10 +31,10 @@ describe('text shapes', () => {
         expect(loaded).toEqual(document);
     });
 
-    it('migrates version 7 documents with no font assets', () => {
+    it('migrates version 7 documents to the current version with no font assets', () => {
         const legacy = {version: 7, title: 'Old', shapes: [], images: [], palettes: [], pages: [{id: 'page_1', name: 'Page 1', groups: []}]};
         const loaded = deserializeDocument(JSON.stringify(legacy));
-        expect(loaded.version).toBe(8);
+        expect(loaded.version).toBe(9);
         expect(loaded.fonts).toEqual([]);
     });
 

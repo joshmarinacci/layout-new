@@ -1,7 +1,12 @@
-import type {Bounds, FontAsset, TextShape} from '../model/types';
+import type {Bounds, FontAsset, TextComponent, TextShape} from '../model/types';
 import {fontFamilyFor} from './googleFonts';
 
-export function wrapText(ctx: Pick<CanvasRenderingContext2D, 'measureText'>, text: string, maxWidth: number): string[] {
+type Measure = Pick<CanvasRenderingContext2D, 'measureText'>;
+
+/** Approximate descender depth as a fraction of font size, so bottom-aligned text isn't clipped. */
+const DESCENT_RATIO = 0.25;
+
+export function wrapText(ctx: Measure, text: string, maxWidth: number): string[] {
     const paragraphs = text.split('\n');
     const lines: string[] = [];
     for (const paragraph of paragraphs) {
@@ -29,6 +34,21 @@ export function wrapText(ctx: Pick<CanvasRenderingContext2D, 'measureText'>, tex
     return lines;
 }
 
+export interface TextLine { text: string; y: number }
+export interface TextLayout { x: number; lines: TextLine[] }
+
+/** Position wrapped lines inside the box; shared by canvas rendering and SVG export. */
+export function layoutText(ctx: Measure, style: TextComponent, bounds: Bounds): TextLayout {
+    const wrapped = wrapText(ctx, style.text, bounds.width);
+    const step = style.fontSize * style.lineHeight;
+    const blockHeight = style.fontSize + (wrapped.length - 1) * step + style.fontSize * DESCENT_RATIO;
+    const top = style.verticalAlign === 'top' ? bounds.y
+        : style.verticalAlign === 'middle' ? bounds.y + (bounds.height - blockHeight) / 2
+            : bounds.y + bounds.height - blockHeight;
+    const x = style.align === 'left' ? bounds.x : style.align === 'center' ? bounds.x + bounds.width / 2 : bounds.x + bounds.width;
+    return {x, lines: wrapped.map((text, index) => ({text, y: top + style.fontSize + index * step}))};
+}
+
 export function textBounds(shape: TextShape): Bounds { return shape.components.rect.bounds; }
 
 export function drawTextShape(ctx: CanvasRenderingContext2D, shape: TextShape, fonts: readonly FontAsset[]) {
@@ -37,8 +57,7 @@ export function drawTextShape(ctx: CanvasRenderingContext2D, shape: TextShape, f
     ctx.beginPath(); ctx.rect(bounds.x, bounds.y, bounds.width, bounds.height); ctx.clip();
     ctx.font = `${style.italic ? 'italic ' : ''}${style.fontWeight} ${style.fontSize}px ${fontFamily}`;
     ctx.textAlign = style.align; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = style.color;
-    const x = style.align === 'left' ? bounds.x : style.align === 'center' ? bounds.x + bounds.width / 2 : bounds.x + bounds.width;
-    const lines = wrapText(ctx, style.text, bounds.width);
-    lines.forEach((line, index) => ctx.fillText(line, x, bounds.y + style.fontSize + index * style.fontSize * style.lineHeight, bounds.width));
+    const {x, lines} = layoutText(ctx, style, bounds);
+    lines.forEach(line => ctx.fillText(line.text, x, line.y, bounds.width));
     ctx.restore();
 }

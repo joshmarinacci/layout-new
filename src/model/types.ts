@@ -198,6 +198,7 @@ export interface TextComponent {
     italic: boolean;
     color: string;
     align: 'left' | 'center' | 'right';
+    verticalAlign: 'top' | 'middle' | 'bottom';
     lineHeight: number;
 }
 
@@ -233,7 +234,7 @@ export interface Page {
 }
 
 export interface Document {
-    version: 8
+    version: 9
     title: string
     shapes: Shape[];
     images: PixelImageData[];

@@ -1,7 +1,7 @@
 import {isTauri} from '@tauri-apps/api/core';
 import type {Bounds, Document, PixelImageData, Shape} from '../model/types';
 import {spanControls, vectorBounds} from '../shapes/vectorNetworks';
-import {wrapText} from '../shapes/text';
+import {layoutText} from '../shapes/text';
 import {fontFamilyFor, waitForTextFont} from '../shapes/googleFonts';
 
 export type ArtworkFormat = 'png' | 'svg';
@@ -53,9 +53,8 @@ function shapeSvg(shape: Shape, doc: Document, index: number): string {
         const measure = document.createElement('canvas').getContext('2d');
         if (!measure) return '';
         measure.font = `${value.italic ? 'italic ' : ''}${value.fontWeight} ${value.fontSize}px ${fontFamilyFor(doc.fonts, value.fontId)}`;
-        const lines = wrapText(measure, value.text, b.width), id = `text-clip-${index}`;
-        const x = value.align === 'left' ? b.x : value.align === 'center' ? b.x + b.width / 2 : b.x + b.width;
-        const tspans = lines.map((line, lineIndex) => `<tspan x="${x}" y="${b.y + value.fontSize + lineIndex * value.fontSize * value.lineHeight}">${esc(line)}</tspan>`).join('');
+        const {x, lines} = layoutText(measure, value, b), id = `text-clip-${index}`;
+        const tspans = lines.map(line => `<tspan x="${x}" y="${line.y}">${esc(line.text)}</tspan>`).join('');
         return `<defs><clipPath id="${id}"><rect x="${b.x}" y="${b.y}" width="${b.width}" height="${b.height}"/></clipPath></defs><text clip-path="url(#${id})" font-family="${esc(fontFamily)}" font-size="${value.fontSize}" font-weight="${value.fontWeight}" font-style="${value.italic ? 'italic' : 'normal'}" text-anchor="${value.align === 'left' ? 'start' : value.align === 'center' ? 'middle' : 'end'}" fill="${esc(value.color)}">${tspans}</text>`;
     }
     if (shape.type === 'vector') {

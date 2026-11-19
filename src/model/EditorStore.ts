@@ -39,7 +39,7 @@ export interface EditorSnapshot {
 }
 
 export const emptyDocument = (): Document => ({
-    version: 8,
+    version: 9,
     images: [],
     palettes: [],
     fonts: [],
