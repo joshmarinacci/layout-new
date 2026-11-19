@@ -92,8 +92,8 @@ export function updateRectFill(rect: RectangleShape, color: string):RectangleSha
 }
 
 export function updateDocShape(doc: DrawDocument, shape: Shape): DrawDocument {
-    let new_shapes = doc.shapes.slice()
-    let index = new_shapes.findIndex(candidate => candidate.id === shape.id)
+    const new_shapes = doc.shapes.slice()
+    const index = new_shapes.findIndex(candidate => candidate.id === shape.id)
     if (index < 0) {
         throw new Error("shape not found in the list")
     }

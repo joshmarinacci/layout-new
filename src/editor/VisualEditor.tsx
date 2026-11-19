@@ -585,7 +585,7 @@ export default function VisualEditor({
                     gesture.current = null;
                     if (ref.current?.hasPointerCapture(event.pointerId)) ref.current.releasePointerCapture(event.pointerId);
                 }}
-                onPointerCancel={event => {
+                onPointerCancel={() => {
                     pixelEditor?.cancel();
                     vector.cancel();
                     finish(true);
