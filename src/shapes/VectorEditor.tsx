@@ -17,7 +17,7 @@ import {
     nearestSegment,
     regionPath,
     smoothPair,
-    splitSegment
+    splitSegment,
 } from './vectorNetworks';
 
 type Tool = 'select' | 'pen' | 'curve' | 'split' | 'junction' | 'fill';
@@ -30,34 +30,39 @@ type Gesture = {
     segment?: string;
     handle?: 'c1' | 'c2';
     end?: Point;
-    additive?: boolean
+    additive?: boolean;
 };
 
 const COLORS = {
-    WHITE:'#ffffff',
+    WHITE: '#ffffff',
     LIGHT_GRAY: '#bbbbbb',
-    RED:'#ff0000',
-    SELECTED_VECTOR:'red',
-    UNSELECTED_VECTOR:'blue',
+    RED: '#ff0000',
+    SELECTED_VECTOR: 'red',
+    UNSELECTED_VECTOR: 'blue',
     SELECTED_LINE: 'red',
-    UNSELECTED_LINE: 'black'
-}
+    UNSELECTED_LINE: 'black',
+};
 export function useVectorEditor(store: EditorStore, shape: VectorShape | undefined, zoom: number, onClose: () => void) {
     const shapeId = shape?.id;
-    const [tool, setTool] = useState<Tool>(() => shape && !shape.components.network.points.length ? 'pen' : 'select'), [color, setColor] = useState('#4f9fff'), [erase, setErase] = useState(false);
+    const [tool, setTool] = useState<Tool>(() => (shape && !shape.components.network.points.length ? 'pen' : 'select')),
+        [color, setColor] = useState('#4f9fff'),
+        [erase, setErase] = useState(false);
     const [colorText, setColorText] = useState('#4f9fff');
-    const [points, setPoints] = useState<string[]>([]), [segments, setSegments] = useState<string[]>([]);
-    const [pen, setPen] = useState<string | null>(null), [hover, setHover] = useState<Point | null>(null);
-    const [message, setMessage] = useState(''), [, redraw] = useState(0);
+    const [points, setPoints] = useState<string[]>([]),
+        [segments, setSegments] = useState<string[]>([]);
+    const [pen, setPen] = useState<string | null>(null),
+        [hover, setHover] = useState<Point | null>(null);
+    const [message, setMessage] = useState(''),
+        [, redraw] = useState(0);
     const [position, setPosition] = useState({x: 12, y: 12});
     const paletteDrag = useRef<{
         pointer: number;
         x: number;
         y: number;
-        start: Point
+        start: Point;
     } | null>(null);
     const gesture = useRef<Gesture | null>(null);
-    const penHandle = useRef<{ id: string; point: Point } | null>(null);
+    const penHandle = useRef<{id: string; point: Point} | null>(null);
     // Reset tool state when a different vector shape is opened for editing.
     const [editedShapeId, setEditedShapeId] = useState(shapeId);
     if (editedShapeId !== shapeId) {
@@ -74,7 +79,7 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
     }, [shapeId]);
     const local = (p: Point): Point => ({
         x: p.x - (shape?.components.network.origin.x ?? 0),
-        y: p.y - (shape?.components.network.origin.y ?? 0)
+        y: p.y - (shape?.components.network.origin.y ?? 0),
     });
     const cancel = () => {
         const g = gesture.current;
@@ -107,11 +112,14 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
         setSegments([]);
         setPen(null);
     };
-    useEffect(() => () => {
-        const g = gesture.current;
-        gesture.current = null;
-        if (g && g.kind !== 'marquee' && store.getSnapshot().transactionActive) store.cancelTransaction();
-    }, [store, shape?.id]);
+    useEffect(
+        () => () => {
+            const g = gesture.current;
+            gesture.current = null;
+            if (g && g.kind !== 'marquee' && store.getSnapshot().transactionActive) store.cancelTransaction();
+        },
+        [store, shape?.id],
+    );
     useEffect(() => {
         const blur = () => cancel();
         window.addEventListener('blur', blur);
@@ -120,13 +128,18 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
     useEffect(() => {
         if (!shape) return;
         const keydown = (event: KeyboardEvent) => {
-            if (event.target instanceof HTMLElement && (event.target.matches('input, textarea, select') || event.target.isContentEditable)) return;
+            if (
+                event.target instanceof HTMLElement &&
+                (event.target.matches('input, textarea, select') || event.target.isContentEditable)
+            )
+                return;
             const key = event.key.toLowerCase();
             if (key === 'escape') {
                 event.preventDefault();
                 event.stopImmediatePropagation();
                 if (!cancel()) {
-                    if (pen) setPen(null); else close();
+                    if (pen) setPen(null);
+                    else close();
                 }
                 return;
             }
@@ -141,7 +154,8 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
                 event.preventDefault();
                 event.stopImmediatePropagation();
                 setPen(null);
-                if (event.shiftKey || key === 'y') store.redo(); else store.undo();
+                if (event.shiftKey || key === 'y') store.redo();
+                else store.undo();
                 return;
             }
             if (!event.metaKey && !event.ctrlKey && !event.altKey) {
@@ -149,7 +163,7 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
                     v: 'select',
                     p: 'pen',
                     b: 'curve',
-                    g: 'fill'
+                    g: 'fill',
                 };
                 if (shortcuts[key]) {
                     event.preventDefault();
@@ -164,34 +178,39 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
     });
     const pointerDown = (world: Point, pointer: number, shift: boolean) => {
         if (!shape || gesture.current || store.getSnapshot().transactionActive) return;
-        const n = shape.components.network, p = local(world), tolerance = 9 / zoom;
+        const n = shape.components.network,
+            p = local(world),
+            tolerance = 9 / zoom;
         const hit = n.points.find(q => distance(q, p) <= tolerance),
             edge = nearestSegment(n, p, tolerance);
         setMessage('');
         if (tool === 'fill') {
             const face = facesFor(n).find(f => faceContains(f, p));
-            if (face) store.updateShape(shape.id, s => {
-                if (s.type === 'vector') {
-                    const r = s.components.network.regions.find(r => r.key === face.key);
-                    if (r) r.fill = erase ? null : color;
-                }
-            });
+            if (face)
+                store.updateShape(shape.id, s => {
+                    if (s.type === 'vector') {
+                        const r = s.components.network.regions.find(r => r.key === face.key);
+                        if (r) r.fill = erase ? null : color;
+                    }
+                });
             else setMessage('No enclosed region here. Close the boundary to fill it.');
             return;
         }
         if (tool === 'junction') {
             edit(d => {
                 const id = joinCrossing(d, p, tolerance);
-                if (id) setPoints([id]); else setMessage('Click a crossing of two segments to join them.');
+                if (id) setPoints([id]);
+                else setMessage('Click a crossing of two segments to join them.');
             });
             return;
         }
         if (tool === 'split') {
-            if (edge) edit(d => {
-                const id = splitSegment(d, edge.segment, edge.t);
-                setPoints([id]);
-                setSegments([]);
-            });
+            if (edge)
+                edit(d => {
+                    const id = splitSegment(d, edge.segment, edge.t);
+                    setPoints([id]);
+                    setSegments([]);
+                });
             return;
         }
         if (tool === 'curve') {
@@ -204,13 +223,15 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
         }
         if (tool === 'pen') {
             store.beginTransaction('Draw vector segment');
-            let id = hit?.id ?? '', newSegment: string | null = null;
+            let id = hit?.id ?? '',
+                newSegment: string | null = null;
             try {
                 store.updateVector(shape.id, d => {
                     if (!id) id = edge ? splitSegment(d, edge.segment, edge.t) : addPoint(d, p);
                     if (pen && d.points.some(p => p.id === pen)) {
                         newSegment = connect(d, pen, id);
-                        if (newSegment && penHandle.current?.id === pen) d.segments.find(s => s.id === newSegment)!.c1 = {...penHandle.current.point};
+                        if (newSegment && penHandle.current?.id === pen)
+                            d.segments.find(s => s.id === newSegment)!.c1 = {...penHandle.current.point};
                         const incoming = d.segments.find(s => s.b === pen && s.c2 && s.id !== newSegment);
                         if (newSegment && incoming?.c2 && penHandle.current?.id !== pen) {
                             const start = d.points.find(p => p.id === pen)!;
@@ -229,7 +250,7 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
                     baseline: current.components.network,
                     kind: 'pen',
                     ids: [id],
-                    segment: newSegment ?? undefined
+                    segment: newSegment ?? undefined,
                 };
             } catch (error) {
                 store.cancelTransaction();
@@ -238,23 +259,33 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
             return;
         }
         // Handles take precedence over edges, but anchors take precedence over handles.
-        if (!hit) for (const s of n.segments.filter(s => segments.includes(s.id) || points.includes(s.a) || points.includes(s.b))) for (const handle of ['c1', 'c2'] as const) {
-            if (s[handle] && distance(s[handle], p) < tolerance) {
-                store.beginTransaction('Move curve handle');
-                gesture.current = {
-                    pointer,
-                    start: p,
-                    baseline: n,
-                    kind: 'handle',
-                    ids: [],
-                    segment: s.id,
-                    handle
-                };
-                return;
-            }
-        }
+        if (!hit)
+            for (const s of n.segments.filter(
+                s => segments.includes(s.id) || points.includes(s.a) || points.includes(s.b),
+            ))
+                for (const handle of ['c1', 'c2'] as const) {
+                    if (s[handle] && distance(s[handle], p) < tolerance) {
+                        store.beginTransaction('Move curve handle');
+                        gesture.current = {
+                            pointer,
+                            start: p,
+                            baseline: n,
+                            kind: 'handle',
+                            ids: [],
+                            segment: s.id,
+                            handle,
+                        };
+                        return;
+                    }
+                }
         if (hit) {
-            const ids = shift ? points.includes(hit.id) ? points.filter(id => id !== hit.id) : [...points, hit.id] : points.includes(hit.id) ? points : [hit.id];
+            const ids = shift
+                ? points.includes(hit.id)
+                    ? points.filter(id => id !== hit.id)
+                    : [...points, hit.id]
+                : points.includes(hit.id)
+                  ? points
+                  : [hit.id];
             setPoints(ids);
             if (!shift) setSegments([]);
             store.beginTransaction('Move vector points');
@@ -262,7 +293,13 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
             return;
         }
         if (edge) {
-            setSegments(shift ? segments.includes(edge.segment) ? segments.filter(id => id !== edge.segment) : [...segments, edge.segment] : [edge.segment]);
+            setSegments(
+                shift
+                    ? segments.includes(edge.segment)
+                        ? segments.filter(id => id !== edge.segment)
+                        : [...segments, edge.segment]
+                    : [edge.segment],
+            );
             if (!shift) setPoints([]);
             return;
         }
@@ -277,7 +314,7 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
             baseline: n,
             kind: 'marquee',
             ids: shift ? points : [],
-            additive: shift
+            additive: shift,
         };
     };
     const pointerMove = (world: Point, pointer: number) => {
@@ -291,36 +328,42 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
             return;
         }
         try {
-            store.updateVector(shape.id, n => {
-                n.points = g.baseline.points.map(p => ({...p}));
-                n.segments = g.baseline.segments.map(s => ({
-                    ...s,
-                    c1: s.c1 && {...s.c1},
-                    c2: s.c2 && {...s.c2}
-                }));
-                if (g.kind === 'move') movePoints(n, g.ids, {
-                    x: p.x - g.start.x,
-                    y: p.y - g.start.y
-                });
-                if (g.kind === 'handle') {
-                    const original = g.baseline.segments.find(s => s.id === g.segment)![g.handle!]!;
-                    moveHandle(n, g.segment!, g.handle!, {
-                        x: original.x + p.x - g.start.x,
-                        y: original.y + p.y - g.start.y
-                    });
-                }
-                if (g.kind === 'pen' && distance(p, g.start) > 2 / zoom) penHandle.current = {
-                    id: g.ids[0],
-                    point: p
-                };
-                if (g.kind === 'pen' && g.segment && distance(p, g.start) > 2 / zoom) {
-                    const end = n.points.find(q => q.id === g.ids[0])!;
-                    n.segments.find(s => s.id === g.segment)!.c2 = {
-                        x: 2 * end.x - p.x,
-                        y: 2 * end.y - p.y
-                    };
-                }
-            }, g.baseline);
+            store.updateVector(
+                shape.id,
+                n => {
+                    n.points = g.baseline.points.map(p => ({...p}));
+                    n.segments = g.baseline.segments.map(s => ({
+                        ...s,
+                        c1: s.c1 && {...s.c1},
+                        c2: s.c2 && {...s.c2},
+                    }));
+                    if (g.kind === 'move')
+                        movePoints(n, g.ids, {
+                            x: p.x - g.start.x,
+                            y: p.y - g.start.y,
+                        });
+                    if (g.kind === 'handle') {
+                        const original = g.baseline.segments.find(s => s.id === g.segment)![g.handle!]!;
+                        moveHandle(n, g.segment!, g.handle!, {
+                            x: original.x + p.x - g.start.x,
+                            y: original.y + p.y - g.start.y,
+                        });
+                    }
+                    if (g.kind === 'pen' && distance(p, g.start) > 2 / zoom)
+                        penHandle.current = {
+                            id: g.ids[0],
+                            point: p,
+                        };
+                    if (g.kind === 'pen' && g.segment && distance(p, g.start) > 2 / zoom) {
+                        const end = n.points.find(q => q.id === g.ids[0])!;
+                        n.segments.find(s => s.id === g.segment)!.c2 = {
+                            x: 2 * end.x - p.x,
+                            y: 2 * end.y - p.y,
+                        };
+                    }
+                },
+                g.baseline,
+            );
         } catch (error) {
             cancel();
             setMessage(String(error));
@@ -334,7 +377,20 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
         gesture.current = null;
         if (g.kind === 'marquee') {
             const p = local(world);
-            setPoints([...new Set([...g.ids, ...g.baseline.points.filter(q => q.x >= Math.min(p.x, g.start.x) && q.x <= Math.max(p.x, g.start.x) && q.y >= Math.min(p.y, g.start.y) && q.y <= Math.max(p.y, g.start.y)).map(q => q.id)])]);
+            setPoints([
+                ...new Set([
+                    ...g.ids,
+                    ...g.baseline.points
+                        .filter(
+                            q =>
+                                q.x >= Math.min(p.x, g.start.x) &&
+                                q.x <= Math.max(p.x, g.start.x) &&
+                                q.y >= Math.min(p.y, g.start.y) &&
+                                q.y <= Math.max(p.y, g.start.y),
+                        )
+                        .map(q => q.id),
+                ]),
+            ]);
         } else if (store.getSnapshot().transactionActive) store.commitTransaction();
         redraw(x => x + 1);
     };
@@ -350,7 +406,7 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
                 regionPath(n, face.loops, ctx);
                 ctx.fillStyle = erase ? '#ff776655' : color + '66';
                 ctx.fill('evenodd');
-                ctx.strokeStyle = 'magenta'
+                ctx.strokeStyle = 'magenta';
                 ctx.stroke();
             }
         }
@@ -359,26 +415,31 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
             ctx.beginPath();
             ctx.moveTo(c[0].x, c[0].y);
             ctx.bezierCurveTo(c[1].x, c[1].y, c[2].x, c[2].y, c[3].x, c[3].y);
-            ctx.strokeStyle = segments.includes(s.id) ? COLORS.SELECTED_LINE : COLORS.UNSELECTED_LINE// '#ffe168' : '#69c8ff';
+            ctx.strokeStyle = segments.includes(s.id) ? COLORS.SELECTED_LINE : COLORS.UNSELECTED_LINE; // '#ffe168' : '#69c8ff';
             ctx.lineWidth = (segments.includes(s.id) ? 3 : 1) / zoom;
             ctx.stroke();
-            if (segments.includes(s.id) || points.includes(s.a) || points.includes(s.b)) for (const [handle, end] of [[s.c1, c[0]], [s.c2, c[3]]]) if (handle && end) {
-                ctx.beginPath();
-                ctx.moveTo(end.x, end.y);
-                ctx.lineTo(handle.x, handle.y);
-                ctx.lineWidth = 1 / zoom;
-                ctx.strokeStyle = COLORS.LIGHT_GRAY;
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.arc(handle.x, handle.y, 4 / zoom, 0, Math.PI * 2);
-                ctx.fillStyle = 'green'//COLORS.WHITE
-                ctx.fill();
-                ctx.stroke();
-            }
+            if (segments.includes(s.id) || points.includes(s.a) || points.includes(s.b))
+                for (const [handle, end] of [
+                    [s.c1, c[0]],
+                    [s.c2, c[3]],
+                ])
+                    if (handle && end) {
+                        ctx.beginPath();
+                        ctx.moveTo(end.x, end.y);
+                        ctx.lineTo(handle.x, handle.y);
+                        ctx.lineWidth = 1 / zoom;
+                        ctx.strokeStyle = COLORS.LIGHT_GRAY;
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.arc(handle.x, handle.y, 4 / zoom, 0, Math.PI * 2);
+                        ctx.fillStyle = 'green'; //COLORS.WHITE
+                        ctx.fill();
+                        ctx.stroke();
+                    }
         }
         for (const p of n.points) {
-            ctx.fillStyle = points.includes(p.id) ? COLORS.SELECTED_VECTOR : COLORS.UNSELECTED_VECTOR// '#ffe168' :
-                // '#ffffff';
+            ctx.fillStyle = points.includes(p.id) ? COLORS.SELECTED_VECTOR : COLORS.UNSELECTED_VECTOR; // '#ffe168' :
+            // '#ffffff';
             ctx.fillRect(p.x - 4 / zoom, p.y - 4 / zoom, 8 / zoom, 8 / zoom);
         }
         if (pen && hover && tool === 'pen') {
@@ -388,7 +449,7 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
                 ctx.setLineDash([4 / zoom, 4 / zoom]);
                 ctx.moveTo(p.x, p.y);
                 ctx.lineTo(hover.x, hover.y);
-                ctx.strokeStyle = COLORS.RED// '#69c8ff';
+                ctx.strokeStyle = COLORS.RED; // '#69c8ff';
                 ctx.stroke();
                 ctx.setLineDash([]);
             }
@@ -410,136 +471,253 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
         curve: 'Click a straight segment to bend it, then drag its handles.',
         split: 'Click a segment to insert a point without changing its curve.',
         junction: 'Click an intersection to join its two paths at an editable point.',
-        fill: 'Hover an enclosed region, then click to fill it. Choose No fill to make a hole.'
+        fill: 'Hover an enclosed region, then click to fill it. Choose No fill to make a hole.',
     };
-    const palette = shape &&
-        <div className="vector-palette" style={{left: position.x, top: position.y}}
-             aria-label="Vector editor">
-            <header onPointerDown={event => {
-                if ((event.target as HTMLElement).closest('button')) return;
-                paletteDrag.current = {
-                    pointer: event.pointerId,
-                    x: event.clientX,
-                    y: event.clientY,
-                    start: position
-                };
-                event.currentTarget.setPointerCapture(event.pointerId);
-            }} onPointerMove={event => {
-                const d = paletteDrag.current;
-                if (d?.pointer === event.pointerId) {
-                    const panel = event.currentTarget.parentElement!,
-                        parent = panel.offsetParent as HTMLElement;
-                    setPosition({
-                        x: Math.max(0, Math.min(parent.clientWidth - panel.offsetWidth, d.start.x + event.clientX - d.x)),
-                        y: Math.max(0, Math.min(parent.clientHeight - panel.offsetHeight, d.start.y + event.clientY - d.y))
-                    });
-                }
-            }} onPointerUp={() => {
-                paletteDrag.current = null;
-            }} onPointerCancel={() => {
-                paletteDrag.current = null;
-            }}><strong>Editing {shape.name}</strong>
+    const palette = shape && (
+        <div className="vector-palette" style={{left: position.x, top: position.y}} aria-label="Vector editor">
+            <header
+                onPointerDown={event => {
+                    if ((event.target as HTMLElement).closest('button')) return;
+                    paletteDrag.current = {
+                        pointer: event.pointerId,
+                        x: event.clientX,
+                        y: event.clientY,
+                        start: position,
+                    };
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                }}
+                onPointerMove={event => {
+                    const d = paletteDrag.current;
+                    if (d?.pointer === event.pointerId) {
+                        const panel = event.currentTarget.parentElement!,
+                            parent = panel.offsetParent as HTMLElement;
+                        setPosition({
+                            x: Math.max(
+                                0,
+                                Math.min(parent.clientWidth - panel.offsetWidth, d.start.x + event.clientX - d.x),
+                            ),
+                            y: Math.max(
+                                0,
+                                Math.min(parent.clientHeight - panel.offsetHeight, d.start.y + event.clientY - d.y),
+                            ),
+                        });
+                    }
+                }}
+                onPointerUp={() => {
+                    paletteDrag.current = null;
+                }}
+                onPointerCancel={() => {
+                    paletteDrag.current = null;
+                }}
+            >
+                <strong>Editing {shape.name}</strong>
                 <button onClick={close}>Done</button>
             </header>
-            <div className="vector-tools" role="group"
-                 aria-label="Vector tools">{(['select', 'pen', 'curve', 'split', 'junction', 'fill'] as Tool[]).map(t =>
-                <button key={t} aria-pressed={tool === t} disabled={busy} onClick={() => {
-                    setTool(t);
-                    setPen(null);
-                }}>{({
-                    select: 'Select (V)',
-                    pen: 'Pen (P)',
-                    curve: 'Curve (B)',
-                    split: 'Insert point',
-                    junction: 'Join crossing',
-                    fill: 'Fill (G)'
-                })[t]}</button>)}</div>
+            <div className="vector-tools" role="group" aria-label="Vector tools">
+                {(['select', 'pen', 'curve', 'split', 'junction', 'fill'] as Tool[]).map(t => (
+                    <button
+                        key={t}
+                        aria-pressed={tool === t}
+                        disabled={busy}
+                        onClick={() => {
+                            setTool(t);
+                            setPen(null);
+                        }}
+                    >
+                        {
+                            {
+                                select: 'Select (V)',
+                                pen: 'Pen (P)',
+                                curve: 'Curve (B)',
+                                split: 'Insert point',
+                                junction: 'Join crossing',
+                                fill: 'Fill (G)',
+                            }[t]
+                        }
+                    </button>
+                ))}
+            </div>
             <p>{tips[tool]}</p>
             <div className="vector-tools">
-                <button disabled={busy} onClick={() => {
-                    setPen(null);
-                    setPoints([]);
-                    setSegments([]);
-                    setTool('pen');
-                }}>New path
-                </button>
-                <button disabled={busy || livePoints.length !== 2} onClick={() => edit(d => {
-                    connect(d, livePoints[0], livePoints[1]);
-                })}>Connect points
-                </button>
-                <button disabled={busy || livePoints.length < 2} onClick={() => {
-                    edit(d => mergePoints(d, livePoints));
-                    setPoints(livePoints.slice(0, 1));
-                }}>Merge points
-                </button>
-                <button disabled={busy || !liveSegments.length} onClick={() => edit(d => {
-                    for (const s of d.segments.filter(s => liveSegments.includes(s.id))) {
-                        s.c1 = null;
-                        s.c2 = null;
-                    }
-                    d.smooth = d.smooth.filter(pair => !pair.segments.some(id => liveSegments.includes(id)));
-                })}>Straighten
+                <button
+                    disabled={busy}
+                    onClick={() => {
+                        setPen(null);
+                        setPoints([]);
+                        setSegments([]);
+                        setTool('pen');
+                    }}
+                >
+                    New path
                 </button>
                 <button
-                    disabled={busy || livePoints.length !== 1 || (n?.segments.filter(s => (s.a === livePoints[0] || s.b === livePoints[0]) && (!liveSegments.length || liveSegments.includes(s.id))).length !== 2)}
-                    onClick={() => edit(d => smoothPair(d, livePoints[0], liveSegments.length ? liveSegments : d.segments.filter(s => s.a === livePoints[0] || s.b === livePoints[0]).map(s => s.id)))}>Smooth
-                    pair
-                </button>
-                <button disabled={busy || !livePoints.length} onClick={() => edit(d => {
-                    d.smooth = d.smooth.filter(pair => !livePoints.includes(pair.point) || liveSegments.length > 0 && !pair.segments.some(id => liveSegments.includes(id)));
-                })}>Corner
-                </button>
-                <button disabled={busy || !livePoints.length && !liveSegments.length}
-                        onClick={remove}>Delete selected
-                </button>
-            </div>
-            <div className="vector-tools"><label>Fill <input aria-label="Region fill color"
-                                                             type="color" value={color}
-                                                             onChange={e => {
-                                                                 setColor(e.target.value);
-                                                                 setColorText(e.target.value);
-                                                                 setErase(false);
-                                                             }}/></label><input
-                aria-label="Region fill hex" className="vector-hex" value={colorText}
-                onChange={e => {
-                    setColorText(e.target.value);
-                    if (/^#[0-9a-f]{6}$/i.test(e.target.value)) {
-                        setColor(e.target.value);
-                        setErase(false);
+                    disabled={busy || livePoints.length !== 2}
+                    onClick={() =>
+                        edit(d => {
+                            connect(d, livePoints[0], livePoints[1]);
+                        })
                     }
-                }} onBlur={() => setColorText(color)} maxLength={7}/><label><input type="checkbox"
-                                                                                   checked={erase}
-                                                                                   onChange={e => setErase(e.target.checked)}/>No
-                fill</label>
-                <label>Stroke <input aria-label="Vector stroke color" type="color"
-                                     value={shape.components.stroke.color} disabled={busy}
-                                     onChange={e => store.updateShape(shape.id, s => {
-                                         if (s.type === 'vector') s.components.stroke.color = e.target.value;
-                                     })}/></label>
-                <label>Width <input aria-label="Vector stroke width" type="number" min="0"
-                                    step="0.5" value={shape.components.stroke.width} disabled={busy}
-                                    onChange={e => {
-                                        const width = e.target.valueAsNumber;
-                                        if (Number.isFinite(width) && width >= 0) store.updateShape(shape.id, s => {
-                                            if (s.type === 'vector') s.components.stroke.width = width;
-                                        });
-                                    }}/></label>
+                >
+                    Connect points
+                </button>
+                <button
+                    disabled={busy || livePoints.length < 2}
+                    onClick={() => {
+                        edit(d => mergePoints(d, livePoints));
+                        setPoints(livePoints.slice(0, 1));
+                    }}
+                >
+                    Merge points
+                </button>
+                <button
+                    disabled={busy || !liveSegments.length}
+                    onClick={() =>
+                        edit(d => {
+                            for (const s of d.segments.filter(s => liveSegments.includes(s.id))) {
+                                s.c1 = null;
+                                s.c2 = null;
+                            }
+                            d.smooth = d.smooth.filter(pair => !pair.segments.some(id => liveSegments.includes(id)));
+                        })
+                    }
+                >
+                    Straighten
+                </button>
+                <button
+                    disabled={
+                        busy ||
+                        livePoints.length !== 1 ||
+                        n?.segments.filter(
+                            s =>
+                                (s.a === livePoints[0] || s.b === livePoints[0]) &&
+                                (!liveSegments.length || liveSegments.includes(s.id)),
+                        ).length !== 2
+                    }
+                    onClick={() =>
+                        edit(d =>
+                            smoothPair(
+                                d,
+                                livePoints[0],
+                                liveSegments.length
+                                    ? liveSegments
+                                    : d.segments
+                                          .filter(s => s.a === livePoints[0] || s.b === livePoints[0])
+                                          .map(s => s.id),
+                            ),
+                        )
+                    }
+                >
+                    Smooth pair
+                </button>
+                <button
+                    disabled={busy || !livePoints.length}
+                    onClick={() =>
+                        edit(d => {
+                            d.smooth = d.smooth.filter(
+                                pair =>
+                                    !livePoints.includes(pair.point) ||
+                                    (liveSegments.length > 0 && !pair.segments.some(id => liveSegments.includes(id))),
+                            );
+                        })
+                    }
+                >
+                    Corner
+                </button>
+                <button disabled={busy || (!livePoints.length && !liveSegments.length)} onClick={remove}>
+                    Delete selected
+                </button>
             </div>
             <div className="vector-tools">
-                <button disabled={!store.getSnapshot().canUndo} onClick={() => {
-                    setPen(null);
-                    store.undo();
-                }}>Undo
+                <label>
+                    Fill{' '}
+                    <input
+                        aria-label="Region fill color"
+                        type="color"
+                        value={color}
+                        onChange={e => {
+                            setColor(e.target.value);
+                            setColorText(e.target.value);
+                            setErase(false);
+                        }}
+                    />
+                </label>
+                <input
+                    aria-label="Region fill hex"
+                    className="vector-hex"
+                    value={colorText}
+                    onChange={e => {
+                        setColorText(e.target.value);
+                        if (/^#[0-9a-f]{6}$/i.test(e.target.value)) {
+                            setColor(e.target.value);
+                            setErase(false);
+                        }
+                    }}
+                    onBlur={() => setColorText(color)}
+                    maxLength={7}
+                />
+                <label>
+                    <input type="checkbox" checked={erase} onChange={e => setErase(e.target.checked)} />
+                    No fill
+                </label>
+                <label>
+                    Stroke{' '}
+                    <input
+                        aria-label="Vector stroke color"
+                        type="color"
+                        value={shape.components.stroke.color}
+                        disabled={busy}
+                        onChange={e =>
+                            store.updateShape(shape.id, s => {
+                                if (s.type === 'vector') s.components.stroke.color = e.target.value;
+                            })
+                        }
+                    />
+                </label>
+                <label>
+                    Width{' '}
+                    <input
+                        aria-label="Vector stroke width"
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        value={shape.components.stroke.width}
+                        disabled={busy}
+                        onChange={e => {
+                            const width = e.target.valueAsNumber;
+                            if (Number.isFinite(width) && width >= 0)
+                                store.updateShape(shape.id, s => {
+                                    if (s.type === 'vector') s.components.stroke.width = width;
+                                });
+                        }}
+                    />
+                </label>
+            </div>
+            <div className="vector-tools">
+                <button
+                    disabled={!store.getSnapshot().canUndo}
+                    onClick={() => {
+                        setPen(null);
+                        store.undo();
+                    }}
+                >
+                    Undo
                 </button>
-                <button disabled={!store.getSnapshot().canRedo} onClick={() => {
-                    setPen(null);
-                    store.redo();
-                }}>Redo
+                <button
+                    disabled={!store.getSnapshot().canRedo}
+                    onClick={() => {
+                        setPen(null);
+                        store.redo();
+                    }}
+                >
+                    Redo
                 </button>
-                <span>{livePoints.length} points · {liveSegments.length} segments selected</span>
+                <span>
+                    {livePoints.length} points · {liveSegments.length} segments selected
+                </span>
             </div>
             {message && <p role="alert">{message}</p>}
-        </div>;
+        </div>
+    );
     return {
         palette,
         pointerDown,
@@ -548,6 +726,6 @@ export function useVectorEditor(store: EditorStore, shape: VectorShape | undefin
         cancel,
         draw,
         active: (pointer: number) => gesture.current?.pointer === pointer,
-        hover
+        hover,
     };
 }

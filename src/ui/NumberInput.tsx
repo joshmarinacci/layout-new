@@ -5,16 +5,16 @@ function roundToTenth(value: number) {
 }
 
 export function NumberInput({
-                                label,
-                                value,
-                                min,
-                                step = 1,
-                                shiftStep = 10,
-                                onChange,
-                                onFocus,
-                                onBlur,
-                                onKeyDown
-                            }: {
+    label,
+    value,
+    min,
+    step = 1,
+    shiftStep = 10,
+    onChange,
+    onFocus,
+    onBlur,
+    onKeyDown,
+}: {
     label: string;
     value: number | string;
     min?: number;
@@ -77,56 +77,73 @@ export function NumberInput({
         return () => element.removeEventListener('wheel', listener);
     }, []);
 
-    return <div className="number-input-control" ref={control}>
-        <button type="button" className="number-step-button"
+    return (
+        <div className="number-input-control" ref={control}>
+            <button
+                type="button"
+                className="number-step-button"
                 aria-label={`Decrease ${label}`}
                 title={`Decrease ${label}`}
                 onMouseDown={event => event.preventDefault()}
-                onClick={() => adjust(-step)}>−
-        </button>
-        <input ref={input} aria-label={label} type="number" inputMode="decimal"
-               value={draft}
-               min={min} step={step} onFocus={() => {
-            if (!editing.current) {
-                editing.current = true;
-                onFocus?.();
-            }
-        }}
-               onBlur={() => {
-                   if (skipBlurCommit.current) {
-                       skipBlurCommit.current = false;
-                       editing.current = false;
-                       return;
-                   }
-                   const parsed = Number(draft);
-                   if (draft !== '' && Number.isFinite(parsed)) {
-                       const rounded = Math.max(min ?? -Infinity, roundToTenth(parsed));
-                       updateDraft(String(rounded));
-                       onChange(rounded);
-                   }
-                   editing.current = false;
-                   onBlur?.();
-               }}
-               onKeyDown={event => {
-                   if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-                       event.preventDefault();
-                       adjust((event.key === 'ArrowUp' ? 1 : -1) * (event.shiftKey ? shiftStep : step));
-                   }
-                   if (event.key === 'Escape') skipBlurCommit.current = true;
-                   onKeyDown?.(event);
-               }}
-               onChange={event => {
-                   const next = event.currentTarget.value;
-                   updateDraft(next);
-                   if (next === '') return;
-                   const parsed = event.currentTarget.valueAsNumber;
-                   if (Number.isFinite(parsed) && (min === undefined || parsed >= min)) onChange(parsed);
-               }}/>
-        <button type="button" className="number-step-button"
+                onClick={() => adjust(-step)}
+            >
+                −
+            </button>
+            <input
+                ref={input}
+                aria-label={label}
+                type="number"
+                inputMode="decimal"
+                value={draft}
+                min={min}
+                step={step}
+                onFocus={() => {
+                    if (!editing.current) {
+                        editing.current = true;
+                        onFocus?.();
+                    }
+                }}
+                onBlur={() => {
+                    if (skipBlurCommit.current) {
+                        skipBlurCommit.current = false;
+                        editing.current = false;
+                        return;
+                    }
+                    const parsed = Number(draft);
+                    if (draft !== '' && Number.isFinite(parsed)) {
+                        const rounded = Math.max(min ?? -Infinity, roundToTenth(parsed));
+                        updateDraft(String(rounded));
+                        onChange(rounded);
+                    }
+                    editing.current = false;
+                    onBlur?.();
+                }}
+                onKeyDown={event => {
+                    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        adjust((event.key === 'ArrowUp' ? 1 : -1) * (event.shiftKey ? shiftStep : step));
+                    }
+                    if (event.key === 'Escape') skipBlurCommit.current = true;
+                    onKeyDown?.(event);
+                }}
+                onChange={event => {
+                    const next = event.currentTarget.value;
+                    updateDraft(next);
+                    if (next === '') return;
+                    const parsed = event.currentTarget.valueAsNumber;
+                    if (Number.isFinite(parsed) && (min === undefined || parsed >= min)) onChange(parsed);
+                }}
+            />
+            <button
+                type="button"
+                className="number-step-button"
                 aria-label={`Increase ${label}`}
                 title={`Increase ${label}`}
                 onMouseDown={event => event.preventDefault()}
-                onClick={() => adjust(step)}>+
-        </button>
-    </div>;
+                onClick={() => adjust(step)}
+            >
+                +
+            </button>
+        </div>
+    );
 }

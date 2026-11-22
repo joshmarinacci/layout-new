@@ -1,7 +1,8 @@
 import type {Bounds, Shape} from './types';
 import {selectionBounds} from '../editor/VisualEditor';
 
-export type ShapeAlignment = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'distribute-horizontal' | 'distribute-vertical';
+export type ShapeAlignment =
+    'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'distribute-horizontal' | 'distribute-vertical';
 
 export interface ShapeOffset {
     x: number;
@@ -25,9 +26,12 @@ export function shapeAlignmentOffsets(shapes: readonly Shape[], alignment: Shape
     if (alignment === 'left' || alignment === 'center' || alignment === 'right') {
         shapes.forEach((shape, index) => {
             const box = bounds[index];
-            const x = alignment === 'left' ? selection.x - box.x
-                : alignment === 'center' ? selection.x + selection.width / 2 - (box.x + box.width / 2)
-                    : selection.x + selection.width - box.x - box.width;
+            const x =
+                alignment === 'left'
+                    ? selection.x - box.x
+                    : alignment === 'center'
+                      ? selection.x + selection.width / 2 - (box.x + box.width / 2)
+                      : selection.x + selection.width - box.x - box.width;
             offsets.set(shape.id, {x, y: 0});
         });
         return offsets;
@@ -35,17 +39,21 @@ export function shapeAlignmentOffsets(shapes: readonly Shape[], alignment: Shape
     if (alignment === 'top' || alignment === 'middle' || alignment === 'bottom') {
         shapes.forEach((shape, index) => {
             const box = bounds[index];
-            const y = alignment === 'top' ? selection.y - box.y
-                : alignment === 'middle' ? selection.y + selection.height / 2 - (box.y + box.height / 2)
-                    : selection.y + selection.height - box.y - box.height;
+            const y =
+                alignment === 'top'
+                    ? selection.y - box.y
+                    : alignment === 'middle'
+                      ? selection.y + selection.height / 2 - (box.y + box.height / 2)
+                      : selection.y + selection.height - box.y - box.height;
             offsets.set(shape.id, {x: 0, y});
         });
         return offsets;
     }
 
     const horizontal = alignment === 'distribute-horizontal';
-    const ordered = shapes.map((shape, index) => ({shape, box: bounds[index]}))
-        .sort((a, b) => horizontal ? a.box.x - b.box.x : a.box.y - b.box.y);
+    const ordered = shapes
+        .map((shape, index) => ({shape, box: bounds[index]}))
+        .sort((a, b) => (horizontal ? a.box.x - b.box.x : a.box.y - b.box.y));
     const start = horizontal ? ordered[0].box.x : ordered[0].box.y;
     const endBox = ordered[ordered.length - 1].box;
     const end = horizontal ? endBox.x + endBox.width : endBox.y + endBox.height;

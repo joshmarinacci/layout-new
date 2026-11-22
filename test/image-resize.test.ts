@@ -7,14 +7,20 @@ describe('image resizing', () => {
     it('resizes freely without Shift', () => {
         expect(resizeImageBounds(bounds, 20, 30, false)).toEqual({...bounds, width: 120, height: 80});
     });
-    it.each([[50, 10, 150, 75], [10, 50, 200, 100], [-50, -10, 50, 25]])(
-        'locks the initial aspect ratio for drag %s,%s', (dx, dy, width, height) => {
-            expect(resizeImageBounds(bounds, dx, dy, true)).toEqual({...bounds, width, height});
-        });
+    it.each([
+        [50, 10, 150, 75],
+        [10, 50, 200, 100],
+        [-50, -10, 50, 25],
+    ])('locks the initial aspect ratio for drag %s,%s', (dx, dy, width, height) => {
+        expect(resizeImageBounds(bounds, dx, dy, true)).toEqual({...bounds, width, height});
+    });
     it('clamps both dimensions while preserving the ratio when dragged past the origin', () => {
         expect(resizeImageBounds(bounds, -200, -100, true)).toEqual({...bounds, width: 2, height: 1});
-        expect(resizeImageBounds({...bounds, width: 50, height: 100}, -200, -100, true))
-            .toEqual({...bounds, width: 1, height: 2});
+        expect(resizeImageBounds({...bounds, width: 50, height: 100}, -200, -100, true)).toEqual({
+            ...bounds,
+            width: 1,
+            height: 2,
+        });
     });
     it('can release Shift during a gesture and handles zero-size bounds without NaN', () => {
         resizeImageBounds(bounds, 20, 30, true);
@@ -29,14 +35,17 @@ describe('image resizing', () => {
         const before = store.getSnapshot().document;
         store.beginTransaction('resize');
         store.updateShape(id, shape => {
-            if (shape.type === 'pixel-image') shape.components.rect.bounds = resizeImageBounds(shape.components.rect.bounds, 50, 20, true);
+            if (shape.type === 'pixel-image')
+                shape.components.rect.bounds = resizeImageBounds(shape.components.rect.bounds, 50, 20, true);
         });
         store.commitTransaction();
         const after = store.getSnapshot().document;
         expect(after.images).toEqual(before.images);
         expect(after.shapes[1]).toEqual(before.shapes[1]);
         expect(after.shapes[0]).not.toEqual(before.shapes[0]);
-        store.undo(); expect(store.getSnapshot().document).toEqual(before);
-        store.redo(); expect(store.getSnapshot().document).toEqual(after);
+        store.undo();
+        expect(store.getSnapshot().document).toEqual(before);
+        store.redo();
+        expect(store.getSnapshot().document).toEqual(after);
     });
 });

@@ -7,16 +7,16 @@ import {emptyDocument} from '../src/model/EditorStore';
 import {makeText} from '../src/model/reducer';
 import type {Document, FontAsset, TextShape} from '../src/model/types';
 
-const fontCss = (family: string) => `@font-face{font-family:"${family}";src:url("data:font/woff2;base64,AA==") format("woff2")}`;
+const fontCss = (family: string) =>
+    `@font-face{font-family:"${family}";src:url("data:font/woff2;base64,AA==") format("woff2")}`;
 const lobster: FontAsset = {id: 'font-lobster', family: 'Lobster', css: fontCss('Lobster')};
 const inter: FontAsset = {id: 'font-inter', family: 'Inter', css: fontCss('Inter')};
 
 // A tiny valid PNG with one IDAT chunk; payload bytes are opaque to metadata tests.
 const tinyPng = Uint8Array.from([
-    137, 80, 78, 71, 13, 10, 26, 10,
-    0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137,
-    0, 0, 0, 12, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180,
-    0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130
+    137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196,
+    137, 0, 0, 0, 12, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68,
+    174, 66, 96, 130,
 ]);
 
 function styledText(name: string, patch: Partial<TextShape['components']['text']>): TextShape {
@@ -30,9 +30,19 @@ function textDocument(): Document {
     const document = emptyDocument();
     document.fonts.push(lobster, inter);
     document.shapes.push(
-        styledText('Heading', {text: 'Hello\nworld', fontId: lobster.id, fontSize: 48, fontWeight: 700, italic: true, color: '#ff0000', align: 'center', verticalAlign: 'middle', lineHeight: 1.5}),
+        styledText('Heading', {
+            text: 'Hello\nworld',
+            fontId: lobster.id,
+            fontSize: 48,
+            fontWeight: 700,
+            italic: true,
+            color: '#ff0000',
+            align: 'center',
+            verticalAlign: 'middle',
+            lineHeight: 1.5,
+        }),
         styledText('Footer', {text: 'Bottom right', fontId: null, align: 'right', verticalAlign: 'bottom'}),
-        styledText('Body', {text: 'Top left', fontId: lobster.id})
+        styledText('Body', {text: 'Top left', fontId: lobster.id}),
     );
     return document;
 }
@@ -52,7 +62,11 @@ describe('text documents: JSON export and import', () => {
     it('writes font references by ID and embeds the font CSS once per asset', () => {
         const json = serializeDocument(textDocument());
         const parsed = JSON.parse(json) as Document;
-        expect(parsed.shapes.map(shape => shape.type === 'text' ? shape.components.text.fontId : undefined)).toEqual([lobster.id, null, lobster.id]);
+        expect(parsed.shapes.map(shape => (shape.type === 'text' ? shape.components.text.fontId : undefined))).toEqual([
+            lobster.id,
+            null,
+            lobster.id,
+        ]);
         expect(json.split('@font-face{font-family:\\"Lobster\\"').length - 1).toBe(1);
     });
 
@@ -95,12 +109,21 @@ describe('text documents: JSON export and import', () => {
     it('migrates version 8 text to top vertical alignment and keeps font references', () => {
         const version8 = serializedObject(textDocument()) as unknown as Document;
         (version8 as unknown as Record<string, unknown>).version = 8;
-        for (const shape of version8.shapes) if (shape.type === 'text') delete (shape.components.text as Partial<TextShape['components']['text']>).verticalAlign;
+        for (const shape of version8.shapes)
+            if (shape.type === 'text')
+                delete (shape.components.text as Partial<TextShape['components']['text']>).verticalAlign;
         const loaded = deserializeDocument(JSON.stringify(version8));
         expect(loaded.version).toBe(9);
         expect(loaded.fonts).toEqual([lobster, inter]);
-        expect(loaded.shapes.map(shape => shape.type === 'text' ? [shape.components.text.fontId, shape.components.text.verticalAlign] : null))
-            .toEqual([[lobster.id, 'top'], [null, 'top'], [lobster.id, 'top']]);
+        expect(
+            loaded.shapes.map(shape =>
+                shape.type === 'text' ? [shape.components.text.fontId, shape.components.text.verticalAlign] : null,
+            ),
+        ).toEqual([
+            [lobster.id, 'top'],
+            [null, 'top'],
+            [lobster.id, 'top'],
+        ]);
         expect(deserializeDocument(serializeDocument(loaded))).toEqual(loaded);
     });
 
@@ -128,10 +151,17 @@ describe('text documents: PNG-embedded export and import', () => {
 describe('text documents: SVG artwork export', () => {
     beforeEach(() => {
         // happy-dom has no canvas text metrics; use a fixed 10px-per-character width.
-        vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() =>
-            ({font: '', measureText: (value: string) => ({width: value.length * 10})}) as unknown as CanvasRenderingContext2D);
+        vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+            () =>
+                ({
+                    font: '',
+                    measureText: (value: string) => ({width: value.length * 10}),
+                }) as unknown as CanvasRenderingContext2D,
+        );
     });
-    afterEach(() => { vi.restoreAllMocks(); });
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
 
     const tspanYs = (svg: string) => [...svg.matchAll(/<tspan x="[^"]+" y="([^"]+)"/g)].map(match => Number(match[1]));
 

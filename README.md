@@ -120,7 +120,6 @@ Next steps include oval creation/interactions and rounded-corner rendering. Cust
 
 Seven image-resize tests cover free and constrained resizing, shrinking and minimum bounds, modifier changes, zero-size bounds, and undo/redo without changing shared pixels. The creation UI offers square presets; the model still supports existing 1–256 pixel dimensions.
 
-
 ## Editor appearance and shared controls
 
 The interface adapts the adjacent `layout-mockup` project's neutral panels, blue property-section headers, compact icon toolbars, menu shortcut columns, tree icons, select controls, dialogs, canvas grid, and transitions. The working editor's document model, history, selection, and pixel editing remain in place.

@@ -4,6 +4,10 @@
  * tooltheme (imported before this file in main.tsx) supplies the reset, type, controls,
  * app shell, panels, menus and dialogs. Only app-wide additions live here.
  */
-#root { height: 100%; }
+#root {
+    height: 100%;
+}
 
-.lucide { stroke-width: 1.6; }
+.lucide {
+    stroke-width: 1.6;
+}

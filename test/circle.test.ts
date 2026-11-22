@@ -1,10 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {makeCircle} from '../src/model/reducer';
-import {
-    circleContains,
-    circleHandles,
-    dragCircle
-} from '../src/shapes/circleGeometry';
+import {circleContains, circleHandles, dragCircle} from '../src/shapes/circleGeometry';
 import {EditorStore} from '../src/model/EditorStore';
 import {deserializeDocument} from '../src/io/serialization';
 
@@ -20,8 +16,10 @@ describe('circles', () => {
         const store = new EditorStore();
         store.addShape(shape);
         expect(deserializeDocument(store.toJSON()).shapes).toEqual([shape]);
-        store.undo(); expect(store.getSnapshot().document.shapes).toEqual([]);
-        store.redo(); expect(store.getSnapshot().document.shapes).toEqual([shape]);
+        store.undo();
+        expect(store.getSnapshot().document.shapes).toEqual([]);
+        store.redo();
+        expect(store.getSnapshot().document.shapes).toEqual([shape]);
     });
     it('hit tests the circular area including its boundary, excluding bounding-box corners', () => {
         const geometry = circle().components.circle;
@@ -40,8 +38,10 @@ describe('circles', () => {
     it.each([0, 1, 2, 3])('resizes from handle %i while preserving center', index => {
         const geometry = circle().components.circle;
         const start = circleHandles(geometry)[index];
-        const end = {x: geometry.center.x + (start.x - geometry.center.x) * 2,
-            y: geometry.center.y + (start.y - geometry.center.y) * 2};
+        const end = {
+            x: geometry.center.x + (start.x - geometry.center.x) * 2,
+            y: geometry.center.y + (start.y - geometry.center.y) * 2,
+        };
         expect(dragCircle(geometry, start, end, true)).toEqual({...geometry, radius: 80});
         expect(dragCircle(geometry, start, start, true)).toEqual(geometry);
     });
@@ -56,14 +56,23 @@ describe('circles', () => {
     });
     it.each([false, true])('groups circle gesture updates, undo/redo and cancellation (resize=%s)', resize => {
         const shape = circle();
-        const store = new EditorStore({version: 9, images: [], palettes: [], fonts: [], title: 'circles', shapes: [shape], pages: [{id: 'page-1', name: 'Page 1', groups: []}]});
+        const store = new EditorStore({
+            version: 9,
+            images: [],
+            palettes: [],
+            fonts: [],
+            title: 'circles',
+            shapes: [shape],
+            pages: [{id: 'page-1', name: 'Page 1', groups: []}],
+        });
         const original = store.getSnapshot().document;
         const geometry = shape.components.circle;
         const start = circleHandles(geometry)[1];
         store.beginTransaction('circle gesture');
         for (let step = 1; step <= 100; step++) {
             store.updateShape(shape.id, draft => {
-                if (draft.type === 'circle') draft.components.circle = dragCircle(geometry, start, {x: start.x + step, y: start.y}, resize);
+                if (draft.type === 'circle')
+                    draft.components.circle = dragCircle(geometry, start, {x: start.x + step, y: start.y}, resize);
             });
         }
         store.commitTransaction();
@@ -72,11 +81,13 @@ describe('circles', () => {
         store.undo();
         expect(store.getSnapshot().document).toEqual(original);
         expect(store.getSnapshot().canUndo).toBe(false);
-        store.redo(); expect(store.getSnapshot().document).toEqual(final);
+        store.redo();
+        expect(store.getSnapshot().document).toEqual(final);
         store.undo();
         store.beginTransaction('cancel circle gesture');
         store.updateShape(shape.id, draft => {
-            if (draft.type === 'circle') draft.components.circle = dragCircle(geometry, start, {x: 300, y: 200}, resize);
+            if (draft.type === 'circle')
+                draft.components.circle = dragCircle(geometry, start, {x: 300, y: 200}, resize);
         });
         store.cancelTransaction();
         expect(store.getSnapshot().document).toEqual(original);
@@ -84,12 +95,22 @@ describe('circles', () => {
     });
     it('rejects invalid circle geometry atomically', () => {
         const shape = circle();
-        const store = new EditorStore({version: 9, images: [], palettes: [], fonts: [], title: 'circles', shapes: [shape], pages: [{id: 'page-1', name: 'Page 1', groups: []}]});
+        const store = new EditorStore({
+            version: 9,
+            images: [],
+            palettes: [],
+            fonts: [],
+            title: 'circles',
+            shapes: [shape],
+            pages: [{id: 'page-1', name: 'Page 1', groups: []}],
+        });
         const before = store.getSnapshot();
         for (const radius of [-1, Infinity, NaN]) {
-            expect(() => store.updateShape(shape.id, draft => {
-                if (draft.type === 'circle') draft.components.circle.radius = radius;
-            })).toThrow();
+            expect(() =>
+                store.updateShape(shape.id, draft => {
+                    if (draft.type === 'circle') draft.components.circle.radius = radius;
+                }),
+            ).toThrow();
             expect(store.getSnapshot()).toBe(before);
         }
     });

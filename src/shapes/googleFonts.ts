@@ -2,26 +2,32 @@ import type {FontAsset, TextComponent} from '../model/types';
 
 function toBase64(bytes: Uint8Array) {
     let binary = '';
-    for (let start = 0; start < bytes.length; start += 0x8000) binary += String.fromCharCode(...bytes.subarray(start, start + 0x8000));
+    for (let start = 0; start < bytes.length; start += 0x8000)
+        binary += String.fromCharCode(...bytes.subarray(start, start + 0x8000));
     return btoa(binary);
 }
 
 /** Fetch one Google Fonts family and embed its WOFF2 subset files in the asset. */
 export async function fetchGoogleFont(familyInput: string): Promise<FontAsset> {
     const family = familyInput.trim();
-    if (!family || family.length > 200 || /[<>\u0000-\u001f]/.test(family)) throw new Error('Enter a valid Google Fonts family name');
+    if (!family || family.length > 200 || /[<>\u0000-\u001f]/.test(family))
+        throw new Error('Enter a valid Google Fonts family name');
     const url = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family).replaceAll('%20', '+')}&display=swap`;
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Google Fonts did not find “${family}”`);
     let css = await response.text();
-    const urls = [...new Set([...css.matchAll(/url\(([^)]+)\)/g)].map(match => match[1].trim().replace(/^['"]|['"]$/g, '')))];
+    const urls = [
+        ...new Set([...css.matchAll(/url\(([^)]+)\)/g)].map(match => match[1].trim().replace(/^['"]|['"]$/g, ''))),
+    ];
     if (!urls.length) throw new Error('Google Fonts returned no font files for this family');
     const embedded = new Map<string, string>();
-    await Promise.all(urls.map(async fontUrl => {
-        const file = await fetch(fontUrl);
-        if (!file.ok) throw new Error(`Unable to download the ${family} font file`);
-        embedded.set(fontUrl, `data:font/woff2;base64,${toBase64(new Uint8Array(await file.arrayBuffer()))}`);
-    }));
+    await Promise.all(
+        urls.map(async fontUrl => {
+            const file = await fetch(fontUrl);
+            if (!file.ok) throw new Error(`Unable to download the ${family} font file`);
+            embedded.set(fontUrl, `data:font/woff2;base64,${toBase64(new Uint8Array(await file.arrayBuffer()))}`);
+        }),
+    );
     css = css.replace(/url\(([^)]+)\)/g, (_whole, value: string) => {
         const fontUrl = value.trim().replace(/^['"]|['"]$/g, '');
         return `url("${embedded.get(fontUrl)}")`;

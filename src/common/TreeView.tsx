@@ -1,32 +1,27 @@
-import {
-    ChevronDown,
-    ChevronRight,
-    File,
-    FileText,
-    Folder,
-    Layers,
-    Square
-} from 'lucide-react';
-import {
-    Children,
-    type DragEvent,
-    type MouseEvent,
-    type ReactNode,
-    useEffect,
-    useRef,
-    useState
-} from 'react';
+import {ChevronDown, ChevronRight, File, FileText, Folder, Layers, Square} from 'lucide-react';
+import {Children, type DragEvent, type MouseEvent, type ReactNode, useEffect, useRef, useState} from 'react';
 import type {ColorPalette, DrawDocument, PixelImageData, Shape} from '../model/types';
 
 /** How long a click on a renameable folder waits to see whether it's the start of a double-click. */
 export const DOUBLE_CLICK_DELAY = 250;
 
 function cls(props: Record<string, boolean>) {
-    return Object.entries(props).filter(([, active]) => active).map(([name]) => name).join(' ');
+    return Object.entries(props)
+        .filter(([, active]) => active)
+        .map(([name]) => name)
+        .join(' ');
 }
 
 /** Inline name editor shown in place of a tree row's label while renaming. */
-function RenameField({initial, onCommit, onCancel}: {initial: string; onCommit: (name: string) => void; onCancel: () => void}) {
+function RenameField({
+    initial,
+    onCommit,
+    onCancel,
+}: {
+    initial: string;
+    onCommit: (name: string) => void;
+    onCancel: () => void;
+}) {
     const [value, setValue] = useState(initial);
     const done = useRef(false);
     const finish = (commit: boolean) => {
@@ -36,39 +31,59 @@ function RenameField({initial, onCommit, onCancel}: {initial: string; onCommit: 
         if (commit && name && name !== initial) onCommit(name);
         else onCancel();
     };
-    return <input className="tree-rename" aria-label={`Rename ${initial}`} value={value} autoFocus
-                  onFocus={event => event.currentTarget.select()}
-                  onChange={event => setValue(event.target.value)}
-                  onBlur={() => finish(true)}
-                  onKeyDown={event => {
-                      if (event.key === 'Enter') { event.preventDefault(); finish(true); }
-                      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish(false); }
-                  }}/>;
+    return (
+        <input
+            className="tree-rename"
+            aria-label={`Rename ${initial}`}
+            value={value}
+            autoFocus
+            onFocus={event => event.currentTarget.select()}
+            onChange={event => setValue(event.target.value)}
+            onBlur={() => finish(true)}
+            onKeyDown={event => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    finish(true);
+                }
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    finish(false);
+                }
+            }}
+        />
+    );
 }
 
 function TreeNode({
-                      label,
-                      editValue = label,
-                      icon: iconOverride,
-                      depth,
-                      defaultExpanded = true,
-                      selected,
-                      current,
-                      onSelect,
-                      onContextMenu,
-                      onRename,
-                      draggable,
-                      onDragStart,
-                      onDragOver,
-                      onDrop,
-                      dropPosition,
-                      children
-                  }: {
-    label: string; editValue?: string; icon?: ReactNode; depth: number; defaultExpanded?: boolean; selected?: boolean;
+    label,
+    editValue = label,
+    icon: iconOverride,
+    depth,
+    defaultExpanded = true,
+    selected,
+    current,
+    onSelect,
+    onContextMenu,
+    onRename,
+    draggable,
+    onDragStart,
+    onDragOver,
+    onDrop,
+    dropPosition,
+    children,
+}: {
+    label: string;
+    editValue?: string;
+    icon?: ReactNode;
+    depth: number;
+    defaultExpanded?: boolean;
+    selected?: boolean;
     /** Marks the open page with a subtle style when something else is the selection. */
     current?: boolean;
     onSelect?: (event: MouseEvent<HTMLButtonElement>) => void;
-    onContextMenu?: (event: MouseEvent<HTMLButtonElement>) => void; children?: ReactNode;
+    onContextMenu?: (event: MouseEvent<HTMLButtonElement>) => void;
+    children?: ReactNode;
     onRename?: (name: string) => void;
     draggable?: boolean;
     onDragStart?: (event: React.DragEvent<HTMLButtonElement>) => void;
@@ -90,31 +105,67 @@ function TreeNode({
     const toggleFromClick = (event: MouseEvent<HTMLButtonElement>) => {
         // detail is 0 for keyboard activation and 2+ for the later clicks of a double-click.
         if (event.detail > 1) return;
-        if (!onRename || event.detail === 0) { setExpanded(value => !value); return; }
+        if (!onRename || event.detail === 0) {
+            setExpanded(value => !value);
+            return;
+        }
         cancelPendingToggle();
         pendingToggle.current = setTimeout(() => {
             pendingToggle.current = null;
             setExpanded(value => !value);
         }, DOUBLE_CLICK_DELAY);
     };
-    const icon = iconOverride ?? (hasChildren ? <Folder aria-hidden="true"/> : depth === 0 ?
-        <File aria-hidden="true"/> : depth < 3 ? <Layers aria-hidden="true"/> : <Square aria-hidden="true"/>);
-    return <li className="tree-node" aria-expanded={hasChildren ? expanded : undefined}>
-        <div className={cls({
-            'tree-row': true,
-            selected: !!selected,
-            current: !selected && !!current,
-            'drop-before': dropPosition === 'before',
-            'drop-after': dropPosition === 'after'
-        })} style={{paddingLeft: `${depth * 0.9}rem`}}>
-            {hasChildren ? <button className="tree-disclosure" tabIndex={-1} aria-hidden="true"
-                                   onClick={() => setExpanded(value => !value)}>{expanded ?
-                    <ChevronDown aria-hidden="true"/> : <ChevronRight aria-hidden="true"/>}</button> :
-                <span className="tree-disclosure-spacer"/>}
-            {renaming && onRename ? <span className="tree-label tree-label-editing">{icon}
-                    <RenameField initial={editValue} onCancel={() => setRenaming(false)}
-                                 onCommit={name => { setRenaming(false); onRename(name); }}/></span> :
-                <button className="tree-label" aria-current={selected ? 'true' : current ? 'page' : undefined}
+    const icon =
+        iconOverride ??
+        (hasChildren ? (
+            <Folder aria-hidden="true" />
+        ) : depth === 0 ? (
+            <File aria-hidden="true" />
+        ) : depth < 3 ? (
+            <Layers aria-hidden="true" />
+        ) : (
+            <Square aria-hidden="true" />
+        ));
+    return (
+        <li className="tree-node" aria-expanded={hasChildren ? expanded : undefined}>
+            <div
+                className={cls({
+                    'tree-row': true,
+                    selected: !!selected,
+                    current: !selected && !!current,
+                    'drop-before': dropPosition === 'before',
+                    'drop-after': dropPosition === 'after',
+                })}
+                style={{paddingLeft: `${depth * 0.9}rem`}}
+            >
+                {hasChildren ? (
+                    <button
+                        className="tree-disclosure"
+                        tabIndex={-1}
+                        aria-hidden="true"
+                        onClick={() => setExpanded(value => !value)}
+                    >
+                        {expanded ? <ChevronDown aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
+                    </button>
+                ) : (
+                    <span className="tree-disclosure-spacer" />
+                )}
+                {renaming && onRename ? (
+                    <span className="tree-label tree-label-editing">
+                        {icon}
+                        <RenameField
+                            initial={editValue}
+                            onCancel={() => setRenaming(false)}
+                            onCommit={name => {
+                                setRenaming(false);
+                                onRename(name);
+                            }}
+                        />
+                    </span>
+                ) : (
+                    <button
+                        className="tree-label"
+                        aria-current={selected ? 'true' : current ? 'page' : undefined}
                         aria-expanded={hasChildren ? expanded : undefined}
                         title={onRename ? 'Double-click or press F2 to rename' : undefined}
                         onClick={event => {
@@ -122,60 +173,95 @@ function TreeNode({
                             onSelect?.(event);
                         }}
                         onContextMenu={onContextMenu}
-                        onDoubleClick={() => { if (onRename) { cancelPendingToggle(); setRenaming(true); } }}
-                        onKeyDown={event => { if (event.key === 'F2' && onRename) { event.preventDefault(); setRenaming(true); } }}
-                        draggable={draggable} onDragStart={onDragStart} onDragOver={onDragOver}
-                        onDrop={onDrop}>{icon}<span>{label}</span></button>}
-        </div>
-        {hasChildren && expanded && <ul>{children}</ul>}
-    </li>;
+                        onDoubleClick={() => {
+                            if (onRename) {
+                                cancelPendingToggle();
+                                setRenaming(true);
+                            }
+                        }}
+                        onKeyDown={event => {
+                            if (event.key === 'F2' && onRename) {
+                                event.preventDefault();
+                                setRenaming(true);
+                            }
+                        }}
+                        draggable={draggable}
+                        onDragStart={onDragStart}
+                        onDragOver={onDragOver}
+                        onDrop={onDrop}
+                    >
+                        {icon}
+                        <span>{label}</span>
+                    </button>
+                )}
+            </div>
+            {hasChildren && expanded && <ul>{children}</ul>}
+        </li>
+    );
 }
 
 export default function TreeView(props: {
-    document: DrawDocument,
-    selectedIds: readonly string[],
-    onSelect: (value: Shape, additive: boolean) => void,
-    selectedAssetId: string | null,
-    onSelectAsset: (image: PixelImageData) => void,
-    selectedPaletteId: string | null,
-    onSelectPalette: (palette: ColorPalette) => void,
-    onShapeContextMenu: (event: MouseEvent<HTMLButtonElement>, shape: Shape) => void,
-    selectedPageId: string,
-    onSelectPage: (id: string) => void,
-    onDocumentContextMenu: (event: MouseEvent<HTMLButtonElement>) => void,
-    documentSelected: boolean,
-    onSelectDocument: () => void,
-    onRenameDocument: (name: string) => void,
-    onRenamePage: (id: string, name: string) => void,
-    onRenameShape: (id: string, name: string) => void,
-    onRenamePalette: (id: string, name: string) => void,
-    onRenameImage: (id: string, name: string) => void,
-    onUngroup: (id: string) => void,
-    onRenameGroup: (id: string, name: string) => void,
-    onSelectGroup: (ids: string[]) => void,
-    onPageContextMenu: (event: MouseEvent<HTMLButtonElement>, pageId: string) => void,
-    onPagesContextMenu: (event: MouseEvent<HTMLButtonElement>) => void,
-    onAssetsContextMenu: (event: MouseEvent<HTMLButtonElement>) => void,
-    onPaletteContextMenu: (event: MouseEvent<HTMLButtonElement>, palette: ColorPalette) => void,
-    onReorderPage: (id: string, targetId: string, position: 'before' | 'after') => void,
-    onReorderShape: (pageId: string, id: string, targetId: string, position: 'before' | 'after', sourceGroupId: string | null, targetGroupId: string | null) => void,
+    document: DrawDocument;
+    selectedIds: readonly string[];
+    onSelect: (value: Shape, additive: boolean) => void;
+    selectedAssetId: string | null;
+    onSelectAsset: (image: PixelImageData) => void;
+    selectedPaletteId: string | null;
+    onSelectPalette: (palette: ColorPalette) => void;
+    onShapeContextMenu: (event: MouseEvent<HTMLButtonElement>, shape: Shape) => void;
+    selectedPageId: string;
+    onSelectPage: (id: string) => void;
+    onDocumentContextMenu: (event: MouseEvent<HTMLButtonElement>) => void;
+    documentSelected: boolean;
+    onSelectDocument: () => void;
+    onRenameDocument: (name: string) => void;
+    onRenamePage: (id: string, name: string) => void;
+    onRenameShape: (id: string, name: string) => void;
+    onRenamePalette: (id: string, name: string) => void;
+    onRenameImage: (id: string, name: string) => void;
+    onUngroup: (id: string) => void;
+    onRenameGroup: (id: string, name: string) => void;
+    onSelectGroup: (ids: string[]) => void;
+    onPageContextMenu: (event: MouseEvent<HTMLButtonElement>, pageId: string) => void;
+    onPagesContextMenu: (event: MouseEvent<HTMLButtonElement>) => void;
+    onAssetsContextMenu: (event: MouseEvent<HTMLButtonElement>) => void;
+    onPaletteContextMenu: (event: MouseEvent<HTMLButtonElement>, palette: ColorPalette) => void;
+    onReorderPage: (id: string, targetId: string, position: 'before' | 'after') => void;
+    onReorderShape: (
+        pageId: string,
+        id: string,
+        targetId: string,
+        position: 'before' | 'after',
+        sourceGroupId: string | null,
+        targetGroupId: string | null,
+    ) => void;
 }) {
     const doc = props.document;
     // The open page is "the selection" only when nothing more specific is selected.
-    const pageIsSelection = !props.documentSelected && !props.selectedIds.length && !props.selectedAssetId && !props.selectedPaletteId;
+    const pageIsSelection =
+        !props.documentSelected && !props.selectedIds.length && !props.selectedAssetId && !props.selectedPaletteId;
     const [dropTarget, setDropTarget] = useState<{
         type: 'page' | 'shape';
         id: string;
         pageId?: string;
-        position: 'before' | 'after'
+        position: 'before' | 'after';
     } | null>(null);
-    const drag = (event: DragEvent<HTMLButtonElement>, type: 'page' | 'shape', id: string, pageId?: string, groupId?: string | null) => {
-        event.dataTransfer.setData('application/x-layout-tree-item', JSON.stringify({
-            type,
-            id,
-            pageId,
-            groupId
-        }));
+    const drag = (
+        event: DragEvent<HTMLButtonElement>,
+        type: 'page' | 'shape',
+        id: string,
+        pageId?: string,
+        groupId?: string | null,
+    ) => {
+        event.dataTransfer.setData(
+            'application/x-layout-tree-item',
+            JSON.stringify({
+                type,
+                id,
+                pageId,
+                groupId,
+            }),
+        );
         event.dataTransfer.effectAllowed = 'move';
         setDropTarget(null);
     };
@@ -186,10 +272,16 @@ export default function TreeView(props: {
             type,
             id,
             pageId,
-            position: event.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+            position: event.clientY < rect.top + rect.height / 2 ? 'before' : 'after',
         });
     };
-    const drop = (event: DragEvent<HTMLButtonElement>, type: 'page' | 'shape', targetId: string, pageId?: string, groupId?: string | null) => {
+    const drop = (
+        event: DragEvent<HTMLButtonElement>,
+        type: 'page' | 'shape',
+        targetId: string,
+        pageId?: string,
+        groupId?: string | null,
+    ) => {
         event.preventDefault();
         const rect = event.currentTarget.getBoundingClientRect();
         const position = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
@@ -198,75 +290,144 @@ export default function TreeView(props: {
                 type: string;
                 id: string;
                 pageId?: string;
-                groupId?: string | null
+                groupId?: string | null;
             };
             if (source.type === type && type === 'page') props.onReorderPage(source.id, targetId, position);
-            else if (source.type === 'shape' && type === 'shape' && source.pageId === pageId) props.onReorderShape(pageId!, source.id, targetId, position, source.groupId ?? null, groupId ?? null);
-        } catch { /* Ignore unrelated or malformed drops. */
+            else if (source.type === 'shape' && type === 'shape' && source.pageId === pageId)
+                props.onReorderShape(pageId!, source.id, targetId, position, source.groupId ?? null, groupId ?? null);
+        } catch {
+            /* Ignore unrelated or malformed drops. */
         }
         setDropTarget(null);
     };
-    return <ul className="tree-view" aria-label="Document contents">
-        <TreeNode label={`Doc: ${doc.title}`} editValue={doc.title} depth={0}
-                  selected={props.documentSelected} onSelect={props.onSelectDocument}
-                  onRename={props.onRenameDocument} onContextMenu={props.onDocumentContextMenu}/>
+    return (
+        <ul className="tree-view" aria-label="Document contents">
+            <TreeNode
+                label={`Doc: ${doc.title}`}
+                editValue={doc.title}
+                depth={0}
+                selected={props.documentSelected}
+                onSelect={props.onSelectDocument}
+                onRename={props.onRenameDocument}
+                onContextMenu={props.onDocumentContextMenu}
+            />
             <TreeNode label="Pages" depth={1} onContextMenu={props.onPagesContextMenu}>
-                {doc.pages.map(page => <TreeNode key={page.id} label={page.name} depth={2}
-                                                 icon={<FileText aria-hidden="true"/>}
-                                                 selected={page.id === props.selectedPageId && pageIsSelection}
-                                                 current={page.id === props.selectedPageId}
-                                                 onSelect={() => props.onSelectPage(page.id)}
-                                                 onRename={name => props.onRenamePage(page.id, name)}
-                                                 onContextMenu={event => props.onPageContextMenu(event, page.id)}
-                                                 draggable
-                                                 dropPosition={dropTarget?.type === 'page' && dropTarget.id === page.id ? dropTarget.position : null}
-                                                 onDragStart={event => drag(event, 'page', page.id)}
-                                                 onDragOver={event => dragOver(event, 'page', page.id)}
-                                                 onDrop={event => drop(event, 'page', page.id)}>
-                    {page.groups.map(group => <TreeNode key={group.id} label={group.name} depth={3}
-                                                        selected={group.shapeIds.length > 0 && group.shapeIds.every(id => props.selectedIds.includes(id))}
-                                                        onSelect={() => {
-                                                            props.onSelectPage(page.id);
-                                                            props.onSelectGroup(group.shapeIds);
-                                                        }}
-                                                        onRename={name => props.onRenameGroup(group.id, name)}>
-                        {group.shapeIds.map(id => doc.shapes.find(shape => shape.id === id)).filter((shape): shape is Shape => !!shape).map(shape =>
-                            <TreeNode key={shape.id} label={shape.name} depth={4}
-                                      selected={props.selectedIds.includes(shape.id)}
-                                      onSelect={event => props.onSelect(shape, event.shiftKey)}
-                                      onRename={name => props.onRenameShape(shape.id, name)}
-                                      onContextMenu={event => props.onShapeContextMenu(event, shape)}
-                                      draggable
-                                      onDragStart={event => drag(event, 'shape', shape.id, page.id, group.id)}
-                                      dropPosition={dropTarget?.type === 'shape' && dropTarget.id === shape.id ? dropTarget.position : null}
-                                      onDragOver={event => dragOver(event, 'shape', shape.id, page.id)}
-                                      onDrop={event => drop(event, 'shape', shape.id, page.id, group.id)}/>)}</TreeNode>)}
-                    {doc.shapes.filter(shape => shape.pageId === page.id && !page.groups.some(group => group.shapeIds.includes(shape.id))).map(shape =>
-                        <TreeNode key={shape.id} label={shape.name} depth={3}
-                                  selected={props.selectedIds.includes(shape.id)}
-                                  onSelect={event => props.onSelect(shape, event.shiftKey)}
-                                  onRename={name => props.onRenameShape(shape.id, name)}
-                                  onContextMenu={event => props.onShapeContextMenu(event, shape)}
-                                  draggable
-                                  onDragStart={event => drag(event, 'shape', shape.id, page.id, null)}
-                                  dropPosition={dropTarget?.type === 'shape' && dropTarget.id === shape.id ? dropTarget.position : null}
-                                  onDragOver={event => dragOver(event, 'shape', shape.id, page.id)}
-                                  onDrop={event => drop(event, 'shape', shape.id, page.id, null)}/>)}
-                </TreeNode>)}
+                {doc.pages.map(page => (
+                    <TreeNode
+                        key={page.id}
+                        label={page.name}
+                        depth={2}
+                        icon={<FileText aria-hidden="true" />}
+                        selected={page.id === props.selectedPageId && pageIsSelection}
+                        current={page.id === props.selectedPageId}
+                        onSelect={() => props.onSelectPage(page.id)}
+                        onRename={name => props.onRenamePage(page.id, name)}
+                        onContextMenu={event => props.onPageContextMenu(event, page.id)}
+                        draggable
+                        dropPosition={
+                            dropTarget?.type === 'page' && dropTarget.id === page.id ? dropTarget.position : null
+                        }
+                        onDragStart={event => drag(event, 'page', page.id)}
+                        onDragOver={event => dragOver(event, 'page', page.id)}
+                        onDrop={event => drop(event, 'page', page.id)}
+                    >
+                        {page.groups.map(group => (
+                            <TreeNode
+                                key={group.id}
+                                label={group.name}
+                                depth={3}
+                                selected={
+                                    group.shapeIds.length > 0 &&
+                                    group.shapeIds.every(id => props.selectedIds.includes(id))
+                                }
+                                onSelect={() => {
+                                    props.onSelectPage(page.id);
+                                    props.onSelectGroup(group.shapeIds);
+                                }}
+                                onRename={name => props.onRenameGroup(group.id, name)}
+                            >
+                                {group.shapeIds
+                                    .map(id => doc.shapes.find(shape => shape.id === id))
+                                    .filter((shape): shape is Shape => !!shape)
+                                    .map(shape => (
+                                        <TreeNode
+                                            key={shape.id}
+                                            label={shape.name}
+                                            depth={4}
+                                            selected={props.selectedIds.includes(shape.id)}
+                                            onSelect={event => props.onSelect(shape, event.shiftKey)}
+                                            onRename={name => props.onRenameShape(shape.id, name)}
+                                            onContextMenu={event => props.onShapeContextMenu(event, shape)}
+                                            draggable
+                                            onDragStart={event => drag(event, 'shape', shape.id, page.id, group.id)}
+                                            dropPosition={
+                                                dropTarget?.type === 'shape' && dropTarget.id === shape.id
+                                                    ? dropTarget.position
+                                                    : null
+                                            }
+                                            onDragOver={event => dragOver(event, 'shape', shape.id, page.id)}
+                                            onDrop={event => drop(event, 'shape', shape.id, page.id, group.id)}
+                                        />
+                                    ))}
+                            </TreeNode>
+                        ))}
+                        {doc.shapes
+                            .filter(
+                                shape =>
+                                    shape.pageId === page.id &&
+                                    !page.groups.some(group => group.shapeIds.includes(shape.id)),
+                            )
+                            .map(shape => (
+                                <TreeNode
+                                    key={shape.id}
+                                    label={shape.name}
+                                    depth={3}
+                                    selected={props.selectedIds.includes(shape.id)}
+                                    onSelect={event => props.onSelect(shape, event.shiftKey)}
+                                    onRename={name => props.onRenameShape(shape.id, name)}
+                                    onContextMenu={event => props.onShapeContextMenu(event, shape)}
+                                    draggable
+                                    onDragStart={event => drag(event, 'shape', shape.id, page.id, null)}
+                                    dropPosition={
+                                        dropTarget?.type === 'shape' && dropTarget.id === shape.id
+                                            ? dropTarget.position
+                                            : null
+                                    }
+                                    onDragOver={event => dragOver(event, 'shape', shape.id, page.id)}
+                                    onDrop={event => drop(event, 'shape', shape.id, page.id, null)}
+                                />
+                            ))}
+                    </TreeNode>
+                ))}
             </TreeNode>
             <TreeNode label="Assets" depth={1} onContextMenu={props.onAssetsContextMenu}>
-                {doc.fonts.map(font => <TreeNode key={font.id} label={`${font.family} (Google Font)`} depth={2}/>) }
-                {doc.palettes.map(palette => <TreeNode key={palette.id} label={`${palette.name} (${palette.colors.length} colors)`} editValue={palette.name} depth={2}
-                                                        selected={palette.id === props.selectedPaletteId}
-                                                        onSelect={() => props.onSelectPalette(palette)}
-                                                        onRename={name => props.onRenamePalette(palette.id, name)}
-                                                        onContextMenu={event => props.onPaletteContextMenu(event, palette)}/>) }
-                {doc.images.map(image => <TreeNode key={image.id}
-                                                   label={`${image.name} (${image.width} × ${image.height})`} editValue={image.name}
-                                                   depth={2}
-                                                   selected={image.id === props.selectedAssetId}
-                                                   onSelect={() => props.onSelectAsset(image)}
-                                                   onRename={name => props.onRenameImage(image.id, name)}/>)}
+                {doc.fonts.map(font => (
+                    <TreeNode key={font.id} label={`${font.family} (Google Font)`} depth={2} />
+                ))}
+                {doc.palettes.map(palette => (
+                    <TreeNode
+                        key={palette.id}
+                        label={`${palette.name} (${palette.colors.length} colors)`}
+                        editValue={palette.name}
+                        depth={2}
+                        selected={palette.id === props.selectedPaletteId}
+                        onSelect={() => props.onSelectPalette(palette)}
+                        onRename={name => props.onRenamePalette(palette.id, name)}
+                        onContextMenu={event => props.onPaletteContextMenu(event, palette)}
+                    />
+                ))}
+                {doc.images.map(image => (
+                    <TreeNode
+                        key={image.id}
+                        label={`${image.name} (${image.width} × ${image.height})`}
+                        editValue={image.name}
+                        depth={2}
+                        selected={image.id === props.selectedAssetId}
+                        onSelect={() => props.onSelectAsset(image)}
+                        onRename={name => props.onRenameImage(image.id, name)}
+                    />
+                ))}
             </TreeNode>
-    </ul>;
+        </ul>
+    );
 }

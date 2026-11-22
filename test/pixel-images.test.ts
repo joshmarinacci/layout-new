@@ -2,13 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {EditorStore, emptyDocument} from '../src/model/EditorStore';
 import {makeExampleDocument} from '../src/model/exampleDocument';
 import {deserializeDocument, serializeDocument} from '../src/io/serialization';
-import {
-    floodFillPixels,
-    makePixelImage,
-    paintPixelLine,
-    PALETTES,
-    samplePixel
-} from '../src/shapes/pixelImages';
+import {floodFillPixels, makePixelImage, paintPixelLine, PALETTES, samplePixel} from '../src/shapes/pixelImages';
 import type {Document, PixelImageShape} from '../src/model/types';
 
 function setup() {
@@ -61,13 +55,16 @@ describe('pixel image document model', () => {
         store.linkImageShape(id);
         const before = store.getSnapshot().document;
         store.beginTransaction('stroke');
-        for (let x = 0; x < 8; x++) store.updatePixelImage(imageId, image => paintPixelLine(image, {x, y: 2}, {x, y: 2}, 1));
+        for (let x = 0; x < 8; x++)
+            store.updatePixelImage(imageId, image => paintPixelLine(image, {x, y: 2}, {x, y: 2}, 1));
         store.commitTransaction();
         const after = store.getSnapshot().document;
         expect(after.images[0].pixels.slice(16, 24)).toEqual(Array(8).fill(1));
         expect(before.images[0].pixels).toEqual(Array(64).fill(-1));
-        store.undo(); expect(store.getSnapshot().document).toEqual(before);
-        store.redo(); expect(store.getSnapshot().document).toEqual(after);
+        store.undo();
+        expect(store.getSnapshot().document).toEqual(before);
+        store.redo();
+        expect(store.getSnapshot().document).toEqual(after);
         store.undo();
         store.beginTransaction('cancel stroke');
         store.updatePixelImage(imageId, image => floodFillPixels(image, {x: 0, y: 0}, 3));
@@ -88,8 +85,10 @@ describe('pixel image document model', () => {
         store.commitTransaction();
         const result = store.getSnapshot().document;
         expect(result.images).toHaveLength(1);
-        store.undo(); expect(store.getSnapshot().document).toEqual(emptyDocument());
-        store.redo(); expect(store.getSnapshot().document).toEqual(result);
+        store.undo();
+        expect(store.getSnapshot().document).toEqual(emptyDocument());
+        store.redo();
+        expect(store.getSnapshot().document).toEqual(result);
     });
     it('retains shared data when a shape is deleted and restores its reference on undo', () => {
         const {store, id} = setup();
@@ -98,7 +97,8 @@ describe('pixel image document model', () => {
         store.removeShape(id);
         expect(store.getSnapshot().document.images).toEqual(before.images);
         expect(store.getSnapshot().document.shapes.map(shape => shape.id)).toEqual([copy]);
-        store.undo(); expect(store.getSnapshot().document).toEqual(before);
+        store.undo();
+        expect(store.getSnapshot().document).toEqual(before);
     });
     it('round trips references and pixels without duplicating the shared data', () => {
         const {store, id, imageId} = setup();
@@ -114,16 +114,36 @@ describe('pixel image document model', () => {
         expect(second.getSnapshot().document.images).not.toEqual(document.images);
     });
     it.each([
-        (doc: Document) => { doc.images[0].pixels.pop(); },
-        (doc: Document) => { doc.images[0].pixels[0] = 4; },
-        (doc: Document) => { doc.images[0].pixels[0] = -2; },
-        (doc: Document) => { doc.images[0].pixels[0] = 0.5; },
-        (doc: Document) => { doc.images[0].width = 0; },
-        (doc: Document) => { doc.images[0].height = 257; },
-        (doc: Document) => { doc.images[0].palette = []; },
-        (doc: Document) => { doc.images[0].palette[0] = 'invalid'; },
-        (doc: Document) => { doc.images.push(doc.images[0]); },
-        (doc: Document) => { doc.images = []; },
+        (doc: Document) => {
+            doc.images[0].pixels.pop();
+        },
+        (doc: Document) => {
+            doc.images[0].pixels[0] = 4;
+        },
+        (doc: Document) => {
+            doc.images[0].pixels[0] = -2;
+        },
+        (doc: Document) => {
+            doc.images[0].pixels[0] = 0.5;
+        },
+        (doc: Document) => {
+            doc.images[0].width = 0;
+        },
+        (doc: Document) => {
+            doc.images[0].height = 257;
+        },
+        (doc: Document) => {
+            doc.images[0].palette = [];
+        },
+        (doc: Document) => {
+            doc.images[0].palette[0] = 'invalid';
+        },
+        (doc: Document) => {
+            doc.images.push(doc.images[0]);
+        },
+        (doc: Document) => {
+            doc.images = [];
+        },
     ])('rejects invalid image data/references atomically (%#)', corrupt => {
         const {store} = setup();
         const before = store.getSnapshot();
@@ -135,8 +155,16 @@ describe('pixel image document model', () => {
     it('rejects invalid edits and image ID changes without publishing them', () => {
         const {store, imageId} = setup();
         const before = store.getSnapshot();
-        expect(() => store.updatePixelImage(imageId, image => { image.pixels[0] = Infinity; })).toThrow();
-        expect(() => store.updatePixelImage(imageId, image => { image.id = 'changed'; })).toThrow();
+        expect(() =>
+            store.updatePixelImage(imageId, image => {
+                image.pixels[0] = Infinity;
+            }),
+        ).toThrow();
+        expect(() =>
+            store.updatePixelImage(imageId, image => {
+                image.id = 'changed';
+            }),
+        ).toThrow();
         expect(() => store.updatePixelImage('missing', () => {})).toThrow();
         expect(store.getSnapshot()).toBe(before);
     });
@@ -152,11 +180,26 @@ describe('pixel image document model', () => {
 
 describe('pixel tools', () => {
     it.each([
-        [{x: 0, y: 0}, {x: 4, y: 0}],
-        [{x: 4, y: 0}, {x: 0, y: 0}],
-        [{x: 2, y: 0}, {x: 2, y: 4}],
-        [{x: 0, y: 0}, {x: 4, y: 4}],
-        [{x: 4, y: 4}, {x: 0, y: 0}],
+        [
+            {x: 0, y: 0},
+            {x: 4, y: 0},
+        ],
+        [
+            {x: 4, y: 0},
+            {x: 0, y: 0},
+        ],
+        [
+            {x: 2, y: 0},
+            {x: 2, y: 4},
+        ],
+        [
+            {x: 0, y: 0},
+            {x: 4, y: 4},
+        ],
+        [
+            {x: 4, y: 4},
+            {x: 0, y: 0},
+        ],
     ])('interpolates continuous pencil strokes in both directions (%#)', (start, end) => {
         const image = makePixelImage(5, 5, PALETTES['Pocket 4']);
         paintPixelLine(image, start, end, 0);

@@ -17,7 +17,9 @@ describe('palette creation commands', () => {
     it('adds the PICO-8 palette through an Immer edit', () => {
         const ctx = context();
         expect(() => NewPico8PaletteCommand.run(ctx)).not.toThrow();
-        expect(ctx.store.getSnapshot().document.palettes[0]).toMatchObject({name: 'PICO-8', colors: expect.arrayContaining([expect.objectContaining({value: '#1d2b53'})])});
+        expect(ctx.store.getSnapshot().document.palettes[0]).toMatchObject({
+            name: 'PICO-8',
+            colors: expect.arrayContaining([expect.objectContaining({value: '#1d2b53'})]),
+        });
     });
-
 });

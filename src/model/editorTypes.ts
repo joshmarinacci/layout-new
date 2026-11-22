@@ -1,33 +1,32 @@
-export type Tool = "select" | "rectangle" | "pan";
-export type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
-import type {Bounds, DrawDocument, Shape} from "./types";
-
+export type Tool = 'select' | 'rectangle' | 'pan';
+export type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+import type {Bounds, DrawDocument, Shape} from './types';
 
 export type ActionIconName =
-    | "file-plus-2"
-    | "folder-open"
-    | "circle-plus"
-    | "image-plus"
-    | "scissors"
-    | "trash-2"
-    | "copy"
-    | "clipboard-paste"
-    | "files"
-    | "undo-2"
-    | "redo-2"
-    | "search"
-    | "zoom-in"
-    | "zoom-out"
-    | "maximize-2"
-    | "save";
+    | 'file-plus-2'
+    | 'folder-open'
+    | 'circle-plus'
+    | 'image-plus'
+    | 'scissors'
+    | 'trash-2'
+    | 'copy'
+    | 'clipboard-paste'
+    | 'files'
+    | 'undo-2'
+    | 'redo-2'
+    | 'search'
+    | 'zoom-in'
+    | 'zoom-out'
+    | 'maximize-2'
+    | 'save';
 export type PowerupActionLocation =
-    | "menu-file"
-    | "menu-edit"
-    | "menu-shapes"
-    | "menu-view"
-    | "tree-layer-context"
-    | "tree-shape-context"
-    | "canvas-shape-context";
+    | 'menu-file'
+    | 'menu-edit'
+    | 'menu-shapes'
+    | 'menu-view'
+    | 'tree-layer-context'
+    | 'tree-shape-context'
+    | 'canvas-shape-context';
 
 export interface PowerupAction {
     name: string;
@@ -42,14 +41,14 @@ export interface PowerupAction {
 }
 
 export interface ExporterAction extends PowerupAction {
-    kind: "exporter";
+    kind: 'exporter';
     fileExtension: string;
     mimeType: string;
 }
 
 export interface SingleComponentEditorArgs {
     shape: Shape;
-    document: DrawDocument
+    document: DrawDocument;
     updateShape: (updater: (shape: Shape) => Shape) => void;
 }
 

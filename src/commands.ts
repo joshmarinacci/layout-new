@@ -1,36 +1,23 @@
-import {
-    type EditorSnapshot,
-    EditorStore,
-    emptyDocument
-} from "./model/EditorStore";
-import {makeCircle, makeRect, makeText} from "./model/reducer";
+import {type EditorSnapshot, EditorStore, emptyDocument} from './model/EditorStore';
+import {makeCircle, makeRect, makeText} from './model/reducer';
 
-
-import type {
-    Bounds,
-    Document as DrawingDocument,
-    PixelImageData,
-    FontAsset,
-    Shape
-} from './model/types';
-import {makeVector} from "./shapes/vectorNetworks";
-import type {PixelEditorController} from "./shapes/PixelImageEditor";
-import {isTauri} from "@tauri-apps/api/core";
-import {
-    readSavedDocuments,
-    type SavedDocumentRecord,
-    writeSavedDocuments
-} from "./io/savedDocuments";
-import {
-    type ShapeAlignment,
-    shapeAlignmentOffsets,
-    translateShape
-} from "./model/shapeAlignment";
+import type {Bounds, Document as DrawingDocument, PixelImageData, FontAsset, Shape} from './model/types';
+import {makeVector} from './shapes/vectorNetworks';
+import type {PixelEditorController} from './shapes/PixelImageEditor';
+import {isTauri} from '@tauri-apps/api/core';
+import {readSavedDocuments, type SavedDocumentRecord, writeSavedDocuments} from './io/savedDocuments';
+import {type ShapeAlignment, shapeAlignmentOffsets, translateShape} from './model/shapeAlignment';
 import {CommandRegistry} from './common/CommandRegistry';
 import type {Theme} from './ui/theme';
 import {type LucideIcon, Redo2Icon, Undo2Icon} from 'lucide-react';
 import {newPalette, pico8Colors} from './shapes/palettes';
-import {downloadDocumentPng, encodeDocumentPng, openDocumentPngWithTauri, renderDocumentPreview, saveDocumentPngWithTauri} from './io/pngDocument';
+import {
+    downloadDocumentPng,
+    encodeDocumentPng,
+    openDocumentPngWithTauri,
+    renderDocumentPreview,
+    saveDocumentPngWithTauri,
+} from './io/pngDocument';
 import {exportArtwork, type ArtworkFormat} from './io/exportArtwork';
 import {importSvg} from './io/svgImport';
 import {waitForTextFont} from './shapes/googleFonts';
@@ -39,65 +26,67 @@ export interface DocumentTab {
     id: string;
     store: EditorStore;
     savedDocumentId: string | null;
-    savedJson: string | null
+    savedJson: string | null;
 }
 
 export type Workspace = {
-    tabs: DocumentTab[]
-    activeId: string
-}
+    tabs: DocumentTab[];
+    activeId: string;
+};
 export type ClipboardState = {
-    shapes: Shape[]
-    images: PixelImageData[]
-    fonts: FontAsset[]
-}
+    shapes: Shape[];
+    images: PixelImageData[];
+    fonts: FontAsset[];
+};
 export type RenamePageState = {
-    pageId: string
-    name: string
-}
-export type ImageDialogConfig = {
-    kind: 'create' | 'import'
-} | {
-    kind: 'edit';
-    imageId: string;
-    source?: Bounds;
-    palettePosition?: { x: number; y: number };
-    imageScreenRect?: Bounds
-} | null
+    pageId: string;
+    name: string;
+};
+export type ImageDialogConfig =
+    | {
+          kind: 'create' | 'import';
+      }
+    | {
+          kind: 'edit';
+          imageId: string;
+          source?: Bounds;
+          palettePosition?: {x: number; y: number};
+          imageScreenRect?: Bounds;
+      }
+    | null;
 
-
-type Setter<W> = (s: W | ((w: W) => W)) => void
+type Setter<W> = (s: W | ((w: W) => W)) => void;
 
 export type CommandContext = {
-    store: EditorStore,
-    state: EditorSnapshot,
-    finishEditing: () => void,
-    workspace: Workspace,
-    setWorkspace: Setter<Workspace>,
-    clipboard: ClipboardState,
-    setClipboard: Setter<ClipboardState>
-    commandPaletteOpen: boolean,
-    setCommandPaletteOpen: Setter<boolean>
-    setKeyboardShortcutsOpen: Setter<boolean>
-    setSavedDocumentsOpen: Setter<boolean>
-    leftPanelVisible: boolean
-    setLeftPanelVisible: Setter<boolean>
-    rightPanelVisible: boolean
-    setRightPanelVisible: Setter<boolean>
-    setRenamePageDialog: Setter<RenamePageState | null>
-    setRenameDocumentName: Setter<string | null>
-    setImageDialog: Setter<ImageDialogConfig>
-    setRepeatingImageDialog: Setter<boolean>
-    setVectorId: Setter<string | null>
-    setPixelEditor: Setter<PixelEditorController | null>
-    setError: Setter<string>
-    setFileDialogOpen: (open: boolean, kind?: 'json' | 'png' | 'svg') => void
-    setTheme: (theme: Theme) => void
-    setThemeSettingsOpen: Setter<boolean>
-    setSelectedAssetId: Setter<string | null>
-    setSelectedPaletteId: Setter<string | null>
-    openPaletteImport: () => void
-}
+    store: EditorStore;
+    state: EditorSnapshot;
+    finishEditing: () => void;
+    workspace: Workspace;
+    setWorkspace: Setter<Workspace>;
+    clipboard: ClipboardState;
+    setClipboard: Setter<ClipboardState>;
+    commandPaletteOpen: boolean;
+    setCommandPaletteOpen: Setter<boolean>;
+    setKeyboardShortcutsOpen: Setter<boolean>;
+    setSavedDocumentsOpen: Setter<boolean>;
+    leftPanelVisible: boolean;
+    setLeftPanelVisible: Setter<boolean>;
+    rightPanelVisible: boolean;
+    setRightPanelVisible: Setter<boolean>;
+    setRenamePageDialog: Setter<RenamePageState | null>;
+    setRenameDocumentName: Setter<string | null>;
+    setImageDialog: Setter<ImageDialogConfig>;
+    setRepeatingImageDialog: Setter<boolean>;
+    setVectorId: Setter<string | null>;
+    setPixelEditor: Setter<PixelEditorController | null>;
+    setError: Setter<string>;
+    setFileDialogOpen: (open: boolean, kind?: 'json' | 'png' | 'svg') => void;
+    setTheme: (theme: Theme) => void;
+    setThemeSettingsOpen: Setter<boolean>;
+    setSelectedAssetId: Setter<string | null>;
+    setSelectedPaletteId: Setter<string | null>;
+    openPaletteImport: () => void;
+};
 
 export type CommandId =
     | 'undo'
@@ -110,18 +99,18 @@ export type CommandId =
     | 'save-json-document'
     | 'open-png-document'
     | 'save-png-document'
-    | 'export-selection-png' | 'export-selection-svg'
-    | 'export-page-png' | 'export-page-svg'
+    | 'export-selection-png'
+    | 'export-selection-svg'
+    | 'export-page-png'
+    | 'export-page-svg'
     | 'import-svg'
     | 'export-json'
-
     | 'new-page'
     | 'rename-page'
     | 'delete-page'
     | 'new-rectangle'
     | 'new-circle'
     | 'new-text'
-
     | 'selection-group'
     | 'selection-ungroup'
     | 'selection-duplicate'
@@ -129,7 +118,6 @@ export type CommandId =
     | 'selection-copy'
     | 'selection-cut'
     | 'selection-paste'
-
     | 'align-left'
     | 'align-center'
     | 'align-right'
@@ -138,16 +126,21 @@ export type CommandId =
     | 'align-bottom'
     | 'align-distribute-vertical'
     | 'align-distribute-horizontal'
-
     | 'ui-toggle-right-sidebar'
     | 'ui-toggle-left-sidebar'
     | 'ui-show-command-palette'
     | 'ui-show-keyboard-shortcuts'
-    | 'new-vector-network' | 'new-pixelimage' | 'new-repeatingimage'
+    | 'new-vector-network'
+    | 'new-pixelimage'
+    | 'new-repeatingimage'
     | 'import-png'
-    | 'new-color-palette' | 'import-color-palette' | 'new-pico8-palette'
-    | 'theme-system' | 'theme-light' | 'theme-dark' | 'theme-settings'
-
+    | 'new-color-palette'
+    | 'import-color-palette'
+    | 'new-pico8-palette'
+    | 'theme-system'
+    | 'theme-light'
+    | 'theme-dark'
+    | 'theme-settings';
 
 export interface Command {
     id: CommandId;
@@ -155,9 +148,9 @@ export interface Command {
     description: string;
     shortcut?: string;
     keywords?: string[];
-    enabled: (ctx: CommandContext) => boolean
+    enabled: (ctx: CommandContext) => boolean;
     run: (ctx: CommandContext) => void;
-    icon?: LucideIcon
+    icon?: LucideIcon;
 }
 
 export const NewDocumentCommand: Command = {
@@ -165,85 +158,84 @@ export const NewDocumentCommand: Command = {
     title: 'New Document',
     description: 'Create a blank document',
     keywords: ['file', 'create'],
-    enabled: (ctx) => !ctx.state.transactionActive,
-    run: (ctx) => openDocument(ctx, emptyDocument())
-}
+    enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => openDocument(ctx, emptyDocument()),
+};
 export const RenameDocumentCommand: Command = {
     id: 'rename-document',
     title: 'Rename Document',
     description: 'rename the document',
     enabled: ctx => ctx.state.document !== undefined,
-    run: ctx => ctx.setRenameDocumentName(ctx.state.document.title)
-}
+    run: ctx => ctx.setRenameDocumentName(ctx.state.document.title),
+};
 export const OpenDocumentCommand: Command = {
     id: 'open-local-document',
     title: isTauri() ? 'Open Saved Document' : 'Open from Browser',
     description: 'opens a document from local storage',
     enabled: ctx => !ctx.state.transactionActive,
     run: ctx => {
-        ctx.setSavedDocumentsOpen(true)
-    }
-}
+        ctx.setSavedDocumentsOpen(true);
+    },
+};
 export const SaveDocumentCommand: Command = {
     id: 'save-local-document',
     title: isTauri() ? 'Save Document' : 'Save to Browser',
     description: 'Save the current document',
     enabled: ctx => !ctx.state.transactionActive,
     keywords: ['file'],
-    run: ctx => saveToBrowser(ctx)
-}
+    run: ctx => saveToBrowser(ctx),
+};
 export const OpenJsonCommand: Command = {
     id: 'open-json-document',
     title: 'Import JSON',
     description: 'Imports a portable JSON file from disk',
     enabled: ctx => !ctx.state.transactionActive,
-    run: ctx => ctx.setFileDialogOpen(true, 'json')
-}
+    run: ctx => ctx.setFileDialogOpen(true, 'json'),
+};
 export const SaveJsonCommand: Command = {
     id: 'save-json-document',
     title: 'Export JSON',
     description: 'exports current document as a portable JSON file',
     keywords: ['save', 'download', 'file'],
     enabled: ctx => !ctx.state.transactionActive,
-    run: ctx => saveDocument(ctx)
-}
+    run: ctx => saveDocument(ctx),
+};
 
 export const NewPageCommand: Command = {
     id: 'new-page',
     title: 'New Page',
     description: 'add a new page to the current document',
     enabled: ctx => !ctx.state.transactionActive,
-    run: ctx => ctx.store.createPage()
-}
+    run: ctx => ctx.store.createPage(),
+};
 export const RenamePageCommand: Command = {
     id: 'rename-page',
     title: 'Rename page',
     description: 'Rename the selected page',
     enabled: ctx => !ctx.state.transactionActive,
     run: ctx => {
-        const pageId = ctx.state.selectedPageId
+        const pageId = ctx.state.selectedPageId;
         const page = ctx.state.document.pages.find(item => item.id === pageId);
         if (page) ctx.setRenamePageDialog({pageId, name: page.name});
-    }
-}
+    },
+};
 export const DeletePageCommand: Command = {
     id: 'delete-page',
     title: 'Delete page',
     description: 'Delete the selected page',
     enabled: ctx => ctx.state.document.pages.length > 1 && !ctx.state.transactionActive,
-    run: ctx => ctx.store.deletePage(ctx.state.selectedPageId)
-}
-
+    run: ctx => ctx.store.deletePage(ctx.state.selectedPageId),
+};
 
 export const UndoCommand: Command = {
     id: 'undo',
     title: 'Undo',
     description: 'Undo the last change',
     keywords: ['history', 'edit'],
-    enabled: (ctx) => ctx.state.canUndo,
+    enabled: ctx => ctx.state.canUndo,
     run: ctx => ctx.store.undo(),
     icon: Undo2Icon,
-}
+};
 export const RedoCommand: Command = {
     id: 'redo',
     title: 'Redo',
@@ -251,8 +243,8 @@ export const RedoCommand: Command = {
     keywords: ['history', 'edit'],
     enabled: ctx => ctx.state.canRedo,
     run: ctx => ctx.store.redo(),
-    icon: Redo2Icon
-}
+    icon: Redo2Icon,
+};
 
 export const NewRectCommand: Command = {
     id: 'new-rectangle',
@@ -264,8 +256,8 @@ export const NewRectCommand: Command = {
         const shape = makeRect('Rectangle', {x: 50, y: 50, width: 100, height: 80});
         ctx.store.addShape(shape);
         ctx.store.select(shape.id);
-    }
-}
+    },
+};
 export const NewCircleCommand: Command = {
     id: 'new-circle',
     title: 'New Circle',
@@ -276,22 +268,29 @@ export const NewCircleCommand: Command = {
         const shape = makeCircle('Circle', {x: 100, y: 100}, 40);
         ctx.store.addShape(shape);
         ctx.store.select(shape.id);
-    }
-}
+    },
+};
 
 export const NewTextCommand: Command = {
-    id: 'new-text', title: 'New Text', description: 'Add a wrapping text shape to the current page',
-    keywords: ['shape', 'text', 'type', 'create'], enabled: ctx => !ctx.state.transactionActive,
-    run: ctx => { const shape = makeText('Text', {x: 50, y: 50, width: 280, height: 120}); ctx.store.addShape(shape); ctx.store.select(shape.id); }
-}
+    id: 'new-text',
+    title: 'New Text',
+    description: 'Add a wrapping text shape to the current page',
+    keywords: ['shape', 'text', 'type', 'create'],
+    enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => {
+        const shape = makeText('Text', {x: 50, y: 50, width: 280, height: 120});
+        ctx.store.addShape(shape);
+        ctx.store.select(shape.id);
+    },
+};
 
 export const NewVectorNetworkCommand: Command = {
     id: 'new-vector-network',
     title: 'New Vector Network',
     description: 'create a new vector network shape',
     enabled: ctx => !ctx.state.transactionActive,
-    run: ctx => createVector(ctx)
-}
+    run: ctx => createVector(ctx),
+};
 export const NewPixelImageCommand: Command = {
     id: 'new-pixelimage',
     title: 'New Pixel Image',
@@ -299,8 +298,8 @@ export const NewPixelImageCommand: Command = {
     enabled: ctx => !ctx.state.transactionActive,
     run: ctx => {
         ctx.setImageDialog({kind: 'create'});
-    }
-}
+    },
+};
 export const NewRepeatingImageCommand: Command = {
     id: 'new-repeatingimage',
     title: 'New Repeating Image',
@@ -308,81 +307,133 @@ export const NewRepeatingImageCommand: Command = {
     enabled: ctx => !ctx.state.transactionActive,
     run: ctx => {
         ctx.setRepeatingImageDialog(true);
-    }
-}
+    },
+};
 export const ImportPNGCommand: Command = {
     id: 'import-png',
     title: 'New Image from PNG',
     description: 'Create a pixel image from a PNG file',
     enabled: () => true,
-    run: ctx => ctx.setImageDialog({kind: 'import'})
-}
+    run: ctx => ctx.setImageDialog({kind: 'import'}),
+};
 
 export const NewColorPaletteCommand: Command = {
-    id: 'new-color-palette', title: 'New Color Palette', description: 'Create a new editable color palette',
+    id: 'new-color-palette',
+    title: 'New Color Palette',
+    description: 'Create a new editable color palette',
     keywords: ['asset', 'palette', 'colors', 'create'],
     enabled: ctx => !ctx.state.transactionActive,
     run: ctx => {
         try {
             const palette = newPalette();
-            ctx.store.edit('Create palette', draft => {draft.palettes.push(palette);});
+            ctx.store.edit('Create palette', draft => {
+                draft.palettes.push(palette);
+            });
             ctx.store.select(null);
             ctx.setSelectedAssetId(null);
             ctx.setSelectedPaletteId(palette.id);
             ctx.setError('');
-        } catch (error) { ctx.setError(error instanceof Error ? error.message : 'Unable to create palette'); }
-    }
+        } catch (error) {
+            ctx.setError(error instanceof Error ? error.message : 'Unable to create palette');
+        }
+    },
 };
 export const ImportSVGCommand: Command = {
-    id: 'import-svg', title: 'Import SVG', description: 'Import SVG geometry as vector networks',
-    keywords: ['import', 'svg', 'vector'], enabled: ctx => !ctx.state.transactionActive,
+    id: 'import-svg',
+    title: 'Import SVG',
+    description: 'Import SVG geometry as vector networks',
+    keywords: ['import', 'svg', 'vector'],
+    enabled: ctx => !ctx.state.transactionActive,
     run: ctx => {
-        if (!isTauri()) { ctx.setFileDialogOpen(true, 'svg'); return; }
+        if (!isTauri()) {
+            ctx.setFileDialogOpen(true, 'svg');
+            return;
+        }
         void (async () => {
-            const [{open}, {readTextFile}] = await Promise.all([import('@tauri-apps/plugin-dialog'), import('@tauri-apps/plugin-fs')]);
-            const selected = await open({multiple:false,filters:[{name:'SVG image',extensions:['svg']}]});
+            const [{open}, {readTextFile}] = await Promise.all([
+                import('@tauri-apps/plugin-dialog'),
+                import('@tauri-apps/plugin-fs'),
+            ]);
+            const selected = await open({multiple: false, filters: [{name: 'SVG image', extensions: ['svg']}]});
             if (!selected || Array.isArray(selected)) return;
-            const result=importSvg(await readTextFile(selected));
-            ctx.store.importVectorNetworks(result.shapes,ctx.state.selectedPageId,selected.split(/[\\/]/).pop()?.replace(/\.svg$/i,'')||'Imported SVG');
+            const result = importSvg(await readTextFile(selected));
+            ctx.store.importVectorNetworks(
+                result.shapes,
+                ctx.state.selectedPageId,
+                selected
+                    .split(/[\\/]/)
+                    .pop()
+                    ?.replace(/\.svg$/i, '') || 'Imported SVG',
+            );
             ctx.setError(result.warnings.join(' · '));
-        })().catch(error=>ctx.setError(error instanceof Error?error.message:'Unable to import SVG'));
-    }
+        })().catch(error => ctx.setError(error instanceof Error ? error.message : 'Unable to import SVG'));
+    },
 };
 export const OpenPngDocumentCommand: Command = {
-    id: 'open-png-document', title: 'Open Draw PNG', description: 'Open a document embedded in a PNG file',
-    keywords: ['open', 'import', 'png', 'document'], enabled: ctx => !ctx.state.transactionActive,
+    id: 'open-png-document',
+    title: 'Open Draw PNG',
+    description: 'Open a document embedded in a PNG file',
+    keywords: ['open', 'import', 'png', 'document'],
+    enabled: ctx => !ctx.state.transactionActive,
     run: ctx => {
-        if (!isTauri()) { ctx.setFileDialogOpen(true, 'png'); return; }
-        void openDocumentPngWithTauri().then(result => {
-            if (result) { openDocument(ctx, result.document); ctx.setError(''); }
-        }).catch(reason => ctx.setError(reason instanceof Error ? reason.message : 'Unable to open document PNG'));
-    }
+        if (!isTauri()) {
+            ctx.setFileDialogOpen(true, 'png');
+            return;
+        }
+        void openDocumentPngWithTauri()
+            .then(result => {
+                if (result) {
+                    openDocument(ctx, result.document);
+                    ctx.setError('');
+                }
+            })
+            .catch(reason => ctx.setError(reason instanceof Error ? reason.message : 'Unable to open document PNG'));
+    },
 };
 export const SavePngDocumentCommand: Command = {
-    id: 'save-png-document', title: 'Save as JSON PNG', description: 'Save a PNG preview with the full document embedded',
-    keywords: ['save', 'export', 'png', 'document'], enabled: ctx => !ctx.state.transactionActive,
+    id: 'save-png-document',
+    title: 'Save as JSON PNG',
+    description: 'Save a PNG preview with the full document embedded',
+    keywords: ['save', 'export', 'png', 'document'],
+    enabled: ctx => !ctx.state.transactionActive,
     run: ctx => {
         void (async () => {
-        try {
-            await Promise.all(ctx.state.document.shapes.filter((shape): shape is Extract<Shape, {type: 'text'}> => shape.type === 'text').map(shape => waitForTextFont(ctx.state.document.fonts, shape.components.text)));
-            const preview = renderDocumentPreview(ctx.state.document);
-            const png = encodeDocumentPng(preview, ctx.state.document);
-            const safeTitle = ctx.state.document.title.trim().replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').replace(/\s+/g, ' ').replace(/\.+$/g, '') || 'Untitled';
-            const filename = `${safeTitle}.json.png`;
-            if (isTauri()) void saveDocumentPngWithTauri(png, filename).then(() => ctx.setError(''))
-                .catch(reason => ctx.setError(reason instanceof Error ? reason.message : 'Unable to save document PNG'));
-            else { downloadDocumentPng(png, filename); ctx.setError(''); }
-        } catch (reason) {
-            ctx.setError(reason instanceof Error ? reason.message : 'Unable to save document PNG');
-        }
+            try {
+                await Promise.all(
+                    ctx.state.document.shapes
+                        .filter((shape): shape is Extract<Shape, {type: 'text'}> => shape.type === 'text')
+                        .map(shape => waitForTextFont(ctx.state.document.fonts, shape.components.text)),
+                );
+                const preview = renderDocumentPreview(ctx.state.document);
+                const png = encodeDocumentPng(preview, ctx.state.document);
+                const safeTitle =
+                    ctx.state.document.title
+                        .trim()
+                        .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-')
+                        .replace(/\s+/g, ' ')
+                        .replace(/\.+$/g, '') || 'Untitled';
+                const filename = `${safeTitle}.json.png`;
+                if (isTauri())
+                    void saveDocumentPngWithTauri(png, filename)
+                        .then(() => ctx.setError(''))
+                        .catch(reason =>
+                            ctx.setError(reason instanceof Error ? reason.message : 'Unable to save document PNG'),
+                        );
+                else {
+                    downloadDocumentPng(png, filename);
+                    ctx.setError('');
+                }
+            } catch (reason) {
+                ctx.setError(reason instanceof Error ? reason.message : 'Unable to save document PNG');
+            }
         })();
-    }
+    },
 };
 function exportSelection(format: ArtworkFormat): Command {
     return {
         id: format === 'png' ? 'export-selection-png' : 'export-selection-svg',
         title: `Export Selection as ${format.toUpperCase()}`,
-            description: `Export selected shapes as ${format.toUpperCase()}`,
+        description: `Export selected shapes as ${format.toUpperCase()}`,
         keywords: ['export', 'selection', 'shapes', format],
         enabled: ctx => !ctx.state.transactionActive && ctx.state.selectedIds.length > 0,
         run: ctx => {
@@ -390,8 +441,10 @@ function exportSelection(format: ArtworkFormat): Command {
             const title = shapes.length === 1 ? shapes[0].name : `${shapes.length}-shapes`;
             void exportArtwork(ctx.state.document, shapes, `${ctx.state.document.title}-${title}`, format)
                 .then(() => ctx.setError(''))
-                .catch(reason => ctx.setError(reason instanceof Error ? reason.message : `Unable to export ${format.toUpperCase()}`));
-        }
+                .catch(reason =>
+                    ctx.setError(reason instanceof Error ? reason.message : `Unable to export ${format.toUpperCase()}`),
+                );
+        },
     };
 }
 function exportPage(format: ArtworkFormat): Command {
@@ -400,15 +453,19 @@ function exportPage(format: ArtworkFormat): Command {
         title: `Export Page as ${format.toUpperCase()}`,
         description: `Export the active page as ${format.toUpperCase()}`,
         keywords: ['export', 'page', format],
-        enabled: ctx => !ctx.state.transactionActive && !!ctx.state.document.pages.find(page => page.id === ctx.state.selectedPageId),
+        enabled: ctx =>
+            !ctx.state.transactionActive &&
+            !!ctx.state.document.pages.find(page => page.id === ctx.state.selectedPageId),
         run: ctx => {
             const page = ctx.state.document.pages.find(item => item.id === ctx.state.selectedPageId);
             if (!page) return;
             const shapes = ctx.state.document.shapes.filter(shape => shape.pageId === page.id);
             void exportArtwork(ctx.state.document, shapes, `${ctx.state.document.title}-${page.name}`, format, true)
                 .then(() => ctx.setError(''))
-                .catch(reason => ctx.setError(reason instanceof Error ? reason.message : `Unable to export ${format.toUpperCase()}`));
-        }
+                .catch(reason =>
+                    ctx.setError(reason instanceof Error ? reason.message : `Unable to export ${format.toUpperCase()}`),
+                );
+        },
     };
 }
 export const ExportSelectionPngCommand = exportSelection('png');
@@ -416,15 +473,28 @@ export const ExportSelectionSvgCommand = exportSelection('svg');
 export const ExportPagePngCommand = exportPage('png');
 export const ExportPageSvgCommand = exportPage('svg');
 export const ImportColorPaletteCommand: Command = {
-    id: 'import-color-palette', title: 'Import Color Palette', description: 'Import a GIMP, JSON, or hex-list palette',
+    id: 'import-color-palette',
+    title: 'Import Color Palette',
+    description: 'Import a GIMP, JSON, or hex-list palette',
     keywords: ['asset', 'palette', 'colors', 'gpl', 'json', 'import'],
     enabled: ctx => !ctx.state.transactionActive,
-    run: ctx => ctx.openPaletteImport()
+    run: ctx => ctx.openPaletteImport(),
 };
 export const NewPico8PaletteCommand: Command = {
-    id: 'new-pico8-palette', title: 'Add PICO-8 Palette', description: 'Add the PICO-8 color palette to Assets',
-    keywords: ['asset', 'palette', 'colors', 'preset'], enabled: ctx => !ctx.state.transactionActive,
-    run: ctx => {const palette = newPalette('PICO-8', pico8Colors); ctx.store.edit('Create PICO-8 palette', draft => { draft.palettes.push(palette); }); ctx.setSelectedAssetId(null); ctx.setSelectedPaletteId(palette.id); ctx.store.select(null);}
+    id: 'new-pico8-palette',
+    title: 'Add PICO-8 Palette',
+    description: 'Add the PICO-8 color palette to Assets',
+    keywords: ['asset', 'palette', 'colors', 'preset'],
+    enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => {
+        const palette = newPalette('PICO-8', pico8Colors);
+        ctx.store.edit('Create PICO-8 palette', draft => {
+            draft.palettes.push(palette);
+        });
+        ctx.setSelectedAssetId(null);
+        ctx.setSelectedPaletteId(palette.id);
+        ctx.store.select(null);
+    },
 };
 
 export const SelectionGroupCommand: Command = {
@@ -435,9 +505,13 @@ export const SelectionGroupCommand: Command = {
     run: ctx => {
         const shapes = getSelected(ctx.store);
         if (!shapes.length) return;
-        ctx.store.createGroup(ctx.state.selectedPageId, shapes.map(shape => shape.id), `Group ${ctx.state.document.pages.flatMap(page => page.groups).length + 1}`);
-    }
-}
+        ctx.store.createGroup(
+            ctx.state.selectedPageId,
+            shapes.map(shape => shape.id),
+            `Group ${ctx.state.document.pages.flatMap(page => page.groups).length + 1}`,
+        );
+    },
+};
 export const SelectionUngroupCommand: Command = {
     id: 'selection-ungroup',
     title: 'Ungroup selection',
@@ -445,76 +519,91 @@ export const SelectionUngroupCommand: Command = {
     enabled: () => true,
     run: ctx => {
         ctx.store.ungroupSelection(getSelected(ctx.store).map(shape => shape.id));
-    }
-}
+    },
+};
 export const SelectionDuplicateCommand: Command = {
     id: 'selection-duplicate',
     title: 'Duplicate Selection',
     description: 'Make a copy of selected shapes',
     keywords: ['copy'],
     enabled: ctx => !!ctx.state.selectedIds.length && !ctx.state.transactionActive,
-    run: (ctx) => {
-        const shapes = getSelected(ctx.store)
+    run: ctx => {
+        const shapes = getSelected(ctx.store);
         if (shapes.length) {
-            ctx.store.duplicateShapes(shapes.map(shape => shape.id))
+            ctx.store.duplicateShapes(shapes.map(shape => shape.id));
         }
-    }
-}
+    },
+};
 export const SelectionDeleteCommand: Command = {
     id: 'selection-delete',
     title: 'Delete',
     description: 'Remove selected shapes',
     keywords: ['selection', 'remove', 'edit'],
     enabled: ctx => !!ctx.state.selectedIds.length && !ctx.state.transactionActive,
-    run: (ctx) => {
-        const shapes = getSelected(ctx.store)
+    run: ctx => {
+        const shapes = getSelected(ctx.store);
         if (!shapes.length) return;
         ctx.store.beginTransaction('Delete selection');
         shapes.forEach(shape => ctx.store.removeShape(shape.id));
         ctx.store.commitTransaction();
         ctx.store.select(null);
-    }
-}
+    },
+};
 
 export const SelectionCopyCommand: Command = {
     id: 'selection-copy',
     title: 'Copy',
     description: 'Copy Selected shapes',
-    enabled: (ctx) => ctx.store.getSnapshot().selectedIds.length > 0,
-    run: (ctx) => {
+    enabled: ctx => ctx.store.getSnapshot().selectedIds.length > 0,
+    run: ctx => {
         const shapes = getSelected(ctx.store);
-        const ids = new Set(shapes.filter((shape): shape is Extract<Shape, {
-            type: 'pixel-image' | 'repeating-image'
-        }> => shape.type === 'pixel-image' || shape.type === 'repeating-image')
-            .map(shape => shape.components.image.imageId));
-        const fontIds = new Set(shapes.filter((shape): shape is Extract<Shape, {type: 'text'}> => shape.type === 'text')
-            .map(shape => shape.components.text.fontId).filter((id): id is string => !!id));
+        const ids = new Set(
+            shapes
+                .filter(
+                    (
+                        shape,
+                    ): shape is Extract<
+                        Shape,
+                        {
+                            type: 'pixel-image' | 'repeating-image';
+                        }
+                    > => shape.type === 'pixel-image' || shape.type === 'repeating-image',
+                )
+                .map(shape => shape.components.image.imageId),
+        );
+        const fontIds = new Set(
+            shapes
+                .filter((shape): shape is Extract<Shape, {type: 'text'}> => shape.type === 'text')
+                .map(shape => shape.components.text.fontId)
+                .filter((id): id is string => !!id),
+        );
         ctx.setClipboard({
             shapes: structuredClone(shapes),
             images: structuredClone(ctx.store.getSnapshot().document.images.filter(image => ids.has(image.id))),
-            fonts: structuredClone(ctx.store.getSnapshot().document.fonts.filter(font => fontIds.has(font.id)))
+            fonts: structuredClone(ctx.store.getSnapshot().document.fonts.filter(font => fontIds.has(font.id))),
         });
-    }
-}
+    },
+};
 export const SelectionCutCommand: Command = {
     id: 'selection-cut',
     title: 'Cut',
     description: 'Cut selected shapes',
     enabled: ctx => ctx.store.getSnapshot().selectedIds.length > 0 && !ctx.state.transactionActive,
     run: ctx => {
-        SelectionCopyCommand.run(ctx)
-        SelectionDeleteCommand.run(ctx)
-    }
-}
+        SelectionCopyCommand.run(ctx);
+        SelectionDeleteCommand.run(ctx);
+    },
+};
 export const SelectionPasteCommand: Command = {
     id: 'selection-paste',
     title: 'Paste',
     description: 'Paste shapes from clipboard',
     enabled: ctx => ctx.clipboard.shapes.length > 0 && !ctx.state.transactionActive,
     run: ctx => {
-        if (ctx.clipboard.shapes.length) ctx.store.pasteShapes(ctx.clipboard.shapes, ctx.clipboard.images, ctx.clipboard.fonts);
-    }
-}
+        if (ctx.clipboard.shapes.length)
+            ctx.store.pasteShapes(ctx.clipboard.shapes, ctx.clipboard.images, ctx.clipboard.fonts);
+    },
+};
 
 export const ShowCommandPaletteCommand: Command = {
     id: 'ui-show-command-palette',
@@ -523,9 +612,9 @@ export const ShowCommandPaletteCommand: Command = {
     keywords: ['view', 'commands'],
     enabled: () => true,
     run: ctx => {
-        ctx.setCommandPaletteOpen(true)
-    }
-}
+        ctx.setCommandPaletteOpen(true);
+    },
+};
 
 export const ShowKeyboardShortcutsCommand: Command = {
     id: 'ui-show-keyboard-shortcuts',
@@ -533,8 +622,8 @@ export const ShowKeyboardShortcutsCommand: Command = {
     description: 'Show all keyboard shortcuts grouped by command keywords',
     keywords: ['help', 'keyboard', 'shortcuts'],
     enabled: () => true,
-    run: ctx => ctx.setKeyboardShortcutsOpen(true)
-}
+    run: ctx => ctx.setKeyboardShortcutsOpen(true),
+};
 
 export const ToggleLeftSidebar: Command = {
     id: 'ui-toggle-left-sidebar',
@@ -542,37 +631,37 @@ export const ToggleLeftSidebar: Command = {
     description: 'Toggle the left sidebar',
     keywords: ['view', 'panels'],
     enabled: () => true,
-    run: ctx => ctx.setLeftPanelVisible(!ctx.leftPanelVisible)
-}
+    run: ctx => ctx.setLeftPanelVisible(!ctx.leftPanelVisible),
+};
 export const ToggleRightSidebar: Command = {
     id: 'ui-toggle-right-sidebar',
     title: 'Toggle Right Sidebar',
     description: 'Toggle the right sidebar',
     keywords: ['view', 'panels'],
     enabled: () => true,
-    run: ctx => ctx.setRightPanelVisible(!ctx.rightPanelVisible)
-}
+    run: ctx => ctx.setRightPanelVisible(!ctx.rightPanelVisible),
+};
 
 export const SystemThemeCommand: Command = {
     id: 'theme-system',
     title: 'System Theme',
     description: 'Use the system appearance preference',
     enabled: () => true,
-    run: ctx => ctx.setTheme('system')
+    run: ctx => ctx.setTheme('system'),
 };
 export const LightThemeCommand: Command = {
     id: 'theme-light',
     title: 'Light Theme',
     description: 'Use the light appearance',
     enabled: () => true,
-    run: ctx => ctx.setTheme('light')
+    run: ctx => ctx.setTheme('light'),
 };
 export const DarkThemeCommand: Command = {
     id: 'theme-dark',
     title: 'Dark Theme',
     description: 'Use the dark appearance',
     enabled: () => true,
-    run: ctx => ctx.setTheme('dark')
+    run: ctx => ctx.setTheme('dark'),
 };
 export const ThemeSettingsCommand: Command = {
     id: 'theme-settings',
@@ -580,16 +669,19 @@ export const ThemeSettingsCommand: Command = {
     description: 'Adjust the accent color, contrast, corners, spacing and fonts',
     keywords: ['appearance', 'theme', 'accent', 'font', 'contrast'],
     enabled: () => true,
-    run: ctx => ctx.setThemeSettingsOpen(true)
+    run: ctx => ctx.setThemeSettingsOpen(true),
 };
 
-
-export function makeTab(document: DrawingDocument, savedDocumentId: string | null = null, savedJson: string | null = null): DocumentTab {
+export function makeTab(
+    document: DrawingDocument,
+    savedDocumentId: string | null = null,
+    savedJson: string | null = null,
+): DocumentTab {
     return {
         id: crypto.randomUUID(),
         store: new EditorStore(document),
         savedDocumentId,
-        savedJson
+        savedJson,
     };
 }
 
@@ -598,27 +690,32 @@ export const openDocument = (ctx: CommandContext, document: DrawingDocument) => 
     ctx.finishEditing();
     ctx.setWorkspace((current: Workspace) => ({
         tabs: [...current.tabs, tab],
-        activeId: tab.id
+        activeId: tab.id,
     }));
 };
 
-const getSelected = (store: EditorStore) => store.getSnapshot().document.shapes.filter(shape => store.getSnapshot().selectedIds.includes(shape.id));
+const getSelected = (store: EditorStore) =>
+    store.getSnapshot().document.shapes.filter(shape => store.getSnapshot().selectedIds.includes(shape.id));
 
 const createVector = (ctx: CommandContext) => {
     ctx.store.selectPage(ctx.state.selectedPageId);
     const shape = makeVector();
     ctx.store.addShape(shape);
     ctx.store.select(shape.id);
-    ctx.setImageDialog(null)
+    ctx.setImageDialog(null);
     ctx.setPixelEditor(null);
     ctx.setVectorId(shape.id);
     // setPageMenu(null);
 };
 
-
 const saveDocument = (ctx: CommandContext) => {
     const url = URL.createObjectURL(new Blob([ctx.store.toJSON()], {type: 'application/json'}));
-    const safeTitle = ctx.state.document.title.trim().replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-').replace(/\s+/g, ' ').replace(/\.+$/g, '') || 'Untitled';
+    const safeTitle =
+        ctx.state.document.title
+            .trim()
+            .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-')
+            .replace(/\s+/g, ' ')
+            .replace(/\.+$/g, '') || 'Untitled';
     const link = document.createElement('a');
     link.href = url;
     link.download = `${safeTitle}.json`;
@@ -637,23 +734,26 @@ const saveToBrowser = async (ctx: CommandContext) => {
             id,
             name: prior?.name ?? (ctx.state.document.title.trim() || 'Untitled'),
             savedAt: new Date().toISOString(),
-            json
+            json,
         };
         await writeSavedDocuments([...records.filter(item => item.id !== id), record]);
         ctx.setWorkspace(current => ({
             ...current,
-            tabs: current.tabs.map(tab => tab.id === activeTab.id ? {
-                ...tab,
-                savedDocumentId: id,
-                savedJson: json
-            } : tab)
+            tabs: current.tabs.map(tab =>
+                tab.id === activeTab.id
+                    ? {
+                          ...tab,
+                          savedDocumentId: id,
+                          savedJson: json,
+                      }
+                    : tab,
+            ),
         }));
         ctx.setError('');
     } catch (reason) {
         ctx.setError(reason instanceof Error ? reason.message : 'Unable to save document');
     }
 };
-
 
 export const AlignLeftCommand: Command = {
     id: 'align-left',
@@ -662,7 +762,7 @@ export const AlignLeftCommand: Command = {
     keywords: ['align', 'alignment', 'distribute'],
     run: ctx => applyAlignment(ctx, 'left'),
     enabled: ctx => getSelectedShapes(ctx).length >= 2,
-}
+};
 
 export const AlignCenterCommand: Command = {
     id: 'align-center',
@@ -671,7 +771,7 @@ export const AlignCenterCommand: Command = {
     keywords: ['align', 'alignment', 'distribute'],
     run: ctx => applyAlignment(ctx, 'center'),
     enabled: ctx => getSelectedShapes(ctx).length >= 2,
-}
+};
 export const AlignRightCommand: Command = {
     id: 'align-right',
     title: 'Align Right',
@@ -679,7 +779,7 @@ export const AlignRightCommand: Command = {
     keywords: ['align', 'alignment', 'distribute'],
     run: ctx => applyAlignment(ctx, 'right'),
     enabled: ctx => getSelectedShapes(ctx).length >= 2,
-}
+};
 export const AlignTopCommand: Command = {
     id: 'align-top',
     title: 'Align Top',
@@ -687,7 +787,7 @@ export const AlignTopCommand: Command = {
     keywords: ['align', 'alignment', 'distribute'],
     run: ctx => applyAlignment(ctx, 'top'),
     enabled: ctx => getSelectedShapes(ctx).length >= 2,
-}
+};
 export const AlignMiddleCommand: Command = {
     id: 'align-middle',
     title: 'Align Vertical Middle',
@@ -695,7 +795,7 @@ export const AlignMiddleCommand: Command = {
     keywords: ['align', 'alignment', 'distribute'],
     run: ctx => applyAlignment(ctx, 'middle'),
     enabled: ctx => getSelectedShapes(ctx).length >= 2,
-}
+};
 export const AlignBottomCommand: Command = {
     id: 'align-bottom',
     title: 'Align Bottom',
@@ -703,43 +803,80 @@ export const AlignBottomCommand: Command = {
     keywords: ['align', 'alignment', 'distribute'],
     run: ctx => applyAlignment(ctx, 'bottom'),
     enabled: ctx => getSelectedShapes(ctx).length >= 2,
-}
+};
 export const AlignDistributeHorizontalCommand: Command = {
     id: 'align-distribute-horizontal',
     title: 'Distribute Horizontally',
     description: 'Space three or more shapes evenly across',
     keywords: ['align', 'alignment', 'distribute'],
     run: ctx => applyAlignment(ctx, 'distribute-horizontal'),
-    enabled: ctx => getSelectedShapes(ctx).length >= 3
-}
+    enabled: ctx => getSelectedShapes(ctx).length >= 3,
+};
 export const AlignDistributeVerticalCommand: Command = {
     id: 'align-distribute-vertical',
     title: 'Distribute Vertically',
     description: 'Space three or more shapes evenly down',
     keywords: ['align', 'alignment', 'distribute'],
     run: ctx => applyAlignment(ctx, 'distribute-vertical'),
-    enabled: ctx => getSelectedShapes(ctx).length >= 3
-}
+    enabled: ctx => getSelectedShapes(ctx).length >= 3,
+};
 
 /** Canonical command definitions used by the palette, shortcuts, menus, and native menu events. */
 export const allCommands: Command[] = [
-    NewDocumentCommand, RenameDocumentCommand, OpenDocumentCommand, SaveDocumentCommand,
-    OpenJsonCommand, SaveJsonCommand, OpenPngDocumentCommand, SavePngDocumentCommand,
-    ExportSelectionPngCommand, ExportSelectionSvgCommand, ExportPagePngCommand, ExportPageSvgCommand,
-    NewPageCommand, RenamePageCommand, DeletePageCommand,
-    UndoCommand, RedoCommand, NewRectCommand, NewCircleCommand, NewTextCommand,
-    NewVectorNetworkCommand, NewPixelImageCommand, NewRepeatingImageCommand,
-    ImportPNGCommand, ImportSVGCommand, NewColorPaletteCommand, ImportColorPaletteCommand, NewPico8PaletteCommand,
-    SelectionGroupCommand, SelectionUngroupCommand, SelectionDuplicateCommand,
-    SelectionDeleteCommand, SelectionCopyCommand, SelectionCutCommand, SelectionPasteCommand,
-    ShowCommandPaletteCommand, ShowKeyboardShortcutsCommand, ToggleLeftSidebar, ToggleRightSidebar, SystemThemeCommand,
-    LightThemeCommand, DarkThemeCommand, ThemeSettingsCommand, AlignLeftCommand,
-    AlignCenterCommand, AlignRightCommand, AlignTopCommand, AlignMiddleCommand,
-    AlignBottomCommand, AlignDistributeHorizontalCommand, AlignDistributeVerticalCommand
+    NewDocumentCommand,
+    RenameDocumentCommand,
+    OpenDocumentCommand,
+    SaveDocumentCommand,
+    OpenJsonCommand,
+    SaveJsonCommand,
+    OpenPngDocumentCommand,
+    SavePngDocumentCommand,
+    ExportSelectionPngCommand,
+    ExportSelectionSvgCommand,
+    ExportPagePngCommand,
+    ExportPageSvgCommand,
+    NewPageCommand,
+    RenamePageCommand,
+    DeletePageCommand,
+    UndoCommand,
+    RedoCommand,
+    NewRectCommand,
+    NewCircleCommand,
+    NewTextCommand,
+    NewVectorNetworkCommand,
+    NewPixelImageCommand,
+    NewRepeatingImageCommand,
+    ImportPNGCommand,
+    ImportSVGCommand,
+    NewColorPaletteCommand,
+    ImportColorPaletteCommand,
+    NewPico8PaletteCommand,
+    SelectionGroupCommand,
+    SelectionUngroupCommand,
+    SelectionDuplicateCommand,
+    SelectionDeleteCommand,
+    SelectionCopyCommand,
+    SelectionCutCommand,
+    SelectionPasteCommand,
+    ShowCommandPaletteCommand,
+    ShowKeyboardShortcutsCommand,
+    ToggleLeftSidebar,
+    ToggleRightSidebar,
+    SystemThemeCommand,
+    LightThemeCommand,
+    DarkThemeCommand,
+    ThemeSettingsCommand,
+    AlignLeftCommand,
+    AlignCenterCommand,
+    AlignRightCommand,
+    AlignTopCommand,
+    AlignMiddleCommand,
+    AlignBottomCommand,
+    AlignDistributeHorizontalCommand,
+    AlignDistributeVerticalCommand,
 ];
 
 export const commandRegistry = new CommandRegistry(allCommands);
-
 
 // enabled: (ctx) => {
 // const pageShapes = ctx.state.document.shapes.filter(shape => shape.pageId === ctx.state.selectedPageId);
@@ -751,7 +888,7 @@ export const commandRegistry = new CommandRegistry(allCommands);
 function getSelectedShapes(ctx: CommandContext): Array<Shape> {
     const pageShapes = ctx.state.document.shapes.filter(shape => shape.pageId === ctx.state.selectedPageId);
     const selectedShapes = pageShapes.filter(shape => ctx.state.selectedIds.includes(shape.id));
-    return selectedShapes
+    return selectedShapes;
 }
 
 const applyAlignment = (ctx: CommandContext, alignment: ShapeAlignment) => {

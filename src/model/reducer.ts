@@ -7,16 +7,16 @@ import type {
     RectangleShape,
     Shape,
     StrokeComponent,
-    TextShape
-} from "./types";
+    TextShape,
+} from './types';
 
 function gen_id(rect1: string) {
-    return rect1+"_"+crypto.randomUUID()
+    return rect1 + '_' + crypto.randomUUID();
 }
 
 export function makeRect(name: string, bounds: Bounds): RectangleShape {
     return {
-        id: gen_id("rect"),
+        id: gen_id('rect'),
         pageId: 'page_1',
         type: 'rectangle',
         name: name,
@@ -28,26 +28,29 @@ export function makeRect(name: string, bounds: Bounds): RectangleShape {
             fill: {
                 kind: 'fill-component',
                 fill: {
-                    kind: "solid",
-                    color: "red"
-                }
+                    kind: 'solid',
+                    color: 'red',
+                },
             },
             stroke: {
                 kind: 'stroke-component',
                 width: 1,
-                color: "black"
+                color: 'black',
             },
             cornerRadius: {
                 kind: 'rounded-corner-component',
-                radius: 10
-            }
-        }
-    }
+                radius: 10,
+            },
+        },
+    };
 }
 
 export function makeCircle(name: string, center: Point, radius: number): CircleShape {
     return {
-        id: gen_id('circle'), pageId: 'page_1', name, type: 'circle',
+        id: gen_id('circle'),
+        pageId: 'page_1',
+        name,
+        type: 'circle',
         components: {
             circle: {kind: 'circle-like-component', center: {...center}, radius},
             fill: {kind: 'fill-component', fill: {kind: 'solid', color: '#ff0000'}},
@@ -58,11 +61,25 @@ export function makeCircle(name: string, center: Point, radius: number): CircleS
 
 export function makeText(name: string, bounds: Bounds): TextShape {
     return {
-        id: gen_id('text'), pageId: 'page_1', name, type: 'text',
+        id: gen_id('text'),
+        pageId: 'page_1',
+        name,
+        type: 'text',
         components: {
             rect: {kind: 'resizable-bounds-component', bounds: {...bounds}},
-            text: {kind: 'text-component', text: 'Text', fontId: null, fontSize: 32, fontWeight: 400, italic: false, color: '#111111', align: 'left', verticalAlign: 'top', lineHeight: 1.2}
-        }
+            text: {
+                kind: 'text-component',
+                text: 'Text',
+                fontId: null,
+                fontSize: 32,
+                fontWeight: 400,
+                italic: false,
+                color: '#111111',
+                align: 'left',
+                verticalAlign: 'top',
+                lineHeight: 1.2,
+            },
+        },
     };
 }
 
@@ -70,11 +87,10 @@ export function updateRectName(rect: RectangleShape, name: string): RectangleSha
     return {
         ...rect,
         name: name,
-    }
+    };
 }
 
-
-export function updateRectFill(rect: RectangleShape, color: string):RectangleShape {
+export function updateRectFill(rect: RectangleShape, color: string): RectangleShape {
     return {
         ...rect,
         components: {
@@ -82,33 +98,32 @@ export function updateRectFill(rect: RectangleShape, color: string):RectangleSha
             fill: {
                 ...rect.components.fill,
                 fill: {
-                    kind: "solid",
-                    color: color
-                }
-            }
-        }
-    }
-
+                    kind: 'solid',
+                    color: color,
+                },
+            },
+        },
+    };
 }
 
 export function updateDocShape(doc: DrawDocument, shape: Shape): DrawDocument {
-    const new_shapes = doc.shapes.slice()
-    const index = new_shapes.findIndex(candidate => candidate.id === shape.id)
+    const new_shapes = doc.shapes.slice();
+    const index = new_shapes.findIndex(candidate => candidate.id === shape.id);
     if (index < 0) {
-        throw new Error("shape not found in the list")
+        throw new Error('shape not found in the list');
     }
-    new_shapes[index] = shape
+    new_shapes[index] = shape;
     return {
         ...doc,
         shapes: new_shapes,
-    }
+    };
 }
 
 export function appendShape(doc: DrawDocument, rectangleShape: RectangleShape): DrawDocument {
     return {
         ...doc,
-        shapes: [...doc.shapes, rectangleShape]
-    }
+        shapes: [...doc.shapes, rectangleShape],
+    };
 }
 
 export function updateFillComp(comp: FillComponent, color: string): FillComponent {
@@ -117,16 +132,20 @@ export function updateFillComp(comp: FillComponent, color: string): FillComponen
         fill: {
             kind: 'solid',
             color: color,
-        }
-    }
+        },
+    };
 }
-export function updateStrokeComp(comp: StrokeComponent, color: string):StrokeComponent {
+export function updateStrokeComp(comp: StrokeComponent, color: string): StrokeComponent {
     return {
         ...comp,
-        color: color
-    }
+        color: color,
+    };
 }
 
-export function updateShapeComp<S extends Shape, K extends keyof S['components']>(shape: S, name: K, comp: S['components'][K]): S {
+export function updateShapeComp<S extends Shape, K extends keyof S['components']>(
+    shape: S,
+    name: K,
+    comp: S['components'][K],
+): S {
     return {...shape, components: {...shape.components, [name]: comp}};
 }

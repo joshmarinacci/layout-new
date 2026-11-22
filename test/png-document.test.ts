@@ -6,21 +6,21 @@ import type {Document} from '../src/model/types';
 
 // A tiny valid PNG with one IDAT chunk; payload bytes are opaque to metadata tests.
 const tinyPng = Uint8Array.from([
-    137,80,78,71,13,10,26,10,
-    0,0,0,13,73,72,68,82,0,0,0,1,0,0,0,1,8,6,0,0,0,31,21,196,137,
-    0,0,0,12,73,68,65,84,120,156,99,0,1,0,0,5,0,1,
-    13,10,45,180,
-    0,0,0,0,73,69,78,68,174,66,96,130
+    137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196,
+    137, 0, 0, 0, 12, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68,
+    174, 66, 96, 130,
 ]);
 
 function readKeyword(bytes: Uint8Array): string | null {
     let offset = 8;
     while (offset + 12 <= bytes.length) {
-        const length = ((bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]) >>> 0;
+        const length =
+            ((bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]) >>> 0;
         const type = String.fromCharCode(...bytes.subarray(offset + 4, offset + 8));
         if (type === 'tEXt') {
             const separator = bytes.indexOf(0, offset + 8);
-            if (separator >= 0 && separator < offset + 8 + length) return new TextDecoder().decode(bytes.subarray(offset + 8, separator));
+            if (separator >= 0 && separator < offset + 8 + length)
+                return new TextDecoder().decode(bytes.subarray(offset + 8, separator));
         }
         offset += 12 + length;
     }
