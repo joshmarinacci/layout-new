@@ -1,5 +1,8 @@
 node_modules
 dist/
+# Benchmark results and the latest metrics report (history.jsonl is committed)
+bench/results/
+metrics/latest.json
 # Playwright
 test-results/
 playwright-report/
