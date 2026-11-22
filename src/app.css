@@ -409,6 +409,22 @@
 }
 
 .name-field { display: inline-flex; align-items: center; gap: var(--s3); }
+
+/* Document properties: counts and saved fonts. */
+.prop-stats { display: grid; gap: var(--s1); margin: 0; }
+
+.prop-stats > div {
+    display: grid;
+    grid-template-columns: minmax(64px, 1fr) minmax(0, 1.6fr);
+    gap: var(--s3);
+    color: var(--text-muted);
+}
+
+.prop-stats dt { text-align: right; }
+.prop-stats dd { margin: 0; font-family: var(--font-num); color: var(--text); }
+.prop-font-list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--s1); font-size: var(--fs-lg); }
+.prop-note { margin: 0; }
+.prop-sheet-panel > button { justify-self: start; }
 .name-field input { min-width: 100px; }
 
 .text-content-field { align-items: start; }

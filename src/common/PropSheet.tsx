@@ -1,6 +1,6 @@
 import {PropertySection} from '../ui/controls';
 import type {Draft} from 'immer';
-import type {ColorPalette, FontAsset, Shape, ShapeComponent, TextComponent} from '../model/types';
+import type {ColorPalette, DrawDocument, FontAsset, Shape, ShapeComponent, TextComponent} from '../model/types';
 import type {EditorStore} from '../model/EditorStore';
 import {useEditorStore} from '../model/useEditorStore';
 import {NameField} from './NameField';
@@ -63,9 +63,46 @@ function componentFor(shape: Draft<Shape>, key: string): Draft<ShapeComponent> {
     return entry[1];
 }
 
-export default function PropSheet({store, onAddGoogleFont}: { store: EditorStore; onAddGoogleFont: () => void }) {
+/** Shown when the document row in the tree is the selection. */
+function DocumentProperties({store, document, onAddGoogleFont}: {
+    store: EditorStore; document: DrawDocument; onAddGoogleFont: () => void;
+}) {
+    const counts: [string, number][] = [
+        ['Pages', document.pages.length],
+        ['Shapes', document.shapes.length],
+        ['Images', document.images.length],
+        ['Palettes', document.palettes.length],
+        ['Fonts', document.fonts.length],
+    ];
+    return <div className="prop-sheet">
+        <PropertySection title="Document">
+            <NameField store={store} label="Title" value={document.title} rename={name => store.setTitle(name)}/>
+        </PropertySection>
+        <PropertySection title="Contents">
+            <dl className="prop-stats">
+                {counts.map(([label, count]) => <div key={label}><dt>{label}</dt><dd>{count}</dd></div>)}
+            </dl>
+        </PropertySection>
+        <PropertySection title="Fonts">
+            {document.fonts.length
+                ? <ul className="prop-font-list">{document.fonts.map(font => <li key={font.id}
+                    style={{fontFamily: JSON.stringify(font.family)}}>{font.family}</li>)}</ul>
+                : <p className="prop-note">No fonts saved with this document.</p>}
+            <button type="button" onClick={onAddGoogleFont}>Add Google Font…</button>
+        </PropertySection>
+    </div>;
+}
+
+export default function PropSheet({store, documentSelected = false, onAddGoogleFont}: {
+    store: EditorStore;
+    /** The document row is selected: show document properties when no shapes are selected. */
+    documentSelected?: boolean;
+    onAddGoogleFont: () => void;
+}) {
     const state = useEditorStore(store);
     const shapes = state.document.shapes.filter(shape => state.selectedIds.includes(shape.id));
+    if (!shapes.length && documentSelected)
+        return <DocumentProperties store={store} document={state.document} onAddGoogleFont={onAddGoogleFont}/>;
     if (!shapes.length) return <div className="prop-sheet empty-state">Select an
         object to edit its properties.</div>;
     const common = Object.entries(shapes[0].components).filter(([key, component]) => shapes.every(shape => {

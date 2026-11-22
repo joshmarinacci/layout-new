@@ -17,6 +17,7 @@ import {CommandPalette} from './common/CommandPalette';
 import {keybindings, matchesKeybinding} from './common/keybindings';
 import {ContextMenu} from './ui/ContextMenu';
 import {PanelResizer} from './ui/PanelResizer';
+import {Toolbar} from './ui/Toolbar';
 import {usePanelWidths} from './ui/usePanelWidths';
 import {EditorDialog} from './common/EditorDialog';
 import {KeyboardShortcutsDialog} from './common/KeyboardShortcutsDialog';
@@ -545,7 +546,7 @@ export default function App() {
                 onReorderShape={(pageId, id, targetId, position, sourceGroupId, targetGroupId) => store.reorderShapes(pageId, id, targetId, position, sourceGroupId, targetGroupId)}/>
             </aside>
             <main id="document-editor" data-canvas role="tabpanel" aria-labelledby={`tab-${activeTab.id}`}>
-            <div className="canvas-toolbar" role="toolbar" aria-label="Canvas tools" key={activeTab.id}>
+            <Toolbar className="canvas-toolbar" label="Canvas tools" key={activeTab.id}>
                 {(selectedAsset || selectedPalette) &&
                     <button onClick={() => {setSelectedAssetId(null); setSelectedPaletteId(null);}}>Back to
                         canvas</button>}
@@ -587,7 +588,7 @@ export default function App() {
                                 disabled={!selectedShapes.length || state.transactionActive}
                                 onClick={() => SelectionDeleteCommand.run(ctx)}/>}
 
-            </div>
+            </Toolbar>
             {selectedPalette ? <div className="asset-center"><PaletteAssetView store={store} palette={selectedPalette} onBack={() => setSelectedPaletteId(null)}/></div> : selectedAsset ?
                 <div className="asset-center"><PixelAssetView
                     store={store}
@@ -641,7 +642,7 @@ export default function App() {
                     <aside className="inspector" aria-labelledby="inspector-heading"><h2
                         id="inspector-heading" className="panel-heading">Properties</h2><PropSheet
                         key={activeTab.id}
-                        store={store} onAddGoogleFont={() => {setGoogleFontName(''); setGoogleFontError(''); setGoogleFontDialog(true);}}/></aside>
+                        store={store} documentSelected={documentSelected} onAddGoogleFont={() => {setGoogleFontName(''); setGoogleFontError(''); setGoogleFontDialog(true);}}/></aside>
             </>}
         <footer className="statusbar">
             <IconButton
