@@ -8,7 +8,13 @@ const ITEM_SELECTOR = 'button:not(:disabled)';
  * On open it focuses the first enabled item; arrow keys, Home and End move between
  * items, and Escape or Tab closes the menu. Escape returns focus to where it was.
  */
-export function ContextMenu({x, y, label, onClose, children}: {
+export function ContextMenu({
+    x,
+    y,
+    label,
+    onClose,
+    children,
+}: {
     x: number;
     y: number;
     label: string;
@@ -46,17 +52,29 @@ export function ContextMenu({x, y, label, onClose, children}: {
         const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>(ITEM_SELECTOR));
         if (!items.length) return;
         const index = items.findIndex(item => item === document.activeElement);
-        const next = event.key === 'Home' ? 0
-            : event.key === 'End' ? items.length - 1
-            : event.key === 'ArrowDown' ? (index + 1) % items.length
-            : (index <= 0 ? items.length - 1 : index - 1);
+        const next =
+            event.key === 'Home'
+                ? 0
+                : event.key === 'End'
+                  ? items.length - 1
+                  : event.key === 'ArrowDown'
+                    ? (index + 1) % items.length
+                    : index <= 0
+                      ? items.length - 1
+                      : index - 1;
         items[next]?.focus();
     };
-    return <MenuPopover label={label} style={{left: x, top: y}} onShown={focusFirstItem}
-                        onContextMenu={event => event.preventDefault()}
-                        onPointerDown={event => event.stopPropagation()}
-                        onClick={closeAfterItem}
-                        onKeyDown={navigate}>
-        {children}
-    </MenuPopover>;
+    return (
+        <MenuPopover
+            label={label}
+            style={{left: x, top: y}}
+            onShown={focusFirstItem}
+            onContextMenu={event => event.preventDefault()}
+            onPointerDown={event => event.stopPropagation()}
+            onClick={closeAfterItem}
+            onKeyDown={navigate}
+        >
+            {children}
+        </MenuPopover>
+    );
 }

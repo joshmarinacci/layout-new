@@ -6,12 +6,24 @@ import type {FontAsset} from '../src/model/types';
 import {fontFamilyFor} from '../src/shapes/googleFonts';
 import {wrapText} from '../src/shapes/text';
 
-const font: FontAsset = {id: 'font-1', family: 'Example Sans', css: '@font-face{font-family:"Example Sans";src:url("data:font/woff2;base64,AA==") format("woff2")}'};
+const font: FontAsset = {
+    id: 'font-1',
+    family: 'Example Sans',
+    css: '@font-face{font-family:"Example Sans";src:url("data:font/woff2;base64,AA==") format("woff2")}',
+};
 
 describe('text shapes', () => {
     it('wraps words, preserves explicit newlines, and breaks long words', () => {
-        const context = {measureText: (value: string) => ({width: value.length * 10})} as Pick<CanvasRenderingContext2D, 'measureText'>;
-        expect(wrapText(context, 'one two three\nextraordinary', 70)).toEqual(['one two', 'three', 'extraor', 'dinary']);
+        const context = {measureText: (value: string) => ({width: value.length * 10})} as Pick<
+            CanvasRenderingContext2D,
+            'measureText'
+        >;
+        expect(wrapText(context, 'one two three\nextraordinary', 70)).toEqual([
+            'one two',
+            'three',
+            'extraor',
+            'dinary',
+        ]);
     });
 
     it('leaves the generic fallback family unquoted', () => {
@@ -32,7 +44,14 @@ describe('text shapes', () => {
     });
 
     it('migrates version 7 documents to the current version with no font assets', () => {
-        const legacy = {version: 7, title: 'Old', shapes: [], images: [], palettes: [], pages: [{id: 'page_1', name: 'Page 1', groups: []}]};
+        const legacy = {
+            version: 7,
+            title: 'Old',
+            shapes: [],
+            images: [],
+            palettes: [],
+            pages: [{id: 'page_1', name: 'Page 1', groups: []}],
+        };
         const loaded = deserializeDocument(JSON.stringify(legacy));
         expect(loaded.version).toBe(9);
         expect(loaded.fonts).toEqual([]);

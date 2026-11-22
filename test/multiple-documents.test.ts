@@ -19,7 +19,8 @@ describe('independent document stores', () => {
 
         a.select(rectangle.id);
         a.updateShape(rectangle.id, shape => {
-            if (shape.type === 'rectangle' || shape.type === 'circle' || shape.type === 'oval') shape.components.fill.fill.color = '#abcdef';
+            if (shape.type === 'rectangle' || shape.type === 'circle' || shape.type === 'oval')
+                shape.components.fill.fill.color = '#abcdef';
             if (shape.type === 'rectangle') shape.components.rect.bounds.x = 500;
         });
         a.removeShape(circle.id);
@@ -119,7 +120,9 @@ describe('independent document stores', () => {
         const beforeB = b.getSnapshot();
         const opened = new EditorStore();
         opened.loadJSON(a.toJSON());
-        opened.updateShape(document.shapes[0].id, shape => { shape.name = 'Only in new copy'; });
+        opened.updateShape(document.shapes[0].id, shape => {
+            shape.name = 'Only in new copy';
+        });
         expect(opened.getSnapshot().document.shapes[0].name).toBe('Only in new copy');
         expect(a.getSnapshot()).toBe(beforeA);
         expect(b.getSnapshot()).toBe(beforeB);

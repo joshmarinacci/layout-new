@@ -3,7 +3,12 @@ import {deserializeDocument} from './serialization';
 import {invoke, isTauri} from '@tauri-apps/api/core';
 
 export const SAVED_DOCUMENTS_KEY = 'layout-new:saved-documents:v1';
-export interface SavedDocumentRecord { id: string; name: string; savedAt: string; json: string }
+export interface SavedDocumentRecord {
+    id: string;
+    name: string;
+    savedAt: string;
+    json: string;
+}
 export async function readSavedDocuments(): Promise<SavedDocumentRecord[]> {
     if (isTauri()) {
         const records = await invoke<SavedDocumentRecord[]>('read_saved_documents');
@@ -17,7 +22,14 @@ export async function readSavedDocuments(): Promise<SavedDocumentRecord[]> {
 function validateRecords(parsed: unknown): SavedDocumentRecord[] {
     if (!Array.isArray(parsed)) throw new Error('Saved documents storage is invalid');
     return parsed.map((item): SavedDocumentRecord => {
-        if (!item || typeof item !== 'object' || typeof item.id !== 'string' || typeof item.name !== 'string' || typeof item.savedAt !== 'string' || typeof item.json !== 'string')
+        if (
+            !item ||
+            typeof item !== 'object' ||
+            typeof item.id !== 'string' ||
+            typeof item.name !== 'string' ||
+            typeof item.savedAt !== 'string' ||
+            typeof item.json !== 'string'
+        )
             throw new Error('Saved documents storage is invalid');
         deserializeDocument(item.json);
         return {id: item.id, name: item.name, savedAt: item.savedAt, json: item.json};
@@ -30,4 +42,6 @@ export async function writeSavedDocuments(records: readonly SavedDocumentRecord[
     }
     localStorage.setItem(SAVED_DOCUMENTS_KEY, JSON.stringify(records));
 }
-export function parseSavedDocument(json: string): Document { return deserializeDocument(json); }
+export function parseSavedDocument(json: string): Document {
+    return deserializeDocument(json);
+}

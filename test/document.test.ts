@@ -1,5 +1,5 @@
-import {describe, expect, it} from 'vitest'
-import type {DrawDocument, RectangleShape} from "../src/model/types";
+import {describe, expect, it} from 'vitest';
+import type {DrawDocument, RectangleShape} from '../src/model/types';
 import {
     appendShape,
     makeRect,
@@ -7,66 +7,74 @@ import {
     updateFillComp,
     updateRectName,
     updateShapeComp,
-    updateStrokeComp
-} from "../src/model/reducer";
+    updateStrokeComp,
+} from '../src/model/reducer';
 
-function makeRectDocument():DrawDocument {
-    const rect = makeRect('rect1',{x:200,y:50,width:100, height:100});
+function makeRectDocument(): DrawDocument {
+    const rect = makeRect('rect1', {x: 200, y: 50, width: 100, height: 100});
     return {
-        version: 9, images: [], palettes: [], fonts: [], pages: [{id: 'page-1', name: 'Page 1', groups: []}],
-        title:'document',
-        shapes:[rect],
-    }
+        version: 9,
+        images: [],
+        palettes: [],
+        fonts: [],
+        pages: [{id: 'page-1', name: 'Page 1', groups: []}],
+        title: 'document',
+        shapes: [rect],
+    };
 }
 
-function makeEmptyDoc():DrawDocument {
+function makeEmptyDoc(): DrawDocument {
     return {
-        title:"some doc",
+        title: 'some doc',
         shapes: [],
-        version: 9, images: [], palettes: [], fonts: [], pages: [{id: 'page-1', name: 'Page 1', groups: []}],
-    }
+        version: 9,
+        images: [],
+        palettes: [],
+        fonts: [],
+        pages: [{id: 'page-1', name: 'Page 1', groups: []}],
+    };
 }
 
-describe("make document",() => {
-    it("can update a rectangle", () => {
-        const doc = makeRectDocument()
-        expect(doc.version).toBe(9)
-        expect(doc.shapes.length).toBe(1)
-        expect(doc.shapes[0].type).toBe('rectangle')
-        let rect = doc.shapes[0] as RectangleShape
-        expect(rect.name).toBe('rect1')
+describe('make document', () => {
+    it('can update a rectangle', () => {
+        const doc = makeRectDocument();
+        expect(doc.version).toBe(9);
+        expect(doc.shapes.length).toBe(1);
+        expect(doc.shapes[0].type).toBe('rectangle');
+        let rect = doc.shapes[0] as RectangleShape;
+        expect(rect.name).toBe('rect1');
         // set the name
-        rect = updateRectName(rect, 'rect2')
-        expect(rect.name).toBe('rect2')
+        rect = updateRectName(rect, 'rect2');
+        expect(rect.name).toBe('rect2');
 
-        const doc2 = updateDocShape(doc, updateRectName(rect, 'rect3'))
-        expect(doc2.shapes[0].type).toBe('rectangle')
-        const rect3 = doc2.shapes[0] as RectangleShape
-        expect(rect3.name).toBe('rect3')
-    })
-    it("can add a rectangle", () => {
-        const doc = makeEmptyDoc()
-        expect(doc.shapes.length).toBe(0)
-        const doc2 = appendShape(doc, makeRect("rect1",{x:0, y:0, width:50, height:50}))
-        expect(doc.shapes.length).toBe(0)
-        expect(doc2.shapes.length).toBe(1)
-    })
-    it("can edit a rectangle fill", () => {
-        const doc = makeRectDocument()
-        const rect1 = doc.shapes[0] as RectangleShape
-        expect(rect1.components.fill.fill.color).toBe('red')
-        const rect2 = updateShapeComp(rect1,'fill',updateFillComp(rect1.components.fill,'blue'))
-        const doc2 = updateDocShape(doc, rect2)
-        const rect3 = doc2.shapes[0] as RectangleShape
-        expect(rect3.components.fill.fill.color).toBe('blue')
-    })
-    it("can change a rect stroke color",() => {
-        const doc = makeRectDocument()
-        const rect1 = doc.shapes[0] as RectangleShape
-        expect(rect1.components.stroke.color).toBe("black")
-        const stroke2 = updateStrokeComp(rect1.components.stroke,'white')
-        expect(stroke2.color).toBe("white")
-        const rect2 = updateShapeComp(rect1,'stroke',stroke2) as RectangleShape
-        expect(rect2.components.stroke.color).toBe('white')
-    })
-})
+        const doc2 = updateDocShape(doc, updateRectName(rect, 'rect3'));
+        expect(doc2.shapes[0].type).toBe('rectangle');
+        const rect3 = doc2.shapes[0] as RectangleShape;
+        expect(rect3.name).toBe('rect3');
+    });
+    it('can add a rectangle', () => {
+        const doc = makeEmptyDoc();
+        expect(doc.shapes.length).toBe(0);
+        const doc2 = appendShape(doc, makeRect('rect1', {x: 0, y: 0, width: 50, height: 50}));
+        expect(doc.shapes.length).toBe(0);
+        expect(doc2.shapes.length).toBe(1);
+    });
+    it('can edit a rectangle fill', () => {
+        const doc = makeRectDocument();
+        const rect1 = doc.shapes[0] as RectangleShape;
+        expect(rect1.components.fill.fill.color).toBe('red');
+        const rect2 = updateShapeComp(rect1, 'fill', updateFillComp(rect1.components.fill, 'blue'));
+        const doc2 = updateDocShape(doc, rect2);
+        const rect3 = doc2.shapes[0] as RectangleShape;
+        expect(rect3.components.fill.fill.color).toBe('blue');
+    });
+    it('can change a rect stroke color', () => {
+        const doc = makeRectDocument();
+        const rect1 = doc.shapes[0] as RectangleShape;
+        expect(rect1.components.stroke.color).toBe('black');
+        const stroke2 = updateStrokeComp(rect1.components.stroke, 'white');
+        expect(stroke2.color).toBe('white');
+        const rect2 = updateShapeComp(rect1, 'stroke', stroke2) as RectangleShape;
+        expect(rect2.components.stroke.color).toBe('white');
+    });
+});

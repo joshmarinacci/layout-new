@@ -12,7 +12,13 @@ export function clampPanelWidth(width: number) {
  * width through a CSS variable on `target` (no React render per pointer move) and
  * commits the final width on release. Escape or a lost pointer cancels the drag.
  */
-export function PanelResizer({side, label, width, target, onCommit}: {
+export function PanelResizer({
+    side,
+    label,
+    width,
+    target,
+    onCommit,
+}: {
     side: 'left' | 'right';
     label: string;
     width: number;
@@ -34,30 +40,43 @@ export function PanelResizer({side, label, width, target, onCommit}: {
         const amount = event.shiftKey ? 50 : 10;
         const grow = side === 'left' ? 'ArrowRight' : 'ArrowLeft';
         const shrink = side === 'left' ? 'ArrowLeft' : 'ArrowRight';
-        if (event.key === 'Escape' && drag.current) { event.preventDefault(); end(event.currentTarget, false); return; }
+        if (event.key === 'Escape' && drag.current) {
+            event.preventDefault();
+            end(event.currentTarget, false);
+            return;
+        }
         if (event.key !== grow && event.key !== shrink) return;
         event.preventDefault();
         onCommit(clampPanelWidth(width + (event.key === grow ? amount : -amount)));
     };
-    return <div className={`panel-resizer panel-resizer-${side}`} role="separator" tabIndex={0}
-                aria-label={label} aria-orientation="vertical"
-                aria-valuenow={width} aria-valuemin={PANEL_MIN_WIDTH} aria-valuemax={PANEL_MAX_WIDTH}
-                onPointerDown={(event: PointerEvent<HTMLDivElement>) => {
-                    if (event.button !== 0) return;
-                    event.preventDefault();
-                    event.currentTarget.setPointerCapture(event.pointerId);
-                    event.currentTarget.focus();
-                    drag.current = {pointerId: event.pointerId, startX: event.clientX, startWidth: width, width};
-                }}
-                onPointerMove={event => {
-                    const active = drag.current;
-                    if (!active || active.pointerId !== event.pointerId) return;
-                    const delta = event.clientX - active.startX;
-                    active.width = clampPanelWidth(active.startWidth + (side === 'left' ? delta : -delta));
-                    preview(active.width);
-                }}
-                onPointerUp={event => end(event.currentTarget, true)}
-                onPointerCancel={event => end(event.currentTarget, false)}
-                onLostPointerCapture={event => end(event.currentTarget, false)}
-                onKeyDown={step}/>;
+    return (
+        <div
+            className={`panel-resizer panel-resizer-${side}`}
+            role="separator"
+            tabIndex={0}
+            aria-label={label}
+            aria-orientation="vertical"
+            aria-valuenow={width}
+            aria-valuemin={PANEL_MIN_WIDTH}
+            aria-valuemax={PANEL_MAX_WIDTH}
+            onPointerDown={(event: PointerEvent<HTMLDivElement>) => {
+                if (event.button !== 0) return;
+                event.preventDefault();
+                event.currentTarget.setPointerCapture(event.pointerId);
+                event.currentTarget.focus();
+                drag.current = {pointerId: event.pointerId, startX: event.clientX, startWidth: width, width};
+            }}
+            onPointerMove={event => {
+                const active = drag.current;
+                if (!active || active.pointerId !== event.pointerId) return;
+                const delta = event.clientX - active.startX;
+                active.width = clampPanelWidth(active.startWidth + (side === 'left' ? delta : -delta));
+                preview(active.width);
+            }}
+            onPointerUp={event => end(event.currentTarget, true)}
+            onPointerCancel={event => end(event.currentTarget, false)}
+            onLostPointerCapture={event => end(event.currentTarget, false)}
+            onKeyDown={step}
+        />
+    );
 }

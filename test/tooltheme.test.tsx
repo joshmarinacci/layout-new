@@ -10,7 +10,10 @@ import {DropdownMenu, Separator} from '../src/ui/DropdownMenu';
 import {MenuPopover} from '../src/ui/MenuPopover';
 import {loadThemeSettings, THEME_STORAGE_KEY, themeMode, useThemeSettings} from '../src/ui/theme';
 
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+});
 
 describe('theme settings', () => {
     beforeEach(() => {
@@ -56,11 +59,13 @@ describe('theme settings', () => {
 
 describe('menus use tooltheme semantics', () => {
     it('render a popover holding a labelled menu of menu items', () => {
-        render(<MenuPopover label="Shape actions" style={{left: 10, top: 20}}>
-            <MenuItem label="Duplicate" shortcut="⌘D"/>
-            <Separator/>
-            <MenuItem label="Delete"/>
-        </MenuPopover>);
+        render(
+            <MenuPopover label="Shape actions" style={{left: 10, top: 20}}>
+                <MenuItem label="Duplicate" shortcut="⌘D" />
+                <Separator />
+                <MenuItem label="Delete" />
+            </MenuPopover>,
+        );
         const menu = screen.getByRole('menu', {name: 'Shape actions'});
         expect(menu.tagName).toBe('MENU');
         expect(menu.parentElement?.getAttribute('popover')).toBe('manual');
@@ -71,7 +76,11 @@ describe('menus use tooltheme semantics', () => {
     it('opens a dropdown from its button and closes it after an item runs', async () => {
         const user = userEvent.setup();
         const run = vi.fn();
-        render(<DropdownMenu title="File"><MenuItem label="New" onClick={run}/></DropdownMenu>);
+        render(
+            <DropdownMenu title="File">
+                <MenuItem label="New" onClick={run} />
+            </DropdownMenu>,
+        );
         const button = screen.getByRole('button', {name: 'File'});
         expect(button.getAttribute('aria-haspopup')).toBe('menu');
         await user.click(button);
@@ -84,7 +93,11 @@ describe('menus use tooltheme semantics', () => {
 
     it('renders command menu items as menu items', () => {
         const ctx = {} as CommandContext;
-        render(<menu role="menu"><CommandMenuItem ctx={ctx} commandId="theme-settings"/></menu>);
+        render(
+            <menu role="menu">
+                <CommandMenuItem ctx={ctx} commandId="theme-settings" />
+            </menu>,
+        );
         expect(screen.getByRole('menuitem', {name: 'Theme Settings…'})).toBeDefined();
     });
 });

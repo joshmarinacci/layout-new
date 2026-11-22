@@ -9,25 +9,36 @@ import {makeExampleDocument} from '../src/model/exampleDocument';
 import {keepInViewport} from '../src/ui/MenuPopover';
 import {Toolbar} from '../src/ui/Toolbar';
 
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+});
 
 const waitPastDoubleClick = () => act(() => new Promise(resolve => setTimeout(resolve, DOUBLE_CLICK_DELAY + 30)));
 
 describe('document properties', () => {
     it('shows the title, contents and fonts when the document is selected', () => {
         const store = new EditorStore(makeExampleDocument());
-        render(<PropSheet store={store} documentSelected onAddGoogleFont={vi.fn()}/>);
+        render(<PropSheet store={store} documentSelected onAddGoogleFont={vi.fn()} />);
         expect((screen.getByRole('textbox', {name: 'Title'}) as HTMLInputElement).value).toBe('test doc');
-        const stats = Object.fromEntries(Array.from(document.querySelectorAll('.prop-stats > div'))
-            .map(row => [row.querySelector('dt')?.textContent, row.querySelector('dd')?.textContent]));
-        expect(stats).toMatchObject({Pages: '1', Shapes: String(store.getSnapshot().document.shapes.length), Fonts: '0'});
+        const stats = Object.fromEntries(
+            Array.from(document.querySelectorAll('.prop-stats > div')).map(row => [
+                row.querySelector('dt')?.textContent,
+                row.querySelector('dd')?.textContent,
+            ]),
+        );
+        expect(stats).toMatchObject({
+            Pages: '1',
+            Shapes: String(store.getSnapshot().document.shapes.length),
+            Fonts: '0',
+        });
         expect(screen.getByText('No fonts saved with this document.')).toBeTruthy();
     });
 
     it('renames the document as one undoable edit', async () => {
         const user = userEvent.setup();
         const store = new EditorStore(makeExampleDocument());
-        render(<PropSheet store={store} documentSelected onAddGoogleFont={vi.fn()}/>);
+        render(<PropSheet store={store} documentSelected onAddGoogleFont={vi.fn()} />);
         const title = screen.getByRole('textbox', {name: 'Title'});
         await user.clear(title);
         await user.type(title, 'Poster{Enter}');
@@ -39,13 +50,19 @@ describe('document properties', () => {
     it('opens the Google Font dialog from the Fonts section', async () => {
         const user = userEvent.setup();
         const onAddGoogleFont = vi.fn();
-        render(<PropSheet store={new EditorStore(makeExampleDocument())} documentSelected onAddGoogleFont={onAddGoogleFont}/>);
+        render(
+            <PropSheet
+                store={new EditorStore(makeExampleDocument())}
+                documentSelected
+                onAddGoogleFont={onAddGoogleFont}
+            />,
+        );
         await user.click(screen.getByRole('button', {name: 'Add Google Font…'}));
         expect(onAddGoogleFont).toHaveBeenCalledTimes(1);
     });
 
     it('still prompts for a selection when neither the document nor a shape is selected', () => {
-        render(<PropSheet store={new EditorStore(makeExampleDocument())} onAddGoogleFont={vi.fn()}/>);
+        render(<PropSheet store={new EditorStore(makeExampleDocument())} onAddGoogleFont={vi.fn()} />);
         expect(screen.getByText(/Select an\s+object/)).toBeTruthy();
     });
 });
@@ -53,13 +70,33 @@ describe('document properties', () => {
 function treeProps() {
     const document = makeExampleDocument();
     return {
-        document, selectedIds: [], selectedAssetId: null, selectedPaletteId: null, selectedPageId: document.pages[0].id,
+        document,
+        selectedIds: [],
+        selectedAssetId: null,
+        selectedPaletteId: null,
+        selectedPageId: document.pages[0].id,
         documentSelected: false,
-        onSelect: vi.fn(), onSelectAsset: vi.fn(), onSelectPalette: vi.fn(), onShapeContextMenu: vi.fn(), onSelectPage: vi.fn(),
-        onDocumentContextMenu: vi.fn(), onSelectDocument: vi.fn(), onRenameDocument: vi.fn(), onRenamePage: vi.fn(),
-        onRenameShape: vi.fn(), onRenamePalette: vi.fn(), onRenameImage: vi.fn(), onUngroup: vi.fn(), onRenameGroup: vi.fn(),
-        onSelectGroup: vi.fn(), onPageContextMenu: vi.fn(), onPagesContextMenu: vi.fn(), onAssetsContextMenu: vi.fn(),
-        onPaletteContextMenu: vi.fn(), onReorderPage: vi.fn(), onReorderShape: vi.fn(),
+        onSelect: vi.fn(),
+        onSelectAsset: vi.fn(),
+        onSelectPalette: vi.fn(),
+        onShapeContextMenu: vi.fn(),
+        onSelectPage: vi.fn(),
+        onDocumentContextMenu: vi.fn(),
+        onSelectDocument: vi.fn(),
+        onRenameDocument: vi.fn(),
+        onRenamePage: vi.fn(),
+        onRenameShape: vi.fn(),
+        onRenamePalette: vi.fn(),
+        onRenameImage: vi.fn(),
+        onUngroup: vi.fn(),
+        onRenameGroup: vi.fn(),
+        onSelectGroup: vi.fn(),
+        onPageContextMenu: vi.fn(),
+        onPagesContextMenu: vi.fn(),
+        onAssetsContextMenu: vi.fn(),
+        onPaletteContextMenu: vi.fn(),
+        onReorderPage: vi.fn(),
+        onReorderShape: vi.fn(),
     };
 }
 
@@ -68,7 +105,7 @@ describe('renameable folders', () => {
 
     it('rename on double-click without opening and closing (no flicker)', async () => {
         const user = userEvent.setup();
-        render(<TreeView {...treeProps()}/>);
+        render(<TreeView {...treeProps()} />);
         const expandedStates: (string | null)[] = [];
         const observer = new MutationObserver(() => expandedStates.push(page().getAttribute('aria-expanded')));
         observer.observe(page(), {attributes: true, attributeFilter: ['aria-expanded']});
@@ -82,7 +119,7 @@ describe('renameable folders', () => {
 
     it('still toggle on a single click, once the double-click window has passed', async () => {
         const user = userEvent.setup();
-        render(<TreeView {...treeProps()}/>);
+        render(<TreeView {...treeProps()} />);
         await user.click(page());
         expect(page().getAttribute('aria-expanded')).toBe('true');
         await waitPastDoubleClick();
@@ -92,7 +129,7 @@ describe('renameable folders', () => {
 
     it('toggle immediately from the keyboard', async () => {
         const user = userEvent.setup();
-        render(<TreeView {...treeProps()}/>);
+        render(<TreeView {...treeProps()} />);
         page().focus();
         await user.keyboard('{Enter}');
         expect(page().getAttribute('aria-expanded')).toBe('false');
@@ -105,7 +142,12 @@ describe('keepInViewport', () => {
         element.style.left = `${rect.left}px`;
         element.style.top = `${rect.top}px`;
         vi.spyOn(element, 'getBoundingClientRect').mockReturnValue({
-            ...rect, x: rect.left, y: rect.top, right: rect.left + rect.width, bottom: rect.top + rect.height, toJSON: () => ({})
+            ...rect,
+            x: rect.left,
+            y: rect.top,
+            right: rect.left + rect.width,
+            bottom: rect.top + rect.height,
+            toJSON: () => ({}),
         } as DOMRect);
         return element;
     }
@@ -133,16 +175,18 @@ describe('keepInViewport', () => {
 
 describe('Toolbar', () => {
     function renderToolbar() {
-        render(<>
-            <button>Before</button>
-            <Toolbar label="Canvas tools">
-                <button>Zoom out</button>
-                <button disabled>Zoom in</button>
-                <button>Reset</button>
-                <button>Delete</button>
-            </Toolbar>
-            <button>After</button>
-        </>);
+        render(
+            <>
+                <button>Before</button>
+                <Toolbar label="Canvas tools">
+                    <button>Zoom out</button>
+                    <button disabled>Zoom in</button>
+                    <button>Reset</button>
+                    <button>Delete</button>
+                </Toolbar>
+                <button>After</button>
+            </>,
+        );
     }
     const focused = () => document.activeElement?.textContent;
 

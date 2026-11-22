@@ -6,10 +6,11 @@
 dialog {
     opacity: 0;
     transform: scale(0.7) translateY(20px);
-    transition: opacity var(--anim-dur) ease,
-    transform var(--anim-dur) ease,
-    display var(--anim-dur) allow-discrete,
-    overlay var(--anim-dur) allow-discrete;
+    transition:
+        opacity var(--anim-dur) ease,
+        transform var(--anim-dur) ease,
+        display var(--anim-dur) allow-discrete,
+        overlay var(--anim-dur) allow-discrete;
 }
 
 dialog[open] {
@@ -26,9 +27,10 @@ dialog[open] {
 
 dialog::backdrop {
     background-color: rgb(0 0 0 / 0%);
-    transition: background-color var(--anim-dur) ease,
-    display var(--anim-dur) allow-discrete,
-    overlay var(--anim-dur) allow-discrete;
+    transition:
+        background-color var(--anim-dur) ease,
+        display var(--anim-dur) allow-discrete,
+        overlay var(--anim-dur) allow-discrete;
 }
 
 dialog[open]::backdrop {
@@ -41,16 +43,16 @@ dialog[open]::backdrop {
     }
 }
 
-
 details::details-content {
     opacity: 0;
     block-size: 0;
     overflow: hidden;
 
     /* Smoothly transition discrete properties along with numerical ones */
-    transition: block-size var(--anim-dur) ease,
-    opacity var(--anim-dur) ease,
-    content-visibility var(--anim-dur) ease allow-discrete;
+    transition:
+        block-size var(--anim-dur) ease,
+        opacity var(--anim-dur) ease,
+        content-visibility var(--anim-dur) ease allow-discrete;
 }
 
 /* 3. Define the styles when the details menu is open */
@@ -61,7 +63,10 @@ details[open]::details-content {
 
 /* Respect motion preferences; leave details usable on browsers without interpolate-size. */
 @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after, *::backdrop {
+    *,
+    *::before,
+    *::after,
+    *::backdrop {
         transition: none !important;
         animation: none !important;
     }

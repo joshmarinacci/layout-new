@@ -11,8 +11,7 @@ export function keepInViewport(element: HTMLElement) {
     const rect = element.getBoundingClientRect();
     const maxBottom = window.innerHeight - VIEWPORT_MARGIN;
     const maxRight = window.innerWidth - VIEWPORT_MARGIN;
-    if (rect.bottom > maxBottom)
-        element.style.top = `${Math.max(VIEWPORT_MARGIN, maxBottom - rect.height)}px`;
+    if (rect.bottom > maxBottom) element.style.top = `${Math.max(VIEWPORT_MARGIN, maxBottom - rect.height)}px`;
     if (rect.right > maxRight) {
         element.style.left = `${Math.max(VIEWPORT_MARGIN, maxRight - rect.width)}px`;
         element.style.right = 'auto';
@@ -25,7 +24,13 @@ export function keepInViewport(element: HTMLElement) {
  * The caller decides when it's mounted and where it sits (fixed, viewport coordinates).
  * `onShown` runs once, right after the menu opens, e.g. to move focus into it.
  */
-export function MenuPopover({label, style, onShown, children, ...props}: HTMLAttributes<HTMLDivElement> & {
+export function MenuPopover({
+    label,
+    style,
+    onShown,
+    children,
+    ...props
+}: HTMLAttributes<HTMLDivElement> & {
     label: string;
     style: CSSProperties;
     onShown?: (popover: HTMLDivElement) => void;
@@ -41,7 +46,11 @@ export function MenuPopover({label, style, onShown, children, ...props}: HTMLAtt
         keepInViewport(element);
         shown(element);
     }, []);
-    return <div ref={popover} popover="manual" className="menu-popover" style={style} {...props}>
-        <menu role="menu" aria-label={label}>{children}</menu>
-    </div>;
+    return (
+        <div ref={popover} popover="manual" className="menu-popover" style={style} {...props}>
+            <menu role="menu" aria-label={label}>
+                {children}
+            </menu>
+        </div>
+    );
 }

@@ -1,10 +1,10 @@
-import react from '@vitejs/plugin-react'
-import {readFileSync} from 'fs'
+import react from '@vitejs/plugin-react';
+import {readFileSync} from 'fs';
 // import {resolve} from 'path'
-import {defineConfig} from 'vite'
+import {defineConfig} from 'vite';
 
-const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'))
-const buildTime = new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'
+const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
+const buildTime = new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
 
 export default defineConfig({
     base: process.env.VITE_BASE_PATH || '/',
@@ -29,4 +29,4 @@ export default defineConfig({
     //         '@actions': resolve(__dirname, 'src/actions'),
     //     },
     // },
-})
+});

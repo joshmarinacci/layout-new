@@ -12,15 +12,15 @@ export interface Bounds {
 }
 
 export interface SolidFill {
-    kind: "solid";
+    kind: 'solid';
     color: string;
 }
 
-export type Fill = SolidFill
+export type Fill = SolidFill;
 
 export interface ColorAsset {
     id: string;
-    kind: "color";
+    kind: 'color';
     name: string;
     value: string;
 }
@@ -33,16 +33,16 @@ export interface GradientStop {
 
 export interface GradientAsset {
     id: string;
-    kind: "gradient";
+    kind: 'gradient';
     name: string;
-    type: "linear";
+    type: 'linear';
     angle: number;
     stops: GradientStop[];
 }
 
 export interface ImageAsset {
     id: string;
-    kind: "image";
+    kind: 'image';
     name: string;
     mimeType: string;
     dataUrl: string;
@@ -74,7 +74,7 @@ export interface FontAsset {
 /* ========== components ========= */
 
 export type ShapeComponent =
-    VectorNetwork
+    | VectorNetwork
     | ResizableBoundsComponent
     | FillComponent
     | RoundedCornerComponent
@@ -85,28 +85,28 @@ export type ShapeComponent =
     | TextComponent;
 
 export interface ResizableBoundsComponent {
-    kind: 'resizable-bounds-component'
+    kind: 'resizable-bounds-component';
     bounds: Bounds;
 }
 
 export interface FillComponent {
-    kind: 'fill-component'
+    kind: 'fill-component';
     fill: Fill;
 }
 
 export interface RoundedCornerComponent {
-    kind: 'rounded-corner-component'
+    kind: 'rounded-corner-component';
     radius: number;
 }
 
 export interface StrokeComponent {
-    kind: 'stroke-component'
+    kind: 'stroke-component';
     color: string;
     width: number;
 }
 
 export interface CircleLikeComponent {
-    kind: 'circle-like-component'
+    kind: 'circle-like-component';
     center: Point;
     radius: number;
 }
@@ -117,11 +117,10 @@ interface BaseShape {
     id: string;
     name: string;
     pageId?: string;
-
 }
 
 export interface RectangleShape extends BaseShape {
-    type: "rectangle";
+    type: 'rectangle';
     components: {
         rect: ResizableBoundsComponent;
         fill: FillComponent;
@@ -131,7 +130,7 @@ export interface RectangleShape extends BaseShape {
 }
 
 export interface CircleShape extends BaseShape {
-    type: "circle";
+    type: 'circle';
     components: {
         circle: CircleLikeComponent;
         fill: FillComponent;
@@ -140,7 +139,7 @@ export interface CircleShape extends BaseShape {
 }
 
 export interface OvalShape extends BaseShape {
-    type: "oval";
+    type: 'oval';
     components: {
         oval: ResizableBoundsComponent;
         fill: FillComponent;
@@ -213,13 +212,7 @@ export interface TextShape extends BaseShape {
 /* ========== document ======== */
 
 export type Shape =
-    VectorShape
-    | RectangleShape
-    | CircleShape
-    | OvalShape
-    | PixelImageShape
-    | RepeatingImageShape
-    | TextShape;
+    VectorShape | RectangleShape | CircleShape | OvalShape | PixelImageShape | RepeatingImageShape | TextShape;
 
 export interface ShapeGroup {
     id: string;
@@ -234,8 +227,8 @@ export interface Page {
 }
 
 export interface Document {
-    version: 9
-    title: string
+    version: 9;
+    title: string;
     shapes: Shape[];
     images: PixelImageData[];
     palettes: ColorPalette[];
@@ -247,7 +240,7 @@ export type DrawDocument = Document;
 
 /** Points and controls are local to origin. IDs are scoped to this network. */
 export interface VectorPoint extends Point {
-    id: string
+    id: string;
 }
 
 export interface VectorSegment {
@@ -255,19 +248,19 @@ export interface VectorSegment {
     a: string;
     b: string;
     c1: Point | null;
-    c2: Point | null
+    c2: Point | null;
 }
 
 export interface VectorSpan {
     segment: string;
     from: number;
-    to: number
+    to: number;
 }
 
 export interface VectorRegion {
     key: string;
     loops: VectorSpan[][];
-    fill: string | null
+    fill: string | null;
 }
 
 export interface VectorNetwork {
@@ -276,10 +269,10 @@ export interface VectorNetwork {
     points: VectorPoint[];
     segments: VectorSegment[];
     regions: VectorRegion[];
-    smooth: { point: string; segments: [string, string] }[];
+    smooth: {point: string; segments: [string, string]}[];
 }
 
 export interface VectorShape extends BaseShape {
     type: 'vector';
-    components: { network: VectorNetwork; stroke: StrokeComponent };
+    components: {network: VectorNetwork; stroke: StrokeComponent};
 }

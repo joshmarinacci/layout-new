@@ -38,7 +38,8 @@ function chunkType(bytes: Uint8Array, offset: number): string {
 }
 
 function validatePng(bytes: Uint8Array): number {
-    if (bytes.length < 8 || PNG_SIGNATURE.some((byte, index) => bytes[index] !== byte)) throw new Error('Not a valid PNG');
+    if (bytes.length < 8 || PNG_SIGNATURE.some((byte, index) => bytes[index] !== byte))
+        throw new Error('Not a valid PNG');
     let position = 8;
     while (position + 12 <= bytes.length) {
         const length = readUint32(bytes, position);
@@ -54,7 +55,8 @@ function validatePng(bytes: Uint8Array): number {
 function utf8ToBase64(value: string): string {
     const bytes = new TextEncoder().encode(value);
     let binary = '';
-    for (let start = 0; start < bytes.length; start += 0x8000) binary += String.fromCharCode(...bytes.subarray(start, start + 0x8000));
+    for (let start = 0; start < bytes.length; start += 0x8000)
+        binary += String.fromCharCode(...bytes.subarray(start, start + 0x8000));
     return btoa(binary);
 }
 
@@ -118,33 +120,53 @@ function shapeBounds(shape: Shape) {
         case 'vector': {
             const points = shape.components.network.points;
             if (!points.length) return {x: 0, y: 0, width: 1, height: 1};
-            const xs = points.map(point => point.x), ys = points.map(point => point.y);
-            return {x: Math.min(...xs), y: Math.min(...ys), width: Math.max(1, Math.max(...xs) - Math.min(...xs)), height: Math.max(1, Math.max(...ys) - Math.min(...ys))};
+            const xs = points.map(point => point.x),
+                ys = points.map(point => point.y);
+            return {
+                x: Math.min(...xs),
+                y: Math.min(...ys),
+                width: Math.max(1, Math.max(...xs) - Math.min(...xs)),
+                height: Math.max(1, Math.max(...ys) - Math.min(...ys)),
+            };
         }
         case 'circle': {
             const {center, radius} = shape.components.circle;
             return {x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2};
         }
-        case 'rectangle': return shape.components.rect.bounds;
-        case 'text': return shape.components.rect.bounds;
-        case 'oval': return shape.components.oval.bounds;
-        case 'pixel-image': case 'repeating-image': return shape.components.rect.bounds;
+        case 'rectangle':
+            return shape.components.rect.bounds;
+        case 'text':
+            return shape.components.rect.bounds;
+        case 'oval':
+            return shape.components.oval.bounds;
+        case 'pixel-image':
+        case 'repeating-image':
+            return shape.components.rect.bounds;
     }
 }
 
 function renderShape(ctx: CanvasRenderingContext2D, shape: Shape, document: Document) {
     const bounds = shapeBounds(shape);
-    if (shape.type === 'text') { drawTextShape(ctx, shape, document.fonts); return; }
+    if (shape.type === 'text') {
+        drawTextShape(ctx, shape, document.fonts);
+        return;
+    }
     if (shape.type === 'vector') {
         const {network, stroke} = shape.components;
         ctx.save();
         ctx.translate(network.origin.x, network.origin.y);
         for (const segment of network.segments) {
-            const a = network.points.find(point => point.id === segment.a), b = network.points.find(point => point.id === segment.b);
+            const a = network.points.find(point => point.id === segment.a),
+                b = network.points.find(point => point.id === segment.b);
             if (!a || !b) continue;
-            ctx.beginPath(); ctx.moveTo(a.x, a.y);
-            if (segment.c1 && segment.c2) ctx.bezierCurveTo(segment.c1.x, segment.c1.y, segment.c2.x, segment.c2.y, b.x, b.y); else ctx.lineTo(b.x, b.y);
-            ctx.strokeStyle = stroke.color; ctx.lineWidth = stroke.width; ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            if (segment.c1 && segment.c2)
+                ctx.bezierCurveTo(segment.c1.x, segment.c1.y, segment.c2.x, segment.c2.y, b.x, b.y);
+            else ctx.lineTo(b.x, b.y);
+            ctx.strokeStyle = stroke.color;
+            ctx.lineWidth = stroke.width;
+            ctx.stroke();
         }
         ctx.restore();
         return;
@@ -152,7 +174,9 @@ function renderShape(ctx: CanvasRenderingContext2D, shape: Shape, document: Docu
     if (shape.type === 'pixel-image' || shape.type === 'repeating-image') {
         const image = document.images.find(item => item.id === shape.components.image.imageId);
         if (image) {
-        const pixels = globalThis.document.createElement('canvas'); pixels.width = image.width; pixels.height = image.height;
+            const pixels = globalThis.document.createElement('canvas');
+            pixels.width = image.width;
+            pixels.height = image.height;
             const imageCtx = pixels.getContext('2d');
             if (imageCtx) {
                 const imageData = imageCtx.createImageData(image.width, image.height);
@@ -167,16 +191,45 @@ function renderShape(ctx: CanvasRenderingContext2D, shape: Shape, document: Docu
                 imageCtx.putImageData(imageData, 0, 0);
                 const source = shape.components.image.source;
                 if (shape.type === 'pixel-image') {
-                    ctx.drawImage(pixels, source.x, source.y, source.width, source.height, bounds.x, bounds.y, bounds.width, bounds.height);
+                    ctx.drawImage(
+                        pixels,
+                        source.x,
+                        source.y,
+                        source.width,
+                        source.height,
+                        bounds.x,
+                        bounds.y,
+                        bounds.width,
+                        bounds.height,
+                    );
                 } else {
-                    const tile = globalThis.document.createElement('canvas'); tile.width = shape.components.pattern.width; tile.height = shape.components.pattern.height;
+                    const tile = globalThis.document.createElement('canvas');
+                    tile.width = shape.components.pattern.width;
+                    tile.height = shape.components.pattern.height;
                     const tileCtx = tile.getContext('2d');
                     if (tileCtx) {
                         tileCtx.imageSmoothingEnabled = false;
-                        tileCtx.drawImage(pixels, source.x, source.y, source.width, source.height, 0, 0, tile.width, tile.height);
-                        ctx.save(); ctx.beginPath(); ctx.rect(bounds.x, bounds.y, bounds.width, bounds.height); ctx.clip();
+                        tileCtx.drawImage(
+                            pixels,
+                            source.x,
+                            source.y,
+                            source.width,
+                            source.height,
+                            0,
+                            0,
+                            tile.width,
+                            tile.height,
+                        );
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.rect(bounds.x, bounds.y, bounds.width, bounds.height);
+                        ctx.clip();
                         const pattern = ctx.createPattern(tile, 'repeat');
-                        if (pattern) { pattern.setTransform(new DOMMatrix().translate(bounds.x, bounds.y)); ctx.fillStyle = pattern; ctx.fillRect(bounds.x, bounds.y, bounds.width, bounds.height); }
+                        if (pattern) {
+                            pattern.setTransform(new DOMMatrix().translate(bounds.x, bounds.y));
+                            ctx.fillStyle = pattern;
+                            ctx.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
+                        }
                         ctx.restore();
                     }
                 }
@@ -185,11 +238,34 @@ function renderShape(ctx: CanvasRenderingContext2D, shape: Shape, document: Docu
         return;
     }
     ctx.beginPath();
-    if (shape.type === 'circle') ctx.ellipse(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, bounds.width / 2, bounds.height / 2, 0, 0, Math.PI * 2);
-    else if (shape.type === 'oval') ctx.ellipse(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, bounds.width / 2, bounds.height / 2, 0, 0, Math.PI * 2);
+    if (shape.type === 'circle')
+        ctx.ellipse(
+            bounds.x + bounds.width / 2,
+            bounds.y + bounds.height / 2,
+            bounds.width / 2,
+            bounds.height / 2,
+            0,
+            0,
+            Math.PI * 2,
+        );
+    else if (shape.type === 'oval')
+        ctx.ellipse(
+            bounds.x + bounds.width / 2,
+            bounds.y + bounds.height / 2,
+            bounds.width / 2,
+            bounds.height / 2,
+            0,
+            0,
+            Math.PI * 2,
+        );
     else ctx.rect(bounds.x, bounds.y, bounds.width, bounds.height);
-    ctx.fillStyle = shape.components.fill.fill.color; ctx.fill();
-    if (shape.components.stroke.width > 0) { ctx.strokeStyle = shape.components.stroke.color; ctx.lineWidth = shape.components.stroke.width; ctx.stroke(); }
+    ctx.fillStyle = shape.components.fill.fill.color;
+    ctx.fill();
+    if (shape.components.stroke.width > 0) {
+        ctx.strokeStyle = shape.components.stroke.color;
+        ctx.lineWidth = shape.components.stroke.width;
+        ctx.stroke();
+    }
 }
 
 export function renderDocumentPreview(document: Document, maxSize = DOCUMENT_PREVIEW_MAX_SIZE): Uint8Array {
@@ -200,15 +276,27 @@ export function renderDocumentPreview(document: Document, maxSize = DOCUMENT_PRE
     const innerSize = Math.ceil(1024 * scale);
     const border = 16;
     const canvas = globalThis.document.createElement('canvas');
-    canvas.width = innerSize + border * 2; canvas.height = innerSize + border * 2;
+    canvas.width = innerSize + border * 2;
+    canvas.height = innerSize + border * 2;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Unable to render document preview');
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.save(); ctx.translate(border, border); ctx.scale(scale, scale); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 1024, 1024);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(border, border);
+    ctx.scale(scale, scale);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 1024, 1024);
     document.shapes.filter(shape => shape.pageId === page.id).forEach(shape => renderShape(ctx, shape, document));
     ctx.restore();
-    ctx.strokeStyle = '#888888'; ctx.lineWidth = 1; ctx.strokeRect(border - 0.5, border - 0.5, innerSize + 1, innerSize + 1);
-    ctx.fillStyle = '#666666'; ctx.font = '12px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillText('Draw', canvas.width - 4, canvas.height - 3);
+    ctx.strokeStyle = '#888888';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(border - 0.5, border - 0.5, innerSize + 1, innerSize + 1);
+    ctx.fillStyle = '#666666';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('Draw', canvas.width - 4, canvas.height - 3);
     const binary = atob(canvas.toDataURL('image/png').split(',')[1]);
     return Uint8Array.from(binary, character => character.charCodeAt(0));
 }
@@ -216,7 +304,10 @@ export function renderDocumentPreview(document: Document, maxSize = DOCUMENT_PRE
 export function downloadDocumentPng(bytes: Uint8Array, filename: string) {
     const blob = new Blob([bytes.slice().buffer], {type: 'application/octet-stream'});
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); link.href = url; link.download = filename; link.click();
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
@@ -227,7 +318,7 @@ export async function openDocumentPngWithTauri(): Promise<{document: Document; f
         multiple: false,
         // Native filters match the final extension; `json.png` is treated as one
         // extension by some platforms and can hide valid `.json.png` files.
-        filters: [{name: 'Draw document PNG', extensions: ['png']}]
+        filters: [{name: 'Draw document PNG', extensions: ['png']}],
     });
     if (!selected || Array.isArray(selected)) return null;
     const bytes = await readFile(selected);
@@ -240,7 +331,7 @@ export async function saveDocumentPngWithTauri(bytes: Uint8Array, filename: stri
     const {writeFile} = await import('@tauri-apps/plugin-fs');
     const selected = await save({
         defaultPath: filename,
-        filters: [{name: 'Draw document PNG', extensions: ['png']}]
+        filters: [{name: 'Draw document PNG', extensions: ['png']}],
     });
     if (!selected) return;
     await writeFile(selected, bytes);

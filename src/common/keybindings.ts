@@ -1,4 +1,4 @@
-import type {CommandId} from "../commands";
+import type {CommandId} from '../commands';
 
 export type Keybinding = {
     commandId: CommandId;
@@ -16,13 +16,13 @@ export const keybindings: Keybinding[] = [
         commandId: 'selection-duplicate',
         key: 'cmd-d',
         mac: '⌘D',
-        other: 'Ctrl+D'
+        other: 'Ctrl+D',
     },
     {
         commandId: 'selection-delete',
         key: 'delete',
         mac: 'Delete',
-        other: 'Delete'
+        other: 'Delete',
     },
     {commandId: 'undo', key: 'cmd-z', mac: '⌘Z', other: 'Ctrl+Z'},
     {commandId: 'redo', key: 'cmd-shift-z', mac: '⌘⇧Z', other: 'Ctrl+Shift+Z'},
@@ -30,20 +30,20 @@ export const keybindings: Keybinding[] = [
         commandId: 'ui-show-command-palette',
         key: 'cmd-shift-p',
         mac: '⌘⇧P',
-        other: 'Ctrl+Shift+P'
+        other: 'Ctrl+Shift+P',
     },
     {
         commandId: 'ui-toggle-left-sidebar',
         key: 'cmd-shift-b',
         mac: '⌘⇧B',
-        other: 'Ctrl+Shift+B'
+        other: 'Ctrl+Shift+B',
     },
     {
         commandId: 'ui-toggle-right-sidebar',
         key: 'cmd-shift-alt-b',
         mac: '⌘⌥⇧B',
-        other: 'Ctrl+Alt+Shift+B'
-    }
+        other: 'Ctrl+Alt+Shift+B',
+    },
 ];
 
 function parseBinding(binding: Keybinding) {
@@ -54,22 +54,25 @@ function parseBinding(binding: Keybinding) {
         cmd: parts.includes('cmd'),
         ctrl: parts.includes('ctrl'),
         shift: parts.includes('shift'),
-        alt: parts.includes('alt')
+        alt: parts.includes('alt'),
     };
 }
 
 export function matchesKeybinding(event: KeyboardEvent, binding: Keybinding): boolean {
     const parsed = parseBinding(binding);
     const wantsCommand = parsed.cmd || parsed.ctrl;
-    return event.key.toLowerCase() === parsed.key &&
+    return (
+        event.key.toLowerCase() === parsed.key &&
         (wantsCommand ? event.metaKey || event.ctrlKey : !event.metaKey && !event.ctrlKey) &&
-        event.shiftKey === parsed.shift && event.altKey === parsed.alt &&
-        (binding.when?.(event) ?? true);
+        event.shiftKey === parsed.shift &&
+        event.altKey === parsed.alt &&
+        (binding.when?.(event) ?? true)
+    );
 }
 
 export function shortcutLabel(commandId: string): string | undefined {
     const bindings = keybindings.filter(binding => binding.commandId === commandId);
     if (!bindings.length) return undefined;
     const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
-    return bindings.map(binding => mac ? binding.mac ?? binding.key : binding.other ?? binding.key).join(' / ');
+    return bindings.map(binding => (mac ? (binding.mac ?? binding.key) : (binding.other ?? binding.key))).join(' / ');
 }
