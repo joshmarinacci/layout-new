@@ -12,10 +12,14 @@ import {
     type DragEvent,
     type MouseEvent,
     type ReactNode,
+    useEffect,
     useRef,
     useState
 } from 'react';
 import type {ColorPalette, DrawDocument, PixelImageData, Shape} from '../model/types';
+
+/** How long a click on a renameable folder waits to see whether it's the start of a double-click. */
+export const DOUBLE_CLICK_DELAY = 250;
 
 function cls(props: Record<string, boolean>) {
     return Object.entries(props).filter(([, active]) => active).map(([name]) => name).join(' ');
@@ -75,6 +79,24 @@ function TreeNode({
     const [expanded, setExpanded] = useState(defaultExpanded);
     const [renaming, setRenaming] = useState(false);
     const hasChildren = Children.count(children) > 0;
+    // A double-click arrives as two clicks; toggling on each made renameable folders open and
+    // close again (flicker). Their toggle waits briefly and a double-click cancels it.
+    const pendingToggle = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const cancelPendingToggle = () => {
+        if (pendingToggle.current !== null) clearTimeout(pendingToggle.current);
+        pendingToggle.current = null;
+    };
+    useEffect(() => cancelPendingToggle, []);
+    const toggleFromClick = (event: MouseEvent<HTMLButtonElement>) => {
+        // detail is 0 for keyboard activation and 2+ for the later clicks of a double-click.
+        if (event.detail > 1) return;
+        if (!onRename || event.detail === 0) { setExpanded(value => !value); return; }
+        cancelPendingToggle();
+        pendingToggle.current = setTimeout(() => {
+            pendingToggle.current = null;
+            setExpanded(value => !value);
+        }, DOUBLE_CLICK_DELAY);
+    };
     const icon = iconOverride ?? (hasChildren ? <Folder aria-hidden="true"/> : depth === 0 ?
         <File aria-hidden="true"/> : depth < 3 ? <Layers aria-hidden="true"/> : <Square aria-hidden="true"/>);
     return <li className="tree-node" aria-expanded={hasChildren ? expanded : undefined}>
@@ -96,11 +118,11 @@ function TreeNode({
                         aria-expanded={hasChildren ? expanded : undefined}
                         title={onRename ? 'Double-click or press F2 to rename' : undefined}
                         onClick={event => {
-                            if (hasChildren) setExpanded(value => !value);
+                            if (hasChildren) toggleFromClick(event);
                             onSelect?.(event);
                         }}
                         onContextMenu={onContextMenu}
-                        onDoubleClick={() => { if (onRename) setRenaming(true); }}
+                        onDoubleClick={() => { if (onRename) { cancelPendingToggle(); setRenaming(true); } }}
                         onKeyDown={event => { if (event.key === 'F2' && onRename) { event.preventDefault(); setRenaming(true); } }}
                         draggable={draggable} onDragStart={onDragStart} onDragOver={onDragOver}
                         onDrop={onDrop}>{icon}<span>{label}</span></button>}
