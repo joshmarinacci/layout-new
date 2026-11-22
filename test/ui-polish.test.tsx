@@ -43,6 +43,77 @@ describe('ContextMenu', () => {
         expect(action).toHaveBeenCalledTimes(1);
         expect(onClose).toHaveBeenCalledTimes(1);
     });
+
+    function KeyboardMenu({onClose, action}: {onClose: () => void; action: () => void}) {
+        return <>
+            <button>Opener</button>
+            <ContextMenu x={0} y={0} label="Test actions" onClose={onClose}>
+                <MenuItem label="First" onClick={action}/>
+                <MenuItem label="Skipped" disabled/>
+                <hr/>
+                <MenuItem label="Second" onClick={action}/>
+                <MenuItem label="Third" onClick={action}/>
+            </ContextMenu>
+        </>;
+    }
+
+    it('focuses the first enabled item and moves with arrows, Home and End, skipping disabled items', async () => {
+        const user = userEvent.setup();
+        render(<KeyboardMenu onClose={vi.fn()} action={vi.fn()}/>);
+        const focused = () => document.activeElement?.textContent;
+        expect(focused()).toBe('First');
+        await user.keyboard('{ArrowDown}');
+        expect(focused()).toBe('Second');
+        await user.keyboard('{ArrowDown}{ArrowDown}');
+        expect(focused()).toBe('First');
+        await user.keyboard('{ArrowUp}');
+        expect(focused()).toBe('Third');
+        await user.keyboard('{Home}');
+        expect(focused()).toBe('First');
+        await user.keyboard('{End}');
+        expect(focused()).toBe('Third');
+    });
+
+    it('runs the focused item with Enter and then closes', async () => {
+        const user = userEvent.setup();
+        const onClose = vi.fn(), action = vi.fn();
+        render(<KeyboardMenu onClose={onClose} action={action}/>);
+        await user.keyboard('{ArrowDown}{Enter}');
+        expect(action).toHaveBeenCalledTimes(1);
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('closes on Escape and returns focus to the previously focused element', async () => {
+        const user = userEvent.setup();
+        const onClose = vi.fn();
+        function Harness() {
+            const [open, setOpen] = useState(false);
+            return <>
+                <button onClick={() => setOpen(true)}>Open</button>
+                {open && <ContextMenu x={0} y={0} label="Test actions" onClose={() => { onClose(); setOpen(false); }}>
+                    <MenuItem label="Only"/>
+                </ContextMenu>}
+            </>;
+        }
+        render(<Harness/>);
+        await user.click(screen.getByRole('button', {name: 'Open'}));
+        expect(document.activeElement?.textContent).toBe('Only');
+        const windowKeydown = vi.fn();
+        window.addEventListener('keydown', windowKeydown);
+        await user.keyboard('{Escape}');
+        window.removeEventListener('keydown', windowKeydown);
+        expect(onClose).toHaveBeenCalledTimes(1);
+        expect(windowKeydown).not.toHaveBeenCalled();
+        expect(document.activeElement?.textContent).toBe('Open');
+    });
+
+    it('closes on Tab', async () => {
+        const user = userEvent.setup();
+        const onClose = vi.fn();
+        render(<KeyboardMenu onClose={onClose} action={vi.fn()}/>);
+        await user.keyboard('{Tab}');
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
 });
 
 function ControlledNumber({step, shiftStep, onChange}: {step?: number; shiftStep?: number; onChange: (value: number) => void}) {
