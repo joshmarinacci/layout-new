@@ -49,6 +49,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "bench": "vitest bench --run",
+    "metrics": "vite build && vitest bench --run && node scripts/metrics.ts"
   }
 }

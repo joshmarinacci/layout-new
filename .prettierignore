@@ -8,3 +8,5 @@ test/fixtures
 .claude
 test-results
 playwright-report
+bench/results
+metrics
