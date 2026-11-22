@@ -732,147 +732,158 @@ export default function App() {
                     }
                 />
             </aside>
-            <main id="document-editor" data-canvas role="tabpanel" aria-labelledby={`tab-${activeTab.id}`}>
-                <Toolbar className="canvas-toolbar" label="Canvas tools" key={activeTab.id}>
-                    {(selectedAsset || selectedPalette) && (
-                        <button
-                            onClick={() => {
-                                setSelectedAssetId(null);
-                                setSelectedPaletteId(null);
-                            }}
-                        >
-                            Back to canvas
-                        </button>
-                    )}
-                    {!selectedAsset && !selectedPalette && (
-                        <div className="canvas-zoom-controls" role="group" aria-label="Canvas zoom controls">
-                            <IconButton
-                                label="Zoom out"
-                                icon={ZoomOut}
-                                disabled={canvasZoom <= 0.25}
-                                onClick={() => setCanvasZoom(value => Math.max(0.25, value / 1.25))}
-                            />
-                            <span aria-live="polite">{Math.round(canvasZoom * 100)}%</span>
-                            <IconButton
-                                label="Zoom in"
-                                icon={ZoomIn}
-                                disabled={canvasZoom >= 4}
-                                onClick={() => setCanvasZoom(value => Math.min(4, value * 1.25))}
-                            />
-                            <IconButton label="Reset zoom" icon={Maximize2} onClick={() => setCanvasZoom(1)} />
-                        </div>
-                    )}
-                    {!selectedAsset &&
-                        !selectedPalette &&
-                        selectedShapes.length === 1 &&
-                        selected?.type === 'vector' && (
+            <main data-canvas>
+                <div
+                    id="document-editor"
+                    className="document-panel"
+                    role="tabpanel"
+                    aria-labelledby={`tab-${activeTab.id}`}
+                >
+                    <Toolbar className="canvas-toolbar" label="Canvas tools" key={activeTab.id}>
+                        {(selectedAsset || selectedPalette) && (
                             <button
-                                disabled={state.transactionActive}
                                 onClick={() => {
-                                    setImageDialog(null);
-                                    setPixelEditor(null);
-                                    setVectorId(selected.id);
+                                    setSelectedAssetId(null);
+                                    setSelectedPaletteId(null);
                                 }}
                             >
-                                Edit Vector
+                                Back to canvas
                             </button>
                         )}
-                    {!selectedAsset &&
-                        !selectedPalette &&
-                        selectedShapes.length === 1 &&
-                        selected?.type === 'pixel-image' && (
-                            <>
-                                <button
-                                    disabled={state.transactionActive}
-                                    onClick={() =>
-                                        setImageDialog({
-                                            kind: 'edit',
-                                            imageId: selected.components.image.imageId,
-                                            source: selected.components.image.source,
-                                        })
-                                    }
-                                >
-                                    Edit Pixels
-                                </button>
-                                <button
-                                    disabled={state.transactionActive}
-                                    onClick={() => store.select(store.linkImageShape(selected.id))}
-                                >
-                                    Linked Copy
-                                </button>
-                            </>
+                        {!selectedAsset && !selectedPalette && (
+                            <div className="canvas-zoom-controls" role="group" aria-label="Canvas zoom controls">
+                                <IconButton
+                                    label="Zoom out"
+                                    icon={ZoomOut}
+                                    disabled={canvasZoom <= 0.25}
+                                    onClick={() => setCanvasZoom(value => Math.max(0.25, value / 1.25))}
+                                />
+                                <span aria-live="polite">{Math.round(canvasZoom * 100)}%</span>
+                                <IconButton
+                                    label="Zoom in"
+                                    icon={ZoomIn}
+                                    disabled={canvasZoom >= 4}
+                                    onClick={() => setCanvasZoom(value => Math.min(4, value * 1.25))}
+                                />
+                                <IconButton label="Reset zoom" icon={Maximize2} onClick={() => setCanvasZoom(1)} />
+                            </div>
                         )}
-                    {!selectedAsset && !selectedPalette && (
-                        <IconButton
-                            label="Delete selected shapes"
-                            icon={Trash2}
-                            disabled={!selectedShapes.length || state.transactionActive}
-                            onClick={() => SelectionDeleteCommand.run(ctx)}
-                        />
-                    )}
-                </Toolbar>
-                {selectedPalette ? (
-                    <div className="asset-center">
-                        <PaletteAssetView
-                            store={store}
-                            palette={selectedPalette}
-                            onBack={() => setSelectedPaletteId(null)}
-                        />
-                    </div>
-                ) : selectedAsset ? (
-                    <div className="asset-center">
-                        <PixelAssetView store={store} image={selectedAsset} onBack={() => setSelectedAssetId(null)} />
-                    </div>
-                ) : (
-                    <>
-                        <div className={`center${imageDialog?.kind === 'edit' ? ' pixel-edit-active' : ''}`}>
-                            <VisualEditor
-                                key={activeTab.id}
-                                store={store}
-                                zoom={canvasZoom}
-                                onZoomChange={setCanvasZoom}
-                                vectorId={vectorId}
-                                onEditVector={setVectorId}
-                                pixelEditor={pixelEditor}
-                                onEditImage={(reference, palettePosition, imageScreenRect) => {
-                                    setVectorId(null);
-                                    setImageDialog({
-                                        kind: 'edit',
-                                        imageId: reference.imageId,
-                                        source: reference.source,
-                                        palettePosition,
-                                        imageScreenRect,
-                                    });
-                                }}
-                                onShapeContextMenu={showShapeContextMenu}
-                                onCanvasContextMenu={event => {
-                                    event.preventDefault();
-                                    setContextMenu(null);
-                                    setPageMenu({
-                                        x: event.clientX,
-                                        y: event.clientY,
-                                        pageId: state.selectedPageId,
-                                    });
-                                }}
-                            />
-                            {imageDialog?.kind === 'edit' && (
-                                <PixelImageEditor
-                                    key={imageDialog.imageId}
-                                    store={store}
-                                    imageId={imageDialog.imageId}
-                                    source={imageDialog.source}
-                                    initialPosition={imageDialog.palettePosition}
-                                    imageScreenRect={imageDialog.imageScreenRect}
-                                    onController={setPixelEditor}
-                                    onClose={() => {
+                        {!selectedAsset &&
+                            !selectedPalette &&
+                            selectedShapes.length === 1 &&
+                            selected?.type === 'vector' && (
+                                <button
+                                    disabled={state.transactionActive}
+                                    onClick={() => {
                                         setImageDialog(null);
                                         setPixelEditor(null);
+                                        setVectorId(selected.id);
+                                    }}
+                                >
+                                    Edit Vector
+                                </button>
+                            )}
+                        {!selectedAsset &&
+                            !selectedPalette &&
+                            selectedShapes.length === 1 &&
+                            selected?.type === 'pixel-image' && (
+                                <>
+                                    <button
+                                        disabled={state.transactionActive}
+                                        onClick={() =>
+                                            setImageDialog({
+                                                kind: 'edit',
+                                                imageId: selected.components.image.imageId,
+                                                source: selected.components.image.source,
+                                            })
+                                        }
+                                    >
+                                        Edit Pixels
+                                    </button>
+                                    <button
+                                        disabled={state.transactionActive}
+                                        onClick={() => store.select(store.linkImageShape(selected.id))}
+                                    >
+                                        Linked Copy
+                                    </button>
+                                </>
+                            )}
+                        {!selectedAsset && !selectedPalette && (
+                            <IconButton
+                                label="Delete selected shapes"
+                                icon={Trash2}
+                                disabled={!selectedShapes.length || state.transactionActive}
+                                onClick={() => SelectionDeleteCommand.run(ctx)}
+                            />
+                        )}
+                    </Toolbar>
+                    {selectedPalette ? (
+                        <div className="asset-center">
+                            <PaletteAssetView
+                                store={store}
+                                palette={selectedPalette}
+                                onBack={() => setSelectedPaletteId(null)}
+                            />
+                        </div>
+                    ) : selectedAsset ? (
+                        <div className="asset-center">
+                            <PixelAssetView
+                                store={store}
+                                image={selectedAsset}
+                                onBack={() => setSelectedAssetId(null)}
+                            />
+                        </div>
+                    ) : (
+                        <>
+                            <div className={`center${imageDialog?.kind === 'edit' ? ' pixel-edit-active' : ''}`}>
+                                <VisualEditor
+                                    key={activeTab.id}
+                                    store={store}
+                                    zoom={canvasZoom}
+                                    onZoomChange={setCanvasZoom}
+                                    vectorId={vectorId}
+                                    onEditVector={setVectorId}
+                                    pixelEditor={pixelEditor}
+                                    onEditImage={(reference, palettePosition, imageScreenRect) => {
+                                        setVectorId(null);
+                                        setImageDialog({
+                                            kind: 'edit',
+                                            imageId: reference.imageId,
+                                            source: reference.source,
+                                            palettePosition,
+                                            imageScreenRect,
+                                        });
+                                    }}
+                                    onShapeContextMenu={showShapeContextMenu}
+                                    onCanvasContextMenu={event => {
+                                        event.preventDefault();
+                                        setContextMenu(null);
+                                        setPageMenu({
+                                            x: event.clientX,
+                                            y: event.clientY,
+                                            pageId: state.selectedPageId,
+                                        });
                                     }}
                                 />
-                            )}
-                        </div>
-                    </>
-                )}
+                                {imageDialog?.kind === 'edit' && (
+                                    <PixelImageEditor
+                                        key={imageDialog.imageId}
+                                        store={store}
+                                        imageId={imageDialog.imageId}
+                                        source={imageDialog.source}
+                                        initialPosition={imageDialog.palettePosition}
+                                        imageScreenRect={imageDialog.imageScreenRect}
+                                        onController={setPixelEditor}
+                                        onClose={() => {
+                                            setImageDialog(null);
+                                            setPixelEditor(null);
+                                        }}
+                                    />
+                                )}
+                            </div>
+                        </>
+                    )}
+                </div>
             </main>
             {!selectedAsset && !selectedPalette && (
                 <>
