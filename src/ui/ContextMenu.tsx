@@ -1,4 +1,5 @@
 import type {MouseEvent, ReactNode} from 'react';
+import {MenuPopover} from './MenuPopover';
 
 /** A floating context menu that closes itself after any enabled item runs. */
 export function ContextMenu({x, y, label, onClose, children}: {
@@ -12,10 +13,10 @@ export function ContextMenu({x, y, label, onClose, children}: {
     const closeAfterItem = (event: MouseEvent<HTMLDivElement>) => {
         if (event.target instanceof Element && event.target.closest('button:not(:disabled)')) onClose();
     };
-    return <div className="shape-context-menu" style={{left: x, top: y}} role="menu" aria-label={label}
-                onContextMenu={event => event.preventDefault()}
-                onPointerDown={event => event.stopPropagation()}
-                onClick={closeAfterItem}>
+    return <MenuPopover label={label} style={{left: x, top: y}}
+                        onContextMenu={event => event.preventDefault()}
+                        onPointerDown={event => event.stopPropagation()}
+                        onClick={closeAfterItem}>
         {children}
-    </div>;
+    </MenuPopover>;
 }

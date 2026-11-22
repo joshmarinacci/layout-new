@@ -22,7 +22,7 @@ describe('Save as JSON PNG command', () => {
             setCommandPaletteOpen: vi.fn(), setKeyboardShortcutsOpen: vi.fn(), setSavedDocumentsOpen: vi.fn(),
             leftPanelVisible: true, setLeftPanelVisible: vi.fn(), rightPanelVisible: true, setRightPanelVisible: vi.fn(),
             setRenamePageDialog: vi.fn(), setRenameDocumentName: vi.fn(), setImageDialog: vi.fn(), setRepeatingImageDialog: vi.fn(),
-            setVectorId: vi.fn(), setPixelEditor: vi.fn(), setError, setFileDialogOpen: vi.fn(), setTheme: vi.fn(),
+            setVectorId: vi.fn(), setPixelEditor: vi.fn(), setError, setFileDialogOpen: vi.fn(), setTheme: vi.fn(), setThemeSettingsOpen: vi.fn(),
             setSelectedAssetId: vi.fn(), setSelectedPaletteId: vi.fn(), openPaletteImport: vi.fn()
         });
         await vi.waitFor(() => expect(mocks.download).toHaveBeenCalledOnce());

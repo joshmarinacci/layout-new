@@ -1,18 +1,13 @@
-// Adapted from layout-mockup's icon toolbars, menu rows, property sections and custom select.
-import {ChevronDown, type LucideIcon} from 'lucide-react';
+// Thin wrappers over plain elements; tooltheme styles them from their semantics.
+import {type LucideIcon} from 'lucide-react';
 import type {ButtonHTMLAttributes, ReactNode, SelectHTMLAttributes} from 'react';
 
-export function IconButton({
-                               label,
-                               icon: Icon,
-                               className = '',
-                               ...props
-                           }: ButtonHTMLAttributes<HTMLButtonElement> & {
+/** A square icon-only button: tooltheme sizes `button[aria-label]` holding just an svg. */
+export function IconButton({label, icon: Icon, ...props}: ButtonHTMLAttributes<HTMLButtonElement> & {
     label: string;
     icon: LucideIcon
 }) {
-    return <button type="button" {...props} className={`icon-button ghost ${className}`}
-                   aria-label={label} title={label}><Icon aria-hidden="true"/></button>;
+    return <button type="button" {...props} aria-label={label} title={label}><Icon aria-hidden="true"/></button>;
 }
 
 export function ToolbarGroup({label, children}: { label: string; children: ReactNode }) {
@@ -23,19 +18,18 @@ export function MenuItem({label, shortcut, ...props}: ButtonHTMLAttributes<HTMLB
     label: string;
     shortcut?: string
 }) {
-    return <button type="button" {...props} className="menu-item"><span>{label}</span>{shortcut &&
-        <kbd>{shortcut}</kbd>}</button>;
+    return <button type="button" role="menuitem" {...props}><span>{label}</span>{shortcut && <kbd>{shortcut}</kbd>}</button>;
 }
 
+/** A collapsible inspector panel (tooltheme's `details > summary`). */
 export function PropertySection({title, children}: { title: string; children: ReactNode }) {
-    return <details open className="property-section">
+    return <details open>
         <summary>{title}</summary>
-        <section className="prop-sheet-panel">{children}</section>
+        <div className="prop-sheet-panel">{children}</div>
     </details>;
 }
 
-/** Keep native selection, type-ahead and keyboard semantics behind the mockup's chevron control. */
+/** A native select; tooltheme draws its chevron. */
 export function SelectControl({children, ...props}: SelectHTMLAttributes<HTMLSelectElement>) {
-    return <span className="custom-select"><select {...props}>{children}</select><ChevronDown
-        aria-hidden="true"/></span>;
+    return <select {...props}>{children}</select>;
 }

@@ -36,10 +36,10 @@ describe('ContextMenu', () => {
             <hr data-testid="separator"/>
             <MenuItem label="Run" onClick={action}/>
         </ContextMenu>);
-        await user.click(screen.getByRole('button', {name: 'Disabled'}));
+        await user.click(screen.getByRole('menuitem', {name: 'Disabled'}));
         await user.click(screen.getByTestId('separator'));
         expect(onClose).not.toHaveBeenCalled();
-        await user.click(screen.getByRole('button', {name: 'Run'}));
+        await user.click(screen.getByRole('menuitem', {name: 'Run'}));
         expect(action).toHaveBeenCalledTimes(1);
         expect(onClose).toHaveBeenCalledTimes(1);
     });
