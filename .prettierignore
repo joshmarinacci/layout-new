@@ -6,3 +6,5 @@ node_modules
 package-lock.json
 test/fixtures
 .claude
+test-results
+playwright-report

@@ -1,5 +1,8 @@
 node_modules
 dist/
+# Playwright
+test-results/
+playwright-report/
 .idea/
 # Tauri
 src-tauri/target/

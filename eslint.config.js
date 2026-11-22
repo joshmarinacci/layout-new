@@ -5,7 +5,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-    {ignores: ['dist', 'docs', 'examples', 'src-tauri', 'node_modules']},
+    {ignores: ['dist', 'docs', 'examples', 'src-tauri', 'node_modules', 'test-results', 'playwright-report']},
     {
         files: ['**/*.{ts,tsx}'],
         extends: [

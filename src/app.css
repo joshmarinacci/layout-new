@@ -27,7 +27,8 @@
 .app-shell.asset-mode {
     --right-col: 0px;
 }
-.app-shell.hide-left > .layers-panel {
+.app-shell.hide-left > .layers-panel,
+.app-shell.hide-right > .inspector {
     display: none;
 }
 .app-shell.tauri-mode > header {
