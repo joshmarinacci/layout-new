@@ -59,17 +59,6 @@ details[open]::details-content {
     block-size: auto; /* Browsers without size interpolation switch immediately. */
 }
 
-li.tree-item {
-    transition: background-color var(--anim-dur) ease,
-    color var(--anim-dur) ease;
-}
-
-
-button {
-    transition: background-color var(--anim-dur) ease,
-    color var(--anim-dur) ease;
-}
-
 /* Respect motion preferences; leave details usable on browsers without interpolate-size. */
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after, *::backdrop {

@@ -92,7 +92,8 @@ export type CommandContext = {
     setPixelEditor: Setter<PixelEditorController | null>
     setError: Setter<string>
     setFileDialogOpen: (open: boolean, kind?: 'json' | 'png' | 'svg') => void
-    setTheme: Setter<Theme>
+    setTheme: (theme: Theme) => void
+    setThemeSettingsOpen: Setter<boolean>
     setSelectedAssetId: Setter<string | null>
     setSelectedPaletteId: Setter<string | null>
     openPaletteImport: () => void
@@ -145,7 +146,7 @@ export type CommandId =
     | 'new-vector-network' | 'new-pixelimage' | 'new-repeatingimage'
     | 'import-png'
     | 'new-color-palette' | 'import-color-palette' | 'new-pico8-palette'
-    | 'theme-system' | 'theme-light' | 'theme-dark'
+    | 'theme-system' | 'theme-light' | 'theme-dark' | 'theme-settings'
 
 
 export interface Command {
@@ -573,6 +574,14 @@ export const DarkThemeCommand: Command = {
     enabled: () => true,
     run: ctx => ctx.setTheme('dark')
 };
+export const ThemeSettingsCommand: Command = {
+    id: 'theme-settings',
+    title: 'Theme Settings…',
+    description: 'Adjust the accent color, contrast, corners, spacing and fonts',
+    keywords: ['appearance', 'theme', 'accent', 'font', 'contrast'],
+    enabled: () => true,
+    run: ctx => ctx.setThemeSettingsOpen(true)
+};
 
 
 export function makeTab(document: DrawingDocument, savedDocumentId: string | null = null, savedJson: string | null = null): DocumentTab {
@@ -724,7 +733,7 @@ export const allCommands: Command[] = [
     SelectionGroupCommand, SelectionUngroupCommand, SelectionDuplicateCommand,
     SelectionDeleteCommand, SelectionCopyCommand, SelectionCutCommand, SelectionPasteCommand,
     ShowCommandPaletteCommand, ShowKeyboardShortcutsCommand, ToggleLeftSidebar, ToggleRightSidebar, SystemThemeCommand,
-    LightThemeCommand, DarkThemeCommand, AlignLeftCommand,
+    LightThemeCommand, DarkThemeCommand, ThemeSettingsCommand, AlignLeftCommand,
     AlignCenterCommand, AlignRightCommand, AlignTopCommand, AlignMiddleCommand,
     AlignBottomCommand, AlignDistributeHorizontalCommand, AlignDistributeVerticalCommand
 ];

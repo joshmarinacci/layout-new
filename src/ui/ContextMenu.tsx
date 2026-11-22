@@ -1,4 +1,5 @@
-import {type KeyboardEvent, type MouseEvent, type ReactNode, useEffect, useRef} from 'react';
+import {type KeyboardEvent, type MouseEvent, type ReactNode, useRef} from 'react';
+import {MenuPopover} from './MenuPopover';
 
 const ITEM_SELECTOR = 'button:not(:disabled)';
 
@@ -14,12 +15,11 @@ export function ContextMenu({x, y, label, onClose, children}: {
     onClose: () => void;
     children: ReactNode;
 }) {
-    const menu = useRef<HTMLDivElement>(null);
     const returnFocus = useRef<HTMLElement | null>(null);
-    useEffect(() => {
+    const focusFirstItem = (popover: HTMLDivElement) => {
         returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        menu.current?.querySelector<HTMLButtonElement>(ITEM_SELECTOR)?.focus();
-    }, []);
+        popover.querySelector<HTMLButtonElement>(ITEM_SELECTOR)?.focus();
+    };
     const closeAndRestoreFocus = () => {
         onClose();
         if (returnFocus.current?.isConnected) returnFocus.current.focus();
@@ -52,11 +52,11 @@ export function ContextMenu({x, y, label, onClose, children}: {
             : (index <= 0 ? items.length - 1 : index - 1);
         items[next]?.focus();
     };
-    return <div ref={menu} className="shape-context-menu" style={{left: x, top: y}} role="menu" aria-label={label}
-                onContextMenu={event => event.preventDefault()}
-                onPointerDown={event => event.stopPropagation()}
-                onClick={closeAfterItem}
-                onKeyDown={navigate}>
+    return <MenuPopover label={label} style={{left: x, top: y}} onShown={focusFirstItem}
+                        onContextMenu={event => event.preventDefault()}
+                        onPointerDown={event => event.stopPropagation()}
+                        onClick={closeAfterItem}
+                        onKeyDown={navigate}>
         {children}
-    </div>;
+    </MenuPopover>;
 }
