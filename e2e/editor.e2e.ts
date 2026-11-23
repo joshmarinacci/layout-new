@@ -304,6 +304,57 @@ test.describe('infinite canvas', () => {
         await expect(page.getByRole('group', {name: 'Canvas zoom controls'})).not.toContainText('100%');
     });
 
+    test('a trackpad pinch keeps the content under the fingers', async ({page}) => {
+        await openEditor(page);
+        const anchor = await canvasPoint(page, 200, 200);
+        // Chromium's pinch: ctrlKey wheel events with deltaY = -100·ln(scale change).
+        await page.evaluate(({x, y}) => {
+            const target = document.querySelector('.canvas-viewport')!;
+            for (let i = 0; i < 10; i++)
+                target.dispatchEvent(
+                    new WheelEvent('wheel', {
+                        deltaY: -100 * Math.log(2 ** 0.1),
+                        ctrlKey: true,
+                        clientX: x,
+                        clientY: y,
+                        bubbles: true,
+                        cancelable: true,
+                    }),
+                );
+        }, anchor);
+        await expect.poll(async () => (await canvasCamera(page)).zoom).toBeCloseTo(2, 5);
+        const after = await canvasPoint(page, 200, 200);
+        expect(after.x).toBeCloseTo(anchor.x, 0);
+        expect(after.y).toBeCloseTo(anchor.y, 0);
+    });
+
+    test('a WebKit pinch gesture zooms by its scale, ignoring the duplicate wheel events', async ({page}) => {
+        await openEditor(page);
+        const anchor = await canvasPoint(page, 200, 200);
+        await page.evaluate(({x, y}) => {
+            const target = document.querySelector('.canvas-viewport')!;
+            const gesture = (type: string, scale: number) =>
+                target.dispatchEvent(
+                    Object.assign(new UIEvent(type, {bubbles: true, cancelable: true}), {
+                        scale,
+                        clientX: x,
+                        clientY: y,
+                    }),
+                );
+            gesture('gesturestart', 1);
+            gesture('gesturechange', 1.5);
+            target.dispatchEvent(
+                new WheelEvent('wheel', {deltaY: -20, ctrlKey: true, bubbles: true, cancelable: true}),
+            );
+            gesture('gesturechange', 3);
+            gesture('gestureend', 3);
+        }, anchor);
+        await expect.poll(async () => (await canvasCamera(page)).zoom).toBeCloseTo(3, 5);
+        const after = await canvasPoint(page, 200, 200);
+        expect(after.x).toBeCloseTo(anchor.x, 0);
+        expect(after.y).toBeCloseTo(anchor.y, 0);
+    });
+
     test('zoom reaches 2% and 6400% and the buttons stop there', async ({page}) => {
         await openEditor(page);
         const center = await canvasPoint(page, 100, 100);
@@ -311,7 +362,7 @@ test.describe('infinite canvas', () => {
         const controls = page.getByRole('group', {name: 'Canvas zoom controls'});
         await expect(controls).toContainText('2%');
         await expect(controls.getByRole('button', {name: 'Zoom out'})).toBeDisabled();
-        for (let i = 0; i < 16; i++) await wheelCanvas(page, center, {y: -2000}, {zoom: true});
+        for (let i = 0; i < 24; i++) await wheelCanvas(page, center, {y: -2000}, {zoom: true});
         await expect(controls).toContainText('6400%');
         await expect(controls.getByRole('button', {name: 'Zoom in'})).toBeDisabled();
         await controls.getByRole('button', {name: 'Reset zoom'}).click();

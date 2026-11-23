@@ -12,6 +12,7 @@ import {
     screenToDocument,
     unionBounds,
     visibleBounds,
+    wheelZoomFactor,
     zoomAt,
 } from '../src/editor/camera';
 
@@ -128,5 +129,24 @@ describe('CameraStore', () => {
         expect(store.center('p')).toEqual({x: 5050, y: 5050});
         store.fit('p', null);
         expect(store.get('p')).toEqual({x: 0, y: 0, zoom: 1});
+    });
+});
+
+describe('wheel zoom', () => {
+    it('follows a Chromium trackpad pinch exactly', () => {
+        // Chromium sends deltaY = -100·ln(scale change) for each step of a pinch.
+        for (const scale of [0.7, 0.9, 1.02, 1.3, 1.6]) {
+            expect(wheelZoomFactor(-100 * Math.log(scale), {pinch: true})).toBeCloseTo(scale, 10);
+        }
+    });
+
+    it('caps a Ctrl+mouse-wheel notch to a moderate step', () => {
+        expect(wheelZoomFactor(-100, {pinch: true})).toBeCloseTo(Math.exp(0.5));
+        expect(wheelZoomFactor(100, {pinch: true})).toBeCloseTo(Math.exp(-0.5));
+    });
+
+    it('zooms more gently for ⌘+scroll', () => {
+        expect(wheelZoomFactor(-100, {pinch: false})).toBeCloseTo(Math.exp(0.2));
+        expect(wheelZoomFactor(0, {pinch: false})).toBe(1);
     });
 });
