@@ -72,8 +72,7 @@ function treeProps() {
     return {
         document,
         selectedIds: [],
-        selectedAssetId: null,
-        selectedPaletteId: null,
+        selectedAsset: null,
         selectedPageId: document.pages[0].id,
         documentSelected: false,
         onSelect: vi.fn(),
@@ -89,6 +88,8 @@ function treeProps() {
         onRenamePalette: vi.fn(),
         onRenameImage: vi.fn(),
         onRenamePhoto: vi.fn(),
+        onSelectFont: vi.fn(),
+        onSelectPhoto: vi.fn(),
         onPhotoContextMenu: vi.fn(),
         onUngroup: vi.fn(),
         onRenameGroup: vi.fn(),

@@ -102,8 +102,7 @@ function commandContext(store: EditorStore, overrides: Partial<CommandContext> =
         setFileDialogOpen: vi.fn(),
         setTheme: vi.fn(),
         setThemeSettingsOpen: vi.fn(),
-        setSelectedAssetId: vi.fn(),
-        setSelectedPaletteId: vi.fn(),
+        setSelectedAsset: vi.fn(),
         openPaletteImport: vi.fn(),
         ...overrides,
     };

@@ -47,8 +47,7 @@ describe('Save as JSON PNG command', () => {
             setFileDialogOpen: vi.fn(),
             setTheme: vi.fn(),
             setThemeSettingsOpen: vi.fn(),
-            setSelectedAssetId: vi.fn(),
-            setSelectedPaletteId: vi.fn(),
+            setSelectedAsset: vi.fn(),
             openPaletteImport: vi.fn(),
         });
         await vi.waitFor(() => expect(mocks.download).toHaveBeenCalledOnce());

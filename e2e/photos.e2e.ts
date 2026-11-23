@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {expect, test, type Page} from '@playwright/test';
-import {canvas, canvasCamera, canvasPoint, inspector, layers, openEditor, property} from './helpers';
+import {canvas, canvasCamera, canvasPoint, clickCanvas, inspector, layers, openEditor, property} from './helpers';
 
 const fixture = (name: string) => join(import.meta.dirname, '..', 'test', 'fixtures', name);
 
@@ -63,6 +63,26 @@ test.describe('photos', () => {
         expect(Math.abs(rect.y + rect.height / 2 - middle.y)).toBeLessThanOrEqual(1);
         await expect(layers(page)).toContainText('quadrants-rotated (300 × 400, 1 use)');
         expect(errors).toEqual([]);
+    });
+
+    test('selecting a photo in the Assets tree shows its properties, and renames it', async ({page}) => {
+        await openEditor(page);
+        await importImage(page, 'quadrants.jpg');
+        await layers(page)
+            .getByRole('button', {name: /^quadrants \(400 × 300/})
+            .click();
+        const name = inspector(page).getByRole('textbox', {name: 'Asset name'});
+        await expect(name).toHaveValue('quadrants');
+        await expect(inspector(page)).toContainText('JPEG');
+        await expect(inspector(page)).toContainText('1 shape');
+        await name.fill('Beach');
+        await name.press('Enter');
+        await expect(layers(page)).toContainText('Beach (400 × 300, 1 use)');
+        await inspector(page).getByRole('button', {name: 'Place on Canvas'}).click();
+        await expect(layers(page)).toContainText('Beach (400 × 300, 2 uses)');
+        // Selecting a shape on the canvas switches the panel back to shape properties.
+        await clickCanvas(page, 50, 50);
+        await expect(inspector(page).getByRole('textbox', {name: 'Shape name'})).toHaveValue('rect');
     });
 
     test('resizing keeps the proportions unless Shift is held', async ({page}) => {

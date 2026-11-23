@@ -40,6 +40,9 @@ export type Workspace = {
     tabs: DocumentTab[];
     activeId: string;
 };
+/** The asset selected in the Assets tree: a pixel image, palette, font or photo. */
+export type AssetSelection = {kind: 'image' | 'palette' | 'font' | 'photo'; id: string} | null;
+
 /** What the shared hidden file input is choosing a file for. */
 export type FileDialogKind = 'json' | 'png' | 'svg';
 
@@ -94,8 +97,7 @@ export type CommandContext = {
     setFileDialogOpen: (open: boolean, kind?: FileDialogKind) => void;
     setTheme: (theme: Theme) => void;
     setThemeSettingsOpen: Setter<boolean>;
-    setSelectedAssetId: Setter<string | null>;
-    setSelectedPaletteId: Setter<string | null>;
+    setSelectedAsset: Setter<AssetSelection>;
     openPaletteImport: () => void;
 };
 
@@ -343,8 +345,7 @@ export const NewColorPaletteCommand: Command = {
                 draft.palettes.push(palette);
             });
             ctx.store.select(null);
-            ctx.setSelectedAssetId(null);
-            ctx.setSelectedPaletteId(palette.id);
+            ctx.setSelectedAsset({kind: 'palette', id: palette.id});
             ctx.setError('');
         } catch (error) {
             ctx.setError(error instanceof Error ? error.message : 'Unable to create palette');
@@ -551,8 +552,7 @@ export const NewPico8PaletteCommand: Command = {
         ctx.store.edit('Create PICO-8 palette', draft => {
             draft.palettes.push(palette);
         });
-        ctx.setSelectedAssetId(null);
-        ctx.setSelectedPaletteId(palette.id);
+        ctx.setSelectedAsset({kind: 'palette', id: palette.id});
         ctx.store.select(null);
     },
 };

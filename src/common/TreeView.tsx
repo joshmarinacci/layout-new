@@ -1,6 +1,7 @@
 import {ChevronDown, ChevronRight, File, FileText, Folder, Image, Layers, Square} from 'lucide-react';
 import {Children, type DragEvent, type MouseEvent, type ReactNode, useEffect, useRef, useState} from 'react';
-import type {ColorPalette, DrawDocument, PhotoAsset, PixelImageData, Shape} from '../model/types';
+import type {ColorPalette, DrawDocument, FontAsset, PhotoAsset, PixelImageData, Shape} from '../model/types';
+import type {AssetSelection} from '../commands';
 
 /** How long a click on a renameable folder waits to see whether it's the start of a double-click. */
 export const DOUBLE_CLICK_DELAY = 250;
@@ -204,10 +205,11 @@ export default function TreeView(props: {
     document: DrawDocument;
     selectedIds: readonly string[];
     onSelect: (value: Shape, additive: boolean) => void;
-    selectedAssetId: string | null;
+    selectedAsset: AssetSelection;
     onSelectAsset: (image: PixelImageData) => void;
-    selectedPaletteId: string | null;
     onSelectPalette: (palette: ColorPalette) => void;
+    onSelectFont: (font: FontAsset) => void;
+    onSelectPhoto: (photo: PhotoAsset) => void;
     onShapeContextMenu: (event: MouseEvent<HTMLButtonElement>, shape: Shape) => void;
     selectedPageId: string;
     onSelectPage: (id: string) => void;
@@ -239,9 +241,10 @@ export default function TreeView(props: {
     ) => void;
 }) {
     const doc = props.document;
+    const isSelected = (kind: NonNullable<AssetSelection>['kind'], id: string) =>
+        props.selectedAsset?.kind === kind && props.selectedAsset.id === id;
     // The open page is "the selection" only when nothing more specific is selected.
-    const pageIsSelection =
-        !props.documentSelected && !props.selectedIds.length && !props.selectedAssetId && !props.selectedPaletteId;
+    const pageIsSelection = !props.documentSelected && !props.selectedIds.length && !props.selectedAsset;
     const [dropTarget, setDropTarget] = useState<{
         type: 'page' | 'shape';
         id: string;
@@ -404,7 +407,13 @@ export default function TreeView(props: {
             </TreeNode>
             <TreeNode label="Assets" depth={1} onContextMenu={props.onAssetsContextMenu}>
                 {doc.fonts.map(font => (
-                    <TreeNode key={font.id} label={`${font.family} (Google Font)`} depth={2} />
+                    <TreeNode
+                        key={font.id}
+                        label={`${font.family} (Google Font)`}
+                        depth={2}
+                        selected={isSelected('font', font.id)}
+                        onSelect={() => props.onSelectFont(font)}
+                    />
                 ))}
                 {doc.palettes.map(palette => (
                     <TreeNode
@@ -412,7 +421,7 @@ export default function TreeView(props: {
                         label={`${palette.name} (${palette.colors.length} colors)`}
                         editValue={palette.name}
                         depth={2}
-                        selected={palette.id === props.selectedPaletteId}
+                        selected={isSelected('palette', palette.id)}
                         onSelect={() => props.onSelectPalette(palette)}
                         onRename={name => props.onRenamePalette(palette.id, name)}
                         onContextMenu={event => props.onPaletteContextMenu(event, palette)}
@@ -424,7 +433,7 @@ export default function TreeView(props: {
                         label={`${image.name} (${image.width} × ${image.height})`}
                         editValue={image.name}
                         depth={2}
-                        selected={image.id === props.selectedAssetId}
+                        selected={isSelected('image', image.id)}
                         onSelect={() => props.onSelectAsset(image)}
                         onRename={name => props.onRenameImage(image.id, name)}
                     />
@@ -440,6 +449,8 @@ export default function TreeView(props: {
                             editValue={photo.name}
                             depth={2}
                             icon={<Image aria-hidden="true" />}
+                            selected={isSelected('photo', photo.id)}
+                            onSelect={() => props.onSelectPhoto(photo)}
                             onRename={name => props.onRenamePhoto(photo.id, name)}
                             onContextMenu={event => props.onPhotoContextMenu(event, photo)}
                         />

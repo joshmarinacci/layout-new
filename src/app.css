@@ -24,9 +24,6 @@
     --left-col: 0px;
 }
 .app-shell.hide-right,
-.app-shell.asset-mode {
-    --right-col: 0px;
-}
 .app-shell.hide-left > .layers-panel,
 .app-shell.hide-right > .inspector {
     display: none;
@@ -571,6 +568,43 @@
     font-size: var(--fs-xs);
     text-transform: capitalize;
     text-align: right;
+}
+
+/* Photo and asset properties */
+.photo-info {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--fs-xs);
+}
+.photo-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s1);
+    margin-top: var(--s2);
+}
+.asset-properties dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--s1) var(--s3);
+    margin: 0;
+}
+.asset-detail {
+    display: contents;
+}
+.asset-detail dt {
+    color: var(--text-muted);
+}
+.asset-detail dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+.asset-thumbnail {
+    display: block;
+    max-width: 100%;
+    margin-bottom: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
 }
 
 .name-field {
