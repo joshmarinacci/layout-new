@@ -85,6 +85,24 @@ test.describe('canvas selection and editing', () => {
     });
 });
 
+test.describe('properties panel', () => {
+    test('a checkbox field sits on the same row as its title', async ({page}) => {
+        await openEditor(page);
+        await page.keyboard.press('ControlOrMeta+Shift+p');
+        await page.keyboard.type('new text');
+        await page.keyboard.press('Enter');
+        const checkbox = inspector(page).getByRole('checkbox', {name: 'Italic'});
+        const row = checkbox.locator('xpath=..');
+        const title = row.locator('.title');
+        const box = (await checkbox.boundingBox())!;
+        const label = (await title.boundingBox())!;
+        // Same row: vertically overlapping, with the title to the left of the checkbox.
+        expect(label.y).toBeLessThan(box.y + box.height);
+        expect(box.y).toBeLessThan(label.y + label.height);
+        expect(label.x + label.width).toBeLessThanOrEqual(box.x);
+    });
+});
+
 test.describe('menus', () => {
     test('a canvas context menu works from the keyboard', async ({page}) => {
         await openEditor(page);

@@ -527,6 +527,9 @@
 }
 .number-input > input[type='checkbox'] {
     width: 14px;
+    /* tooltheme moves checkboxes in <details> before their text (order: -1); here the
+       title is its own column, so keep source order or the title drops to a new row. */
+    order: 0;
 }
 
 .number-input-control {
