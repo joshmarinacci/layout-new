@@ -83,8 +83,9 @@ describe('native menu', () => {
 
     it('offers the web menubar actions that are not commands', () => {
         expect(read('src/app.tsx')).toContain('label="Add Google Font…"');
-        expect(nativeOnlyIds).toEqual(['add-google-font']);
-        expect(menuIds).toContain('add-google-font');
+        // Select All only edits text fields, which get ⌘A directly in the browser.
+        expect(nativeOnlyIds).toEqual(['add-google-font', 'select-all']);
+        expect(menuIds).toEqual(expect.arrayContaining(nativeOnlyIds));
     });
 
     it('forwards menu clicks on the event the frontend listens for', () => {

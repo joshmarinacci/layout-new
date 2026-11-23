@@ -1,5 +1,6 @@
 import type {Bounds, Shape} from './types';
 import {selectionBounds} from '../editor/VisualEditor';
+import {intersects, type Point} from '../editor/camera';
 
 export type ShapeAlignment =
     'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'distribute-horizontal' | 'distribute-vertical';
@@ -80,4 +81,19 @@ export function translateShape(shape: Shape, x: number, y: number) {
         bounds.x += x;
         bounds.y += y;
     }
+}
+
+/** Moves shapes together so the middle of their combined bounds sits at `center`, in whole units. */
+export function centerShapesAt(shapes: readonly Shape[], center: Point) {
+    if (!shapes.length) return;
+    const box = unionBounds(shapes.map(selectionBounds));
+    const dx = Math.round(center.x - (box.x + box.width / 2));
+    const dy = Math.round(center.y - (box.y + box.height / 2));
+    for (const shape of shapes) translateShape(shape, dx, dy);
+}
+
+/** Leaves shapes alone when any of them is visible in `view`; otherwise centers them in it. */
+export function bringShapesIntoView(shapes: readonly Shape[], view: Bounds) {
+    if (!shapes.length || intersects(unionBounds(shapes.map(selectionBounds)), view)) return;
+    centerShapesAt(shapes, {x: view.x + view.width / 2, y: view.y + view.height / 2});
 }

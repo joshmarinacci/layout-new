@@ -2,8 +2,18 @@ import {useEffect, useMemo, useRef, useState} from 'react';
 import {EditorDialog} from '../common/EditorDialog';
 import {convertImportedPixels, type DecodedPixels, decodePng} from '../io/pngImport';
 import type {EditorStore} from '../model/EditorStore';
+import type {Point} from '../editor/camera';
 
-export function ImportPixelImage({store, onClose}: {store: EditorStore; onClose: () => void}) {
+export function ImportPixelImage({
+    store,
+    getCenter,
+    onClose,
+}: {
+    store: EditorStore;
+    /** The middle of the visible canvas, read when the import is confirmed. */
+    getCenter: () => Point;
+    onClose: () => void;
+}) {
     const [source, setSource] = useState<DecodedPixels | null>(null);
     const [originalName, setOriginalName] = useState<string | null>(null);
     const [name, setName] = useState('Imported image');
@@ -53,6 +63,7 @@ export function ImportPixelImage({store, onClose}: {store: EditorStore; onClose:
                             name,
                             split ? {width: tileWidth, height: tileHeight} : undefined,
                             originalName,
+                            getCenter(),
                         );
                         store.select(ids[0]);
                         onClose();

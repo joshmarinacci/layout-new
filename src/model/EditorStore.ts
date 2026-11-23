@@ -2,7 +2,8 @@ import {applyPatches, type Draft, enablePatches, freeze, type Patch, produceWith
 import {makeImageShape, makePixelImage} from '../shapes/pixelImages';
 import {convertImportedPixels, type DecodedPixels, type TileSize} from '../io/pngImport';
 import {deserializeDocument, serializeDocument, validateDocument} from '../io/serialization';
-import type {Document, FontAsset, PixelImageData, Shape, VectorNetwork, VectorShape} from './types';
+import type {Bounds, Document, FontAsset, PixelImageData, Shape, VectorNetwork, VectorShape} from './types';
+import {bringShapesIntoView, centerShapesAt} from './shapeAlignment';
 import {centeredBounds, type Point} from '../editor/camera';
 import {reconcileRegions} from '../shapes/vectorNetworks';
 
@@ -110,7 +111,10 @@ export class EditorStore {
     selectPage(id: string) {
         if (!this.document.pages.some(page => page.id === id)) throw new Error('Unknown page');
         this.selectedPageId = id;
-        this.setSelection([]);
+        // Publish even when nothing was selected: the page change alone must reach subscribers.
+        this.selectedIds = [];
+        this.selectedId = null;
+        this.publish();
     }
 
     createPage(name = `Page ${this.document.pages.length + 1}`) {
@@ -219,7 +223,8 @@ export class EditorStore {
         return group.id;
     }
 
-    importVectorNetworks(shapes: readonly VectorShape[], pageId: string, groupName = 'Imported SVG') {
+    /** Adds imported vector shapes, centered on `center` (the middle of the view) when given. */
+    importVectorNetworks(shapes: readonly VectorShape[], pageId: string, groupName = 'Imported SVG', center?: Point) {
         this.requireIdle();
         if (!this.document.pages.some(page => page.id === pageId)) throw new Error('Unknown page');
         if (!shapes.length) return [];
@@ -227,6 +232,7 @@ export class EditorStore {
         copies.forEach(shape => {
             shape.pageId = pageId;
         });
+        if (center) centerShapesAt(copies, center);
         const ids = copies.map(shape => shape.id);
         this.edit('Import SVG', draft => {
             draft.shapes.push(...copies);
@@ -370,7 +376,13 @@ export class EditorStore {
         return copies.map(shape => shape.id);
     }
 
-    pasteShapes(shapes: readonly Shape[], images: readonly PixelImageData[], fonts: readonly FontAsset[] = []) {
+    /** Pastes copies offset from the originals, moved into the middle of `view` if they'd be out of sight. */
+    pasteShapes(
+        shapes: readonly Shape[],
+        images: readonly PixelImageData[],
+        fonts: readonly FontAsset[] = [],
+        view?: Bounds,
+    ) {
         this.requireIdle();
         const referencedImageIds = new Set(
             shapes
@@ -435,6 +447,7 @@ export class EditorStore {
             return copy;
         });
         if (!copies.length) return [];
+        if (view) bringShapesIntoView(copies, view);
         this.edit('Paste shapes', draft => {
             draft.images.push(...imageCopies);
             draft.fonts.push(...fontCopies);
@@ -505,7 +518,14 @@ export class EditorStore {
         });
     }
 
-    importPixelImages(source: DecodedPixels, name: string, tile?: TileSize, originalName: string | null = null) {
+    /** Adds an imported PNG (or its tiles), centered on `center` (the middle of the view) when given. */
+    importPixelImages(
+        source: DecodedPixels,
+        name: string,
+        tile?: TileSize,
+        originalName: string | null = null,
+        center?: Point,
+    ) {
         this.requireIdle();
         const {image, regions, columns, rows} = convertImportedPixels(source, name, tile, originalName);
         const gap = 8;
@@ -534,6 +554,7 @@ export class EditorStore {
         shapes.forEach(shape => {
             shape.pageId = this.selectedPageId;
         });
+        if (center) centerShapesAt(shapes, center);
         this.edit('Import PNG', draft => {
             draft.images.push(image);
             draft.shapes.push(...shapes);
@@ -541,7 +562,8 @@ export class EditorStore {
         return shapes.map(shape => shape.id);
     }
 
-    linkImageShape(id: string) {
+    /** Adds a linked copy beside the image, or in the middle of `view` if that spot is out of sight. */
+    linkImageShape(id: string, view?: Bounds) {
         const source = this.document.shapes.find(shape => shape.id === id);
         if (source?.type !== 'pixel-image') throw new Error('Expected an image shape');
         const bounds = source.components.rect.bounds;
@@ -556,6 +578,7 @@ export class EditorStore {
             `${source.name} copy`,
         );
         shape.pageId = this.selectedPageId;
+        if (view) bringShapesIntoView([shape], view);
         this.addShape(shape);
         return shape.id;
     }

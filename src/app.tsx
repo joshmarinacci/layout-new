@@ -2,6 +2,7 @@ import {PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, SunMoon,
 import {type CSSProperties, type MouseEvent, useEffect, useEffectEvent, useLayoutEffect, useRef, useState} from 'react';
 import {isTauri} from '@tauri-apps/api/core';
 import {listen} from '@tauri-apps/api/event';
+import {performNativeTextEdit, textEditFor} from './common/nativeTextEdit';
 import {DropdownMenu, Separator} from './ui/DropdownMenu';
 import {CommandPalette} from './common/CommandPalette';
 import {keybindings, matchesKeybinding} from './common/keybindings';
@@ -49,12 +50,15 @@ import {
     SelectionDuplicateCommand,
     SelectionPasteCommand,
     type Workspace,
+    viewBounds,
     viewCenter,
 } from './commands';
 import {CommandIconButton, CommandMenuItem, DocumentTabButton} from './common/common';
 
 /** Native menu id for the Assets ▸ Add Google Font… item, which opens a dialog rather than running a command. */
 const NATIVE_ADD_GOOGLE_FONT = 'add-google-font';
+/** Only meaningful in text fields; in the browser ⌘A already reaches them. */
+const NATIVE_SELECT_ALL = 'select-all';
 
 export default function App() {
     const theme = useThemeSettings();
@@ -379,6 +383,14 @@ export default function App() {
     };
     const commands = commandRegistry.getAll();
     const onNativeMenuAction = useEffectEvent((id: string) => {
+        const textEdit = textEditFor(id, document.activeElement);
+        if (textEdit) {
+            performNativeTextEdit(textEdit).catch(reason =>
+                setError(reason instanceof Error ? reason.message : String(reason)),
+            );
+            return;
+        }
+        if (id === NATIVE_SELECT_ALL) return;
         if (store.getSnapshot().transactionActive) return;
         if (
             (selectedAssetId || selectedPaletteId) &&
@@ -544,6 +556,7 @@ export default function App() {
                                         result.shapes,
                                         state.selectedPageId,
                                         chosen.name.replace(/\.svg$/i, '') || 'Imported SVG',
+                                        viewCenter(ctx),
                                     );
                                     setError(result.warnings.join(' · '));
                                 } else {
@@ -798,7 +811,7 @@ export default function App() {
                                     </button>
                                     <button
                                         disabled={state.transactionActive}
-                                        onClick={() => store.select(store.linkImageShape(selected.id))}
+                                        onClick={() => store.select(store.linkImageShape(selected.id, viewBounds(ctx)))}
                                     >
                                         Linked Copy
                                     </button>
@@ -1223,7 +1236,13 @@ export default function App() {
                     </form>
                 </EditorDialog>
             )}
-            {imageDialog?.kind === 'import' && <ImportPixelImage store={store} onClose={() => setImageDialog(null)} />}
+            {imageDialog?.kind === 'import' && (
+                <ImportPixelImage
+                    store={store}
+                    getCenter={() => viewCenter(ctx)}
+                    onClose={() => setImageDialog(null)}
+                />
+            )}
             {imageDialog?.kind === 'create' && (
                 <NewPixelImage
                     store={store}

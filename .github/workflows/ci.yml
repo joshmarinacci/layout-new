@@ -43,6 +43,24 @@ jobs:
       - name: Build
         run: npx vite build
 
+  rust:
+    name: Desktop app (Rust) tests
+    # macOS, so the macOS-only native menu code is compiled and tested too.
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      # Debug builds load the dev server URL, so no frontend build is needed to compile.
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
   e2e:
     name: End-to-end tests
     runs-on: ubuntu-latest
