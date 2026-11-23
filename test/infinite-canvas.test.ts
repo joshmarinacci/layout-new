@@ -1,6 +1,8 @@
 import {describe, expect, it} from 'vitest';
 import {EditorStore, emptyDocument} from '../src/model/EditorStore';
 import {makeCircle, makeRect} from '../src/model/reducer';
+import {makeVector} from '../src/shapes/vectorNetworks';
+import {unionBounds} from '../src/editor/camera';
 import {
     EMPTY_PAGE_SIZE,
     PAGE_EXPORT_MARGIN,
@@ -10,7 +12,7 @@ import {
 } from '../src/io/exportArtwork';
 import {makeTab, NewCircleCommand, NewRectCommand, NewTextCommand, viewCenter} from '../src/commands';
 import type {CommandContext} from '../src/commands';
-import {gridStep} from '../src/editor/VisualEditor';
+import {gridStep, selectionBounds} from '../src/editor/VisualEditor';
 import type {Shape} from '../src/model/types';
 
 const viewBox = (svg: string) =>
@@ -133,5 +135,62 @@ describe('canvas grid', () => {
         }
         expect(gridStep(1)).toBe(64);
         expect(gridStep(64)).toBe(1);
+    });
+});
+
+describe('imports, pastes and linked copies on an infinite canvas', () => {
+    const view = {x: 10_000, y: -5_000, width: 800, height: 600};
+    const viewMiddle = {x: 10_400, y: -4_700};
+    const middleOf = (b: {x: number; y: number; width: number; height: number}) => ({
+        x: b.x + b.width / 2,
+        y: b.y + b.height / 2,
+    });
+
+    it('centers imported PNG images on the view', () => {
+        const store = new EditorStore(emptyDocument());
+        const source = {width: 4, height: 2, rgba: new Uint8ClampedArray(4 * 2 * 4).fill(255)};
+        const [id] = store.importPixelImages(source, 'Imported', undefined, null, viewMiddle);
+        const shape = store.getSnapshot().document.shapes.find(item => item.id === id)!;
+        expect(shape.type === 'pixel-image' && middleOf(shape.components.rect.bounds)).toEqual(viewMiddle);
+    });
+
+    it('centers imported SVG shapes on the view, keeping their layout', () => {
+        const store = new EditorStore(emptyDocument());
+        const page = store.getSnapshot().selectedPageId;
+        const shapes = [makeVector(), makeVector()];
+        shapes[1].components.network.origin.x += 300;
+        const ids = store.importVectorNetworks(shapes, page, 'Logo', viewMiddle);
+        const imported = store.getSnapshot().document.shapes.filter(shape => ids.includes(shape.id));
+        const box = unionBounds(imported.map(selectionBounds))!;
+        expect(Math.abs(middleOf(box).x - viewMiddle.x)).toBeLessThanOrEqual(0.5);
+        expect(Math.abs(middleOf(box).y - viewMiddle.y)).toBeLessThanOrEqual(0.5);
+        const [a, b] = imported.map(shape => shape.type === 'vector' && shape.components.network.origin.x);
+        expect(Number(b) - Number(a)).toBe(300);
+    });
+
+    it('pastes beside the originals when they are in view, and into view when they are not', () => {
+        const store = new EditorStore(emptyDocument());
+        const rect = makeRect('Rect', {x: 10_100, y: -4_900, width: 100, height: 80});
+        expect(store.pasteShapes([rect], [], [], view)).toHaveLength(1);
+        expect(store.getSnapshot().document.shapes.at(-1)).toMatchObject({
+            components: {rect: {bounds: {x: 10_120, y: -4_880}}},
+        });
+        const far = makeRect('Far', {x: 0, y: 0, width: 100, height: 80});
+        store.pasteShapes([far], [], [], view);
+        const pasted = store.getSnapshot().document.shapes.at(-1)!;
+        expect(pasted.type === 'rectangle' && middleOf(pasted.components.rect.bounds)).toEqual(viewMiddle);
+    });
+
+    it('puts a linked copy beside its image, or in view if that spot is out of sight', () => {
+        const store = new EditorStore(emptyDocument());
+        const id = store.createPixelImage(8, 8, ['#000000'], {x: 0, y: 0});
+        const besides = store.linkImageShape(id, {x: -100, y: -100, width: 800, height: 600});
+        const bounds = (shapeId: string) => {
+            const shape = store.getSnapshot().document.shapes.find(item => item.id === shapeId)!;
+            return shape.type === 'pixel-image' ? shape.components.rect.bounds : null;
+        };
+        expect(bounds(besides)).toMatchObject({x: bounds(id)!.x + 20, y: bounds(id)!.y + 20});
+        const inView = store.linkImageShape(id, view);
+        expect(middleOf(bounds(inView)!)).toEqual(viewMiddle);
     });
 });

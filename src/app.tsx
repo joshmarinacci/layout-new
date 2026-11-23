@@ -50,6 +50,7 @@ import {
     SelectionPasteCommand,
     type Workspace,
     viewCenter,
+    viewBounds,
 } from './commands';
 import {CommandIconButton, CommandMenuItem, DocumentTabButton} from './common/common';
 
@@ -555,6 +556,7 @@ export default function App() {
                                 }
                                 setError('');
                             } catch (error) {
+                                        viewCenter(ctx),
                                 setError(error instanceof Error ? error.message : 'Unable to load document');
                             }
                         }}
@@ -798,7 +800,7 @@ export default function App() {
                                     </button>
                                     <button
                                         disabled={state.transactionActive}
-                                        onClick={() => store.select(store.linkImageShape(selected.id))}
+                                        onClick={() => store.select(store.linkImageShape(selected.id, viewBounds(ctx)))}
                                     >
                                         Linked Copy
                                     </button>
@@ -1223,7 +1225,13 @@ export default function App() {
                     </form>
                 </EditorDialog>
             )}
-            {imageDialog?.kind === 'import' && <ImportPixelImage store={store} onClose={() => setImageDialog(null)} />}
+            {imageDialog?.kind === 'import' && (
+                <ImportPixelImage
+                    store={store}
+                    getCenter={() => viewCenter(ctx)}
+                    onClose={() => setImageDialog(null)}
+                />
+            )}
             {imageDialog?.kind === 'create' && (
                 <NewPixelImage
                     store={store}

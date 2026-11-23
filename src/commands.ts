@@ -8,7 +8,7 @@ import {isTauri} from '@tauri-apps/api/core';
 import {readSavedDocuments, type SavedDocumentRecord, writeSavedDocuments} from './io/savedDocuments';
 import {type ShapeAlignment, shapeAlignmentOffsets, translateShape} from './model/shapeAlignment';
 import {CommandRegistry} from './common/CommandRegistry';
-import {CameraStore, centeredBounds, type Point} from './editor/camera';
+import {CameraStore, centeredBounds, type Point, visibleBounds} from './editor/camera';
 import type {Theme} from './ui/theme';
 import {type LucideIcon, Redo2Icon, Undo2Icon} from 'lucide-react';
 import {newPalette, pico8Colors} from './shapes/palettes';
@@ -368,6 +368,7 @@ export const ImportSVGCommand: Command = {
                     .split(/[\\/]/)
                     .pop()
                     ?.replace(/\.svg$/i, '') || 'Imported SVG',
+                viewCenter(ctx),
             );
             ctx.setError(result.warnings.join(' · '));
         })().catch(error => ctx.setError(error instanceof Error ? error.message : 'Unable to import SVG'));
@@ -605,7 +606,7 @@ export const SelectionPasteCommand: Command = {
     enabled: ctx => ctx.clipboard.shapes.length > 0 && !ctx.state.transactionActive,
     run: ctx => {
         if (ctx.clipboard.shapes.length)
-            ctx.store.pasteShapes(ctx.clipboard.shapes, ctx.clipboard.images, ctx.clipboard.fonts);
+            ctx.store.pasteShapes(ctx.clipboard.shapes, ctx.clipboard.images, ctx.clipboard.fonts, viewBounds(ctx));
     },
 };
 
@@ -708,6 +709,13 @@ export function viewCenter(ctx: Pick<CommandContext, 'workspace' | 'state'>): Po
     const camera = ctx.workspace.tabs.find(tab => tab.id === ctx.workspace.activeId)?.camera;
     if (!camera || !camera.viewport.width || !camera.viewport.height) return {x: 100, y: 90};
     return camera.center(ctx.state.selectedPageId);
+}
+
+/** The part of the active page that is visible on the canvas, or undefined before it has been measured. */
+export function viewBounds(ctx: Pick<CommandContext, 'workspace' | 'state'>): Bounds | undefined {
+    const camera = ctx.workspace.tabs.find(tab => tab.id === ctx.workspace.activeId)?.camera;
+    if (!camera || !camera.viewport.width || !camera.viewport.height) return undefined;
+    return visibleBounds(camera.get(ctx.state.selectedPageId), camera.viewport);
 }
 
 const getSelected = (store: EditorStore) =>
