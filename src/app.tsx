@@ -60,6 +60,9 @@ import {
 } from './commands';
 import {CommandIconButton, CommandMenuItem, DocumentTabButton} from './common/common';
 
+/** Native menu id for the Assets ▸ Add Google Font… item, which opens a dialog rather than running a command. */
+const NATIVE_ADD_GOOGLE_FONT = 'add-google-font';
+
 export default function App() {
     const theme = useThemeSettings();
     const [themeSettingsOpen, setThemeSettingsOpen] = useState(false);
@@ -377,6 +380,11 @@ export default function App() {
         setContextMenu(null);
         setPageMenu({x: event.clientX, y: event.clientY, pageId});
     };
+    const openGoogleFontDialog = () => {
+        setGoogleFontName('');
+        setGoogleFontError('');
+        setGoogleFontDialog(true);
+    };
     const commands = commandRegistry.getAll();
     const onNativeMenuAction = useEffectEvent((id: string) => {
         if (store.getSnapshot().transactionActive) return;
@@ -393,7 +401,12 @@ export default function App() {
             ].includes(id)
         )
             return;
+        if ((selectedAssetId || selectedPaletteId) && id.startsWith('align-')) return;
         if (id === 'new-repeatingimage' && !doc.images.length) return;
+        if (id === NATIVE_ADD_GOOGLE_FONT) {
+            openGoogleFontDialog();
+            return;
+        }
         const command = commandRegistry.get(id);
         if (command?.enabled(ctx)) command.run(ctx);
     });
@@ -484,14 +497,7 @@ export default function App() {
                         <CommandMenuItem ctx={ctx} commandId="new-color-palette" />
                         <CommandMenuItem ctx={ctx} commandId="import-color-palette" />
                         <Separator />
-                        <MenuItem
-                            label="Add Google Font…"
-                            onClick={() => {
-                                setGoogleFontName('');
-                                setGoogleFontError('');
-                                setGoogleFontDialog(true);
-                            }}
-                        />
+                        <MenuItem label="Add Google Font…" onClick={openGoogleFontDialog} />
                         <Separator />
                         <CommandMenuItem ctx={ctx} commandId="new-pico8-palette" />
                     </DropdownMenu>
@@ -904,11 +910,7 @@ export default function App() {
                             key={activeTab.id}
                             store={store}
                             documentSelected={documentSelected}
-                            onAddGoogleFont={() => {
-                                setGoogleFontName('');
-                                setGoogleFontError('');
-                                setGoogleFontDialog(true);
-                            }}
+                            onAddGoogleFont={openGoogleFontDialog}
                         />
                     </aside>
                 </>
@@ -1013,14 +1015,7 @@ export default function App() {
                     <CommandMenuItem ctx={ctx} commandId="new-color-palette" />
                     <CommandMenuItem ctx={ctx} commandId="import-color-palette" />
                     <Separator />
-                    <MenuItem
-                        label="Add Google Font…"
-                        onClick={() => {
-                            setGoogleFontName('');
-                            setGoogleFontError('');
-                            setGoogleFontDialog(true);
-                        }}
-                    />
+                    <MenuItem label="Add Google Font…" onClick={openGoogleFontDialog} />
                     <Separator />
                     <CommandMenuItem ctx={ctx} commandId="new-pico8-palette" />
                 </ContextMenu>
