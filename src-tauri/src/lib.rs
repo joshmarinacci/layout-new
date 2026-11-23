@@ -1,4 +1,7 @@
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 use tauri::{menu::{Menu, MenuItem, PredefinedMenuItem, Submenu}, Emitter, Manager};
 
 fn documents_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -7,19 +10,28 @@ fn documents_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(dir.join("saved-documents.json"))
 }
 
-#[tauri::command]
-fn read_saved_documents(app: tauri::AppHandle) -> Result<Vec<serde_json::Value>, String> {
-    let path = documents_path(&app)?;
-    if !path.exists() { return Ok(Vec::new()); }
+/// Reads the saved-document records stored at `path`; a missing file means none saved yet.
+fn read_documents_file(path: &Path) -> Result<Vec<serde_json::Value>, String> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
     let contents = fs::read_to_string(path).map_err(|error| error.to_string())?;
     serde_json::from_str(&contents).map_err(|error| error.to_string())
 }
 
+fn write_documents_file(path: &Path, records: &[serde_json::Value]) -> Result<(), String> {
+    let contents = serde_json::to_string(records).map_err(|error| error.to_string())?;
+    fs::write(path, contents).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn read_saved_documents(app: tauri::AppHandle) -> Result<Vec<serde_json::Value>, String> {
+    read_documents_file(&documents_path(&app)?)
+}
+
 #[tauri::command]
 fn write_saved_documents(app: tauri::AppHandle, records: Vec<serde_json::Value>) -> Result<(), String> {
-    let path = documents_path(&app)?;
-    let contents = serde_json::to_string(&records).map_err(|error| error.to_string())?;
-    fs::write(path, contents).map_err(|error| error.to_string())
+    write_documents_file(&documents_path(&app)?, &records)
 }
 
 #[cfg_attr(mobile, export_name = "mobile_entry")]
@@ -72,6 +84,15 @@ pub fn run() {
                 &PredefinedMenuItem::separator(handle)?, &cut, &copy, &paste,
             ])?;
 
+            // Keep these menus in step with the web menubar in src/app.tsx, which the
+            // desktop app hides; test/tauri-config.test.ts checks that they match.
+            let view_menu = Submenu::with_items(handle, "View", true, &[
+                &item("ui-show-command-palette", "Show Command Palette", None)?,
+                &PredefinedMenuItem::separator(handle)?,
+                &item("ui-toggle-left-sidebar", "Toggle Left Sidebar", None)?,
+                &item("ui-toggle-right-sidebar", "Toggle Right Sidebar", None)?,
+            ])?;
+
             let new_page = item("new-page", "New Page", None)?;
             let rename_page = item("rename-page", "Rename Page…", None)?;
             let delete_page = item("delete-page", "Delete Page", None)?;
@@ -89,10 +110,34 @@ pub fn run() {
                 &new_pixel_image, &new_repeating_image, &import_png,
             ])?;
 
+            let assets_menu = Submenu::with_items(handle, "Assets", true, &[
+                &item("new-color-palette", "New Color Palette", None)?,
+                &item("import-color-palette", "Import Color Palette", None)?,
+                &PredefinedMenuItem::separator(handle)?,
+                &item("add-google-font", "Add Google Font…", None)?,
+                &PredefinedMenuItem::separator(handle)?,
+                &item("new-pico8-palette", "Add PICO-8 Palette", None)?,
+            ])?;
+
+            let arrange_menu = Submenu::with_items(handle, "Align", true, &[
+                &item("align-left", "Align Left", None)?,
+                &item("align-center", "Align Horizontal Center", None)?,
+                &item("align-right", "Align Right", None)?,
+                &PredefinedMenuItem::separator(handle)?,
+                &item("align-top", "Align Top", None)?,
+                &item("align-middle", "Align Vertical Middle", None)?,
+                &item("align-bottom", "Align Bottom", None)?,
+                &PredefinedMenuItem::separator(handle)?,
+                &item("align-distribute-horizontal", "Distribute Horizontally", None)?,
+                &item("align-distribute-vertical", "Distribute Vertically", None)?,
+            ])?;
+
             let appearance_menu = Submenu::with_items(handle, "Appearance", true, &[
                 &item("theme-system", "System Theme", None)?,
                 &item("theme-light", "Light Theme", None)?,
                 &item("theme-dark", "Dark Theme", None)?,
+                &PredefinedMenuItem::separator(handle)?,
+                &item("theme-settings", "Theme Settings…", None)?,
             ])?;
             let help_menu = Submenu::with_items(handle, "Help", true, &[
                 &item("ui-show-keyboard-shortcuts", "Keyboard Shortcuts…", None)?,
@@ -100,7 +145,8 @@ pub fn run() {
             let menu = Menu::with_items(handle, &[
                 #[cfg(target_os = "macos")]
                 &app_menu,
-                &file_menu, &edit_menu, &page_menu, &shape_menu, &appearance_menu, &help_menu,
+                &file_menu, &edit_menu, &view_menu, &page_menu, &shape_menu, &assets_menu, &arrange_menu,
+                &appearance_menu, &help_menu,
             ])?;
             app.set_menu(menu)?;
             app.on_menu_event(|app, event| {
@@ -110,4 +156,63 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// A fresh, empty directory under the system temp dir, removed when dropped.
+    struct TempDir(PathBuf);
+    impl TempDir {
+        fn new(name: &str) -> Self {
+            let dir = std::env::temp_dir().join(format!("layout-new-{name}-{}", std::process::id()));
+            let _ = fs::remove_dir_all(&dir);
+            fs::create_dir_all(&dir).unwrap();
+            TempDir(dir)
+        }
+        fn file(&self) -> PathBuf {
+            self.0.join("saved-documents.json")
+        }
+    }
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn missing_file_reads_as_no_documents() {
+        let dir = TempDir::new("missing");
+        assert_eq!(read_documents_file(&dir.file()).unwrap(), Vec::<serde_json::Value>::new());
+    }
+
+    #[test]
+    fn written_records_read_back_unchanged() {
+        let dir = TempDir::new("roundtrip");
+        let records = vec![
+            json!({"id": "a", "name": "First", "savedAt": "2026-11-22T10:00:00Z", "json": "{\"title\":\"First\"}"}),
+            json!({"id": "b", "name": "Ünïcödé ✏️", "savedAt": "2026-11-22T11:00:00Z", "json": "{}"}),
+        ];
+        write_documents_file(&dir.file(), &records).unwrap();
+        assert_eq!(read_documents_file(&dir.file()).unwrap(), records);
+    }
+
+    #[test]
+    fn writing_replaces_previous_records() {
+        let dir = TempDir::new("replace");
+        write_documents_file(&dir.file(), &[json!({"id": "old"})]).unwrap();
+        write_documents_file(&dir.file(), &[]).unwrap();
+        assert!(read_documents_file(&dir.file()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn corrupt_or_non_array_files_are_errors() {
+        let dir = TempDir::new("corrupt");
+        fs::write(dir.file(), "{not json").unwrap();
+        assert!(read_documents_file(&dir.file()).is_err());
+        fs::write(dir.file(), r#"{"id": "not-an-array"}"#).unwrap();
+        assert!(read_documents_file(&dir.file()).is_err());
+    }
 }
