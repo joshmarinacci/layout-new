@@ -3,13 +3,17 @@ import {useState} from 'react';
 import {EditorDialog} from '../common/EditorDialog';
 import {PALETTES} from './pixelImages';
 import type {EditorStore} from '../model/EditorStore';
+import type {Point} from '../editor/camera';
 
 export function NewPixelImage({
     store,
+    getCenter,
     onClose,
     onCreated,
 }: {
     store: EditorStore;
+    /** Document point to center the new image on, read when it is created. */
+    getCenter: () => Point;
     onClose: () => void;
     onCreated: (imageId: string) => void;
 }) {
@@ -23,7 +27,7 @@ export function NewPixelImage({
                 onSubmit={event => {
                     event.preventDefault();
                     try {
-                        const id = store.createPixelImage(size, size, PALETTES[palette]);
+                        const id = store.createPixelImage(size, size, PALETTES[palette], getCenter());
                         store.select(id);
                         const shape = store.getSnapshot().document.shapes.find(item => item.id === id)!;
                         if (shape.type === 'pixel-image') onCreated(shape.components.image.imageId);

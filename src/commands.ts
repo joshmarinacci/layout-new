@@ -8,6 +8,7 @@ import {isTauri} from '@tauri-apps/api/core';
 import {readSavedDocuments, type SavedDocumentRecord, writeSavedDocuments} from './io/savedDocuments';
 import {type ShapeAlignment, shapeAlignmentOffsets, translateShape} from './model/shapeAlignment';
 import {CommandRegistry} from './common/CommandRegistry';
+import {CameraStore, centeredBounds, type Point} from './editor/camera';
 import type {Theme} from './ui/theme';
 import {type LucideIcon, Redo2Icon, Undo2Icon} from 'lucide-react';
 import {newPalette, pico8Colors} from './shapes/palettes';
@@ -25,6 +26,8 @@ import {waitForTextFont} from './shapes/googleFonts';
 export interface DocumentTab {
     id: string;
     store: EditorStore;
+    /** Where this tab's canvas is looking, per page. View state, not saved with the document. */
+    camera: CameraStore;
     savedDocumentId: string | null;
     savedJson: string | null;
 }
@@ -253,7 +256,7 @@ export const NewRectCommand: Command = {
     keywords: ['shape', 'rect', 'create'],
     enabled: ctx => !ctx.state.transactionActive,
     run: ctx => {
-        const shape = makeRect('Rectangle', {x: 50, y: 50, width: 100, height: 80});
+        const shape = makeRect('Rectangle', centeredBounds(viewCenter(ctx), 100, 80));
         ctx.store.addShape(shape);
         ctx.store.select(shape.id);
     },
@@ -265,7 +268,8 @@ export const NewCircleCommand: Command = {
     keywords: ['shape', 'oval', 'create'],
     enabled: ctx => !ctx.state.transactionActive,
     run: ctx => {
-        const shape = makeCircle('Circle', {x: 100, y: 100}, 40);
+        const center = viewCenter(ctx);
+        const shape = makeCircle('Circle', {x: Math.round(center.x), y: Math.round(center.y)}, 40);
         ctx.store.addShape(shape);
         ctx.store.select(shape.id);
     },
@@ -278,7 +282,7 @@ export const NewTextCommand: Command = {
     keywords: ['shape', 'text', 'type', 'create'],
     enabled: ctx => !ctx.state.transactionActive,
     run: ctx => {
-        const shape = makeText('Text', {x: 50, y: 50, width: 280, height: 120});
+        const shape = makeText('Text', centeredBounds(viewCenter(ctx), 280, 120));
         ctx.store.addShape(shape);
         ctx.store.select(shape.id);
     },
@@ -680,6 +684,7 @@ export function makeTab(
     return {
         id: crypto.randomUUID(),
         store: new EditorStore(document),
+        camera: new CameraStore(),
         savedDocumentId,
         savedJson,
     };
@@ -693,6 +698,17 @@ export const openDocument = (ctx: CommandContext, document: DrawingDocument) => 
         activeId: tab.id,
     }));
 };
+
+/**
+ * The document point at the middle of the active tab's canvas, where new shapes go.
+ * Before the canvas has been measured (or outside the app) it falls back to the
+ * spot near the origin that new shapes used before the canvas became infinite.
+ */
+export function viewCenter(ctx: Pick<CommandContext, 'workspace' | 'state'>): Point {
+    const camera = ctx.workspace.tabs.find(tab => tab.id === ctx.workspace.activeId)?.camera;
+    if (!camera || !camera.viewport.width || !camera.viewport.height) return {x: 100, y: 90};
+    return camera.center(ctx.state.selectedPageId);
+}
 
 const getSelected = (store: EditorStore) =>
     store.getSnapshot().document.shapes.filter(shape => store.getSnapshot().selectedIds.includes(shape.id));

@@ -3,6 +3,7 @@ import {makeImageShape, makePixelImage} from '../shapes/pixelImages';
 import {convertImportedPixels, type DecodedPixels, type TileSize} from '../io/pngImport';
 import {deserializeDocument, serializeDocument, validateDocument} from '../io/serialization';
 import type {Document, FontAsset, PixelImageData, Shape, VectorNetwork, VectorShape} from './types';
+import {centeredBounds, type Point} from '../editor/camera';
 import {reconcileRegions} from '../shapes/vectorNetworks';
 
 enablePatches();
@@ -463,17 +464,15 @@ export class EditorStore {
         });
     }
 
-    createPixelImage(width: number, height: number, palette: readonly string[]) {
+    /** Creates a pixel image and a shape showing it, centered on `center` when given. */
+    createPixelImage(width: number, height: number, palette: readonly string[], center?: Point) {
         const image = makePixelImage(width, height, palette);
         const scale = Math.max(1, Math.floor(128 / Math.max(width, height)));
         const shape = makeImageShape(
             image.id,
-            {
-                x: 50,
-                y: 50,
-                width: width * scale,
-                height: height * scale,
-            },
+            center
+                ? centeredBounds(center, width * scale, height * scale)
+                : {x: 50, y: 50, width: width * scale, height: height * scale},
             {x: 0, y: 0, width, height},
         );
         shape.pageId = this.selectedPageId;

@@ -1,4 +1,12 @@
-import {type MouseEvent, type PointerEvent, useEffect, useEffectEvent, useRef, useState} from 'react';
+import {
+    type MouseEvent,
+    type PointerEvent,
+    useEffect,
+    useEffectEvent,
+    useRef,
+    useState,
+    useSyncExternalStore,
+} from 'react';
 import {circleContains, circleHandles, dragCircle} from '../shapes/circleGeometry';
 import type {EditorStore} from '../model/EditorStore';
 import type {PixelEditorController} from '../shapes/PixelImageEditor';
@@ -16,6 +24,16 @@ import {useVectorEditor} from '../shapes/VectorEditor';
 import {drawVector, resizeVector, vectorBounds, vectorHit} from '../shapes/vectorNetworks';
 import {drawTextShape} from '../shapes/text';
 import {installDocumentFonts} from '../shapes/googleFonts';
+import {
+    type Camera,
+    type CameraStore,
+    documentToScreen,
+    intersects,
+    panBy,
+    screenToDocument,
+    visibleBounds,
+    zoomAt,
+} from './camera';
 
 export function selectionBounds(shape: Shape): Bounds {
     switch (shape.type) {
@@ -43,14 +61,49 @@ export function selectionBounds(shape: Shape): Bounds {
     }
 }
 
-const clampZoom = (zoom: number) => Math.max(0.25, Math.min(4, zoom));
+/** Spacing of the background grid in document units: a power of two times 64 that stays 24–96px on screen. */
+export function gridStep(zoom: number) {
+    let step = 64;
+    while (step * zoom < 24) step *= 2;
+    while (step > 1 && step * zoom > 96) step /= 2;
+    return step;
+}
+
+/** Draws the background grid in screen space so its lines stay one pixel wide at any zoom. */
+function drawGrid(ctx: CanvasRenderingContext2D, view: Camera, width: number, height: number, color: string) {
+    const step = gridStep(view.zoom);
+    ctx.beginPath();
+    for (let x = Math.ceil(view.x / step) * step; ; x += step) {
+        const screenX = Math.round((x - view.x) * view.zoom) + 0.5;
+        if (screenX > width) break;
+        ctx.moveTo(screenX, 0);
+        ctx.lineTo(screenX, height);
+    }
+    for (let y = Math.ceil(view.y / step) * step; ; y += step) {
+        const screenY = Math.round((y - view.y) * view.zoom) + 0.5;
+        if (screenY > height) break;
+        ctx.moveTo(0, screenY);
+        ctx.lineTo(width, screenY);
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+}
+
+/** How far past its bounds a shape may paint (strokes are centered on the outline). */
+function paintMargin(shape: Shape, zoom: number) {
+    const stroke =
+        shape.type === 'vector' || shape.type === 'circle' || shape.type === 'oval' || shape.type === 'rectangle'
+            ? shape.components.stroke.width
+            : 0;
+    return stroke + 12 / zoom;
+}
 export default function VisualEditor({
     store,
     onEditImage,
     onShapeContextMenu,
     onCanvasContextMenu,
-    zoom,
-    onZoomChange,
+    camera,
     pixelEditor,
     vectorId,
     onEditVector,
@@ -66,15 +119,18 @@ export default function VisualEditor({
     ) => void;
     onShapeContextMenu: (event: MouseEvent<HTMLCanvasElement>, shape: Shape) => void;
     onCanvasContextMenu: (event: MouseEvent<HTMLCanvasElement>) => void;
-    zoom: number;
-    onZoomChange: (zoom: number) => void;
+    camera: CameraStore;
     pixelEditor?: PixelEditorController | null;
     vectorId: string | null;
     onEditVector: (id: string | null) => void;
 }) {
     const state = useEditorStore(store);
+    const pageId = state.selectedPageId;
+    // Re-render on zoom changes (hit tolerances depend on it) but not on panning,
+    // which only redraws the canvas.
+    const zoom = useSyncExternalStore(camera.subscribe, () => camera.get(pageId).zoom);
     const vectorShape = state.document.shapes.find(
-        s => s.id === vectorId && s.type === 'vector' && s.pageId === state.selectedPageId,
+        s => s.id === vectorId && s.type === 'vector' && s.pageId === pageId,
     );
     const vector = useVectorEditor(store, vectorShape?.type === 'vector' ? vectorShape : undefined, zoom, () =>
         onEditVector(null),
@@ -94,13 +150,14 @@ export default function VisualEditor({
         vectors?: Map<string, VectorNetwork>;
         circles?: Map<string, CircleLikeComponent>;
         additive?: boolean;
-        scrollX?: number;
-        scrollY?: number;
+        camera?: Camera;
         duplicate?: boolean;
         duplicateStarted?: boolean;
     } | null>(null);
     const [marquee, setMarquee] = useState<Bounds | null>(null);
-    const [fontEpoch, setFontEpoch] = useState(0);
+    const [, setFontEpoch] = useState(0);
+    const patterns = useRef(new WeakMap<PixelImageData, Map<string, CanvasPattern | null>>());
+    const frame = useRef(0);
     useEffect(() => {
         let active = true;
         const fonts = state.document.fonts;
@@ -112,18 +169,36 @@ export default function VisualEditor({
             active = false;
         };
     }, [state.document.fonts]);
-    useEffect(() => {
+    const draw = useEffectEvent(() => {
         const canvas = ref.current;
+        const element = viewport.current;
         const ctx = canvas?.getContext('2d');
-        if (!ctx || !canvas) return;
+        if (!ctx || !canvas || !element) return;
+        const width = element.clientWidth;
+        const height = element.clientHeight;
         const pixelRatio = window.devicePixelRatio || 1;
-        const resolution = 1024 * zoom * pixelRatio;
-        if (canvas.width !== resolution || canvas.height !== resolution) {
-            canvas.width = resolution;
-            canvas.height = resolution;
+        const pixelWidth = Math.max(1, Math.round(width * pixelRatio));
+        const pixelHeight = Math.max(1, Math.round(height * pixelRatio));
+        if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+            canvas.width = pixelWidth;
+            canvas.height = pixelHeight;
         }
-        ctx.setTransform(zoom * pixelRatio, 0, 0, zoom * pixelRatio, 0, 0);
-        ctx.clearRect(0, 0, 1024, 1024);
+        const view = camera.get(pageId);
+        const {zoom} = view;
+        // Read by the end-to-end tests to map document points to the screen.
+        canvas.dataset.camera = `${view.x},${view.y},${zoom}`;
+        ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        ctx.clearRect(0, 0, width, height);
+        drawGrid(ctx, view, width, height, getComputedStyle(canvas).color);
+        ctx.setTransform(
+            zoom * pixelRatio,
+            0,
+            0,
+            zoom * pixelRatio,
+            -view.x * zoom * pixelRatio,
+            -view.y * zoom * pixelRatio,
+        );
+        const visible = visibleBounds(view, {width, height});
         const images = new Map(
             state.document.images.map(image => {
                 const cached = bitmaps.current.get(image);
@@ -139,9 +214,19 @@ export default function VisualEditor({
         );
         ctx.imageSmoothingEnabled = false;
         state.document.shapes
-            .filter(shape => shape.pageId === state.selectedPageId)
+            .filter(shape => shape.pageId === pageId)
             .forEach(shape => {
                 const b = selectionBounds(shape);
+                const margin = paintMargin(shape, zoom);
+                // Text may paint outside its box, and is cheap to keep.
+                if (
+                    shape.type !== 'text' &&
+                    !intersects(
+                        {x: b.x - margin, y: b.y - margin, width: b.width + margin * 2, height: b.height + margin * 2},
+                        visible,
+                    )
+                )
+                    return;
                 if (shape.type === 'vector') {
                     drawVector(ctx, shape);
                 } else if (shape.type === 'text') {
@@ -172,37 +257,46 @@ export default function VisualEditor({
                     ctx.lineWidth = 1;
                     ctx.strokeRect(b.x, b.y, b.width, b.height);
                 } else if (shape.type === 'repeating-image') {
+                    const image = state.document.images.find(item => item.id === shape.components.image.imageId);
                     const bitmap = images.get(shape.components.image.imageId);
-                    if (bitmap) {
+                    if (image && bitmap) {
                         const region = shape.components.image.source;
-                        const tile = document.createElement('canvas');
-                        tile.width = shape.components.pattern.width;
-                        tile.height = shape.components.pattern.height;
-                        const tileCtx = tile.getContext('2d');
-                        if (tileCtx) {
-                            tileCtx.imageSmoothingEnabled = false;
-                            tileCtx.drawImage(
-                                bitmap,
-                                region.x,
-                                region.y,
-                                region.width,
-                                region.height,
-                                0,
-                                0,
-                                tile.width,
-                                tile.height,
-                            );
-                            const pattern = ctx.createPattern(tile, 'repeat');
-                            if (pattern) {
-                                pattern.setTransform(new DOMMatrix().translate(b.x, b.y));
-                                ctx.save();
-                                ctx.beginPath();
-                                ctx.rect(b.x, b.y, b.width, b.height);
-                                ctx.clip();
-                                ctx.fillStyle = pattern;
-                                ctx.fillRect(b.x, b.y, b.width, b.height);
-                                ctx.restore();
+                        const {width: tileWidth, height: tileHeight} = shape.components.pattern;
+                        // Patterns are rebuilt only when the image or tile changes, not every frame.
+                        const key = `${region.x},${region.y},${region.width},${region.height}:${tileWidth}x${tileHeight}`;
+                        let cache = patterns.current.get(image);
+                        if (!cache) patterns.current.set(image, (cache = new Map()));
+                        if (!cache.has(key)) {
+                            const tile = document.createElement('canvas');
+                            tile.width = tileWidth;
+                            tile.height = tileHeight;
+                            const tileCtx = tile.getContext('2d');
+                            if (tileCtx) {
+                                tileCtx.imageSmoothingEnabled = false;
+                                tileCtx.drawImage(
+                                    bitmap,
+                                    region.x,
+                                    region.y,
+                                    region.width,
+                                    region.height,
+                                    0,
+                                    0,
+                                    tile.width,
+                                    tile.height,
+                                );
                             }
+                            cache.set(key, tileCtx ? ctx.createPattern(tile, 'repeat') : null);
+                        }
+                        const pattern = cache.get(key);
+                        if (pattern) {
+                            pattern.setTransform(new DOMMatrix().translate(b.x, b.y));
+                            ctx.save();
+                            ctx.beginPath();
+                            ctx.rect(b.x, b.y, b.width, b.height);
+                            ctx.clip();
+                            ctx.fillStyle = pattern;
+                            ctx.fillRect(b.x, b.y, b.width, b.height);
+                            ctx.restore();
                         }
                     }
                     ctx.strokeStyle = '#657b83';
@@ -285,18 +379,42 @@ export default function VisualEditor({
             ctx.strokeRect(marquee.x, marquee.y, marquee.width, marquee.height);
             ctx.restore();
         }
-    }, [
-        state.document,
-        state.selectedId,
-        state.selectedIds,
-        state.selectedPageId,
-        marquee,
-        zoom,
-        pixelEditor,
-        vector,
-        vectorShape,
-        fontEpoch,
-    ]);
+    });
+    const scheduleDraw = useEffectEvent(() => {
+        if (frame.current) return;
+        frame.current = requestAnimationFrame(() => {
+            frame.current = 0;
+            draw();
+        });
+    });
+    // The document, selection, editor overlays and fonts are all render state,
+    // so redraw after every render; frames coalesce to one per animation frame.
+    useEffect(() => scheduleDraw());
+    useEffect(() => camera.subscribe(() => scheduleDraw()), [camera]);
+    useEffect(() => {
+        const element = viewport.current;
+        if (!element) return;
+        const measure = () => {
+            camera.setViewport({width: element.clientWidth, height: element.clientHeight});
+            scheduleDraw();
+        };
+        measure();
+        const resize = new ResizeObserver(measure);
+        resize.observe(element);
+        // Theme changes restyle the grid colour without a React render here.
+        const theme = new MutationObserver(() => scheduleDraw());
+        theme.observe(document.documentElement, {attributes: true});
+        const scheme = window.matchMedia('(prefers-color-scheme: dark)');
+        const onScheme = () => scheduleDraw();
+        scheme.addEventListener('change', onScheme);
+        return () => {
+            resize.disconnect();
+            theme.disconnect();
+            scheme.removeEventListener('change', onScheme);
+            cancelAnimationFrame(frame.current);
+            frame.current = 0;
+        };
+    }, [camera]);
     useEffect(
         () => () => {
             if (gesture.current) {
@@ -306,9 +424,9 @@ export default function VisualEditor({
         },
         [store],
     );
-    const point = (event: PointerEvent<HTMLCanvasElement>) => {
+    const point = (event: PointerEvent<HTMLCanvasElement> | MouseEvent<HTMLCanvasElement>) => {
         const rect = event.currentTarget.getBoundingClientRect();
-        return {x: (event.clientX - rect.left) / zoom, y: (event.clientY - rect.top) / zoom};
+        return screenToDocument(camera.get(pageId), {x: event.clientX - rect.left, y: event.clientY - rect.top});
     };
     const finish = (cancel: boolean) => {
         if (!gesture.current) return;
@@ -324,33 +442,26 @@ export default function VisualEditor({
         }
         if (ref.current?.hasPointerCapture(pointer)) ref.current.releasePointerCapture(pointer);
     };
-    const setZoomAt = (nextZoom: number, clientX?: number, clientY?: number) => {
-        const element = viewport.current;
-        const oldZoom = zoom,
-            next = clampZoom(nextZoom);
-        if (next === oldZoom) return;
-        if (element && clientX !== undefined && clientY !== undefined) {
-            const rect = element.getBoundingClientRect();
-            const anchorX = clientX - rect.left,
-                anchorY = clientY - rect.top;
-            const docX = (element.scrollLeft + anchorX) / oldZoom;
-            const docY = (element.scrollTop + anchorY) / oldZoom;
-            onZoomChange(next);
-            requestAnimationFrame(() => {
-                element.scrollLeft = docX * next - anchorX;
-                element.scrollTop = docY * next - anchorY;
-            });
-        } else onZoomChange(next);
-    };
-    const onWheelZoom = useEffectEvent((event: WheelEvent) => {
-        if (!event.ctrlKey && !event.metaKey) return;
+    const onWheel = useEffectEvent((event: WheelEvent) => {
         event.preventDefault();
-        setZoomAt(zoom * Math.exp(-event.deltaY * 0.002), event.clientX, event.clientY);
+        const rect = viewport.current?.getBoundingClientRect();
+        if (!rect) return;
+        const view = camera.get(pageId);
+        const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? rect.height : 1;
+        if (event.ctrlKey || event.metaKey)
+            camera.set(
+                pageId,
+                zoomAt(view, view.zoom * Math.exp(-event.deltaY * unit * 0.002), {
+                    x: event.clientX - rect.left,
+                    y: event.clientY - rect.top,
+                }),
+            );
+        else camera.set(pageId, panBy(view, event.deltaX * unit, event.deltaY * unit));
     });
     useEffect(() => {
         const element = viewport.current;
         if (!element) return;
-        const handleWheel = (event: WheelEvent) => onWheelZoom(event);
+        const handleWheel = (event: WheelEvent) => onWheel(event);
         element.addEventListener('wheel', handleWheel, {passive: false});
         return () => element.removeEventListener('wheel', handleWheel);
     }, []);
@@ -360,25 +471,14 @@ export default function VisualEditor({
                 aria-label="Drawing canvas"
                 tabIndex={0}
                 ref={ref}
-                width={1024 * zoom * (window.devicePixelRatio || 1)}
-                height={1024 * zoom * (window.devicePixelRatio || 1)}
-                style={{
-                    width: 1024 * zoom,
-                    height: 1024 * zoom,
-                    backgroundSize: `${64 * zoom}px ${64 * zoom}px`,
-                    touchAction: 'none',
-                }}
+                style={{touchAction: 'none'}}
                 onContextMenu={event => {
                     event.preventDefault();
                     if (vectorShape) return;
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    const p = {
-                        x: (event.clientX - rect.left) / zoom,
-                        y: (event.clientY - rect.top) / zoom,
-                    };
+                    const p = point(event);
                     const shape = [...state.document.shapes]
                         .reverse()
-                        .filter(item => item.pageId === state.selectedPageId)
+                        .filter(item => item.pageId === pageId)
                         .find(item => {
                             if (item.type === 'vector') return vectorHit(item, p, 8 / zoom);
                             if (item.type === 'circle') return circleContains(item.components.circle, p);
@@ -404,14 +504,10 @@ export default function VisualEditor({
                 }}
                 onDoubleClick={event => {
                     if (pixelEditor || vectorShape) return;
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    const p = {
-                        x: (event.clientX - rect.left) / zoom,
-                        y: (event.clientY - rect.top) / zoom,
-                    };
+                    const p = point(event);
                     const shape = [...store.getSnapshot().document.shapes]
                         .reverse()
-                        .filter(s => s.pageId === state.selectedPageId)
+                        .filter(s => s.pageId === pageId)
                         .find(s => {
                             if (s.type === 'vector') return vectorHit(s, p, 8 / zoom);
                             if (s.type === 'circle') return circleContains(s.components.circle, p);
@@ -427,20 +523,18 @@ export default function VisualEditor({
                     if (shape?.type === 'pixel-image') {
                         finish(false);
                         const view = viewport.current;
-                        const parent = view?.parentElement;
                         const viewRect = view?.getBoundingClientRect();
-                        const parentRect = parent?.getBoundingClientRect();
+                        const parentRect = view?.parentElement?.getBoundingClientRect();
                         const bounds = shape.components.rect.bounds;
-                        const position =
-                            view && viewRect && parentRect
-                                ? {
-                                      x: viewRect.left - parentRect.left + bounds.x * zoom - view.scrollLeft,
-                                      y: viewRect.top - parentRect.top + bounds.y * zoom - view.scrollTop,
-                                  }
-                                : {x: 12, y: 12};
+                        // Both positions are relative to the viewport's parent, where the palette is placed.
+                        const screen = documentToScreen(camera.get(pageId), bounds);
+                        const offset =
+                            viewRect && parentRect
+                                ? {x: viewRect.left - parentRect.left, y: viewRect.top - parentRect.top}
+                                : {x: 0, y: 0};
+                        const position = {x: offset.x + screen.x, y: offset.y + screen.y};
                         onEditImage(shape.components.image, position, {
-                            x: bounds.x * zoom,
-                            y: bounds.y * zoom,
+                            ...position,
                             width: bounds.width * zoom,
                             height: bounds.height * zoom,
                         });
@@ -473,8 +567,6 @@ export default function VisualEditor({
                     const isPan = event.button === 1 || (event.button === 0 && spacePan.current);
                     if (isPan) {
                         event.preventDefault();
-                        const element = viewport.current;
-                        if (!element) return;
                         gesture.current = {
                             kind: 'pan',
                             ids: [],
@@ -482,8 +574,7 @@ export default function VisualEditor({
                             x: event.clientX,
                             y: event.clientY,
                             bounds: [],
-                            scrollX: element.scrollLeft,
-                            scrollY: element.scrollTop,
+                            camera: camera.get(pageId),
                         };
                         event.currentTarget.setPointerCapture(event.pointerId);
                         return;
@@ -505,7 +596,7 @@ export default function VisualEditor({
                                 shape =>
                                     shape.type === 'pixel-image' &&
                                     shape.components.image.imageId === pixelEditor.imageId &&
-                                    shape.pageId === state.selectedPageId &&
+                                    shape.pageId === pageId &&
                                     p.x >= shape.components.rect.bounds.x &&
                                     p.y >= shape.components.rect.bounds.y &&
                                     p.x <= shape.components.rect.bounds.x + shape.components.rect.bounds.width &&
@@ -530,7 +621,7 @@ export default function VisualEditor({
                     const hitTolerance = 10 / zoom;
                     const selected = state.document.shapes.find(s => s.id === state.selectedId);
                     const selectedShapes = state.document.shapes.filter(
-                        shape => shape.pageId === state.selectedPageId && state.selectedIds.includes(shape.id),
+                        shape => shape.pageId === pageId && state.selectedIds.includes(shape.id),
                     );
                     const circleHandle =
                         selected?.type === 'circle' &&
@@ -553,7 +644,7 @@ export default function VisualEditor({
                             ? selected
                             : [...state.document.shapes]
                                   .reverse()
-                                  .filter(s => s.pageId === state.selectedPageId)
+                                  .filter(s => s.pageId === pageId)
                                   .find(s => {
                                       if (s.type === 'vector') return vectorHit(s, p, 8 / zoom);
                                       if (s.type === 'circle') return circleContains(s.components.circle, p);
@@ -644,10 +735,7 @@ export default function VisualEditor({
                     const g = gesture.current;
                     if (!g || g.pointer !== event.pointerId) return;
                     if (g.kind === 'pan') {
-                        if (viewport.current) {
-                            viewport.current.scrollLeft = (g.scrollX ?? 0) - (event.clientX - g.x);
-                            viewport.current.scrollTop = (g.scrollY ?? 0) - (event.clientY - g.y);
-                        }
+                        if (g.camera) camera.set(pageId, panBy(g.camera, g.x - event.clientX, g.y - event.clientY));
                         return;
                     }
                     const p = point(event);
@@ -749,7 +837,7 @@ export default function VisualEditor({
                             box.width < 2 && box.height < 2
                                 ? []
                                 : state.document.shapes
-                                      .filter(shape => shape.pageId === state.selectedPageId)
+                                      .filter(shape => shape.pageId === pageId)
                                       .filter(shape => {
                                           const b = selectionBounds(shape);
                                           return (

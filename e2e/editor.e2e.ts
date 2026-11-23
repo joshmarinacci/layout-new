@@ -1,6 +1,8 @@
 import {expect, test} from '@playwright/test';
 import {
     canvas,
+    canvasCamera,
+    canvasPoint,
     clickCanvas,
     dragOnCanvas,
     focusedLabel,
@@ -10,6 +12,7 @@ import {
     openEditor,
     property,
     treeItem,
+    wheelCanvas,
 } from './helpers';
 
 // The example document: "rect" at (0, 0) 100×100 and "circle" centered at (200, 200), radius 30.
@@ -245,7 +248,7 @@ test.describe('panels and toolbar', () => {
         await page.keyboard.press('ArrowRight');
         await page.keyboard.press('Enter');
         await expect(toolbar).toContainText('125%');
-        await expect.poll(async () => Math.round((await canvas(page).boundingBox())!.width)).toBe(1280);
+        await expect.poll(async () => (await canvasCamera(page)).zoom).toBe(1.25);
     });
 });
 
@@ -275,5 +278,112 @@ test.describe('appearance', () => {
         await page.reload();
         await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
         expect(await accent()).toBe('#f08c2e');
+    });
+});
+
+test.describe('infinite canvas', () => {
+    test('the wheel pans in every direction and shapes stay hittable', async ({page}) => {
+        await openEditor(page);
+        const start = await canvasPoint(page, 50, 50);
+        await wheelCanvas(page, start, {x: -300, y: -200});
+        await expect.poll(async () => canvasCamera(page)).toEqual({x: -300, y: -200, zoom: 1});
+        // The rect moved on screen with the pan, and clicks still find it.
+        expect(await canvasPoint(page, 50, 50)).toEqual({x: start.x + 300, y: start.y + 200});
+        await clickCanvas(page, 50, 50);
+        await expect(inspector(page).getByRole('textbox', {name: 'Shape name'})).toHaveValue('rect');
+    });
+
+    test('pinch or Ctrl/⌘+wheel zooms around the cursor', async ({page}) => {
+        await openEditor(page);
+        const anchor = await canvasPoint(page, 200, 200);
+        await wheelCanvas(page, anchor, {y: -400}, {zoom: true});
+        await expect.poll(async () => (await canvasCamera(page)).zoom).toBeGreaterThan(1.5);
+        const after = await canvasPoint(page, 200, 200);
+        expect(after.x).toBeCloseTo(anchor.x, 0);
+        expect(after.y).toBeCloseTo(anchor.y, 0);
+        await expect(page.getByRole('group', {name: 'Canvas zoom controls'})).not.toContainText('100%');
+    });
+
+    test('zoom reaches 2% and 6400% and the buttons stop there', async ({page}) => {
+        await openEditor(page);
+        const center = await canvasPoint(page, 100, 100);
+        for (let i = 0; i < 8; i++) await wheelCanvas(page, center, {y: 2000}, {zoom: true});
+        const controls = page.getByRole('group', {name: 'Canvas zoom controls'});
+        await expect(controls).toContainText('2%');
+        await expect(controls.getByRole('button', {name: 'Zoom out'})).toBeDisabled();
+        for (let i = 0; i < 16; i++) await wheelCanvas(page, center, {y: -2000}, {zoom: true});
+        await expect(controls).toContainText('6400%');
+        await expect(controls.getByRole('button', {name: 'Zoom in'})).toBeDisabled();
+        await controls.getByRole('button', {name: 'Reset zoom'}).click();
+        await expect(controls).toContainText('100%');
+    });
+
+    test('space-drag and middle-drag pan the canvas', async ({page}) => {
+        await openEditor(page);
+        const from = await canvasPoint(page, 300, 300);
+        await canvas(page).focus();
+        await page.keyboard.down('Space');
+        await page.mouse.move(from.x, from.y);
+        await page.mouse.down();
+        await page.mouse.move(from.x + 120, from.y + 80, {steps: 4});
+        await page.mouse.up();
+        await page.keyboard.up('Space');
+        await expect.poll(async () => canvasCamera(page)).toEqual({x: -120, y: -80, zoom: 1});
+        await page.mouse.move(from.x, from.y);
+        await page.mouse.down({button: 'middle'});
+        await page.mouse.move(from.x - 120, from.y - 80, {steps: 4});
+        await page.mouse.up({button: 'middle'});
+        await expect.poll(async () => canvasCamera(page)).toEqual({x: 0, y: 0, zoom: 1});
+        // Panning never selects or moves anything.
+        await expect(inspector(page).getByText(/Select an\s+object/)).toBeVisible();
+    });
+
+    test('new shapes appear in view far from the origin, and can be moved there', async ({page}) => {
+        await openEditor(page);
+        const middle = await canvasPoint(page, 300, 300);
+        await wheelCanvas(page, middle, {x: -50_000, y: 30_000});
+        await expect.poll(async () => canvasCamera(page)).toMatchObject({x: -50_000, y: 30_000});
+        await page.getByRole('button', {name: 'Shape', exact: true}).click();
+        await page.getByRole('menuitem', {name: 'New Rectangle'}).click();
+        const x = Number(await property(page, 'x').inputValue());
+        const y = Number(await property(page, 'y').inputValue());
+        const box = (await canvas(page).boundingBox())!;
+        // Centered on the visible canvas: the far side of the old 1024×1024 page.
+        expect(x + 50).toBeCloseTo(-50_000 + box.width / 2, -1);
+        expect(y + 40).toBeCloseTo(30_000 + box.height / 2, -1);
+        await dragOnCanvas(page, {x: x + 50, y: y + 40}, {x: x + 150, y: y + 10});
+        await expect(property(page, 'x')).toHaveValue(String(x + 100));
+        await expect(property(page, 'y')).toHaveValue(String(y - 30));
+    });
+
+    test('zoom to fit brings far-apart content into view', async ({page}) => {
+        await openEditor(page);
+        await clickCanvas(page, 50, 50);
+        const x = property(page, 'x');
+        await x.fill('-20000');
+        await x.press('Enter');
+        const zoomToFit = page.getByRole('button', {name: 'Zoom to fit'});
+        await zoomToFit.click();
+        await expect.poll(async () => (await canvasCamera(page)).zoom).toBeLessThan(0.1);
+        // Both ends of the content are on screen: canvasPoint throws for off-canvas points.
+        await canvasPoint(page, -20_000, 0);
+        await canvasPoint(page, 230, 230);
+        await clickCanvas(page, 200, 200);
+        await expect(inspector(page).getByRole('textbox', {name: 'Shape name'})).toHaveValue('circle');
+    });
+
+    test('each page keeps its own view', async ({page}) => {
+        await openEditor(page);
+        await wheelCanvas(page, await canvasPoint(page, 50, 50), {x: 400, y: 400});
+        await expect.poll(async () => canvasCamera(page)).toEqual({x: 400, y: 400, zoom: 1});
+        await page.getByRole('button', {name: 'Page', exact: true}).click();
+        await page.getByRole('menuitem', {name: 'New Page'}).click();
+        await expect.poll(async () => canvasCamera(page)).toEqual({x: 0, y: 0, zoom: 1});
+        // Select something first: switching pages with an empty selection is a separate,
+        // pre-existing bug (EditorStore.selectPage does not publish).
+        await page.getByRole('button', {name: 'Shape', exact: true}).click();
+        await page.getByRole('menuitem', {name: 'New Rectangle'}).click();
+        await treeItem(page, /Page 1/).click();
+        await expect.poll(async () => canvasCamera(page)).toEqual({x: 400, y: 400, zoom: 1});
     });
 });

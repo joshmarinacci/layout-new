@@ -3,8 +3,18 @@ import {useState} from 'react';
 import type {EditorStore} from '../model/EditorStore';
 import {EditorDialog} from '../common/EditorDialog';
 import {makeRepeatingImageShape} from './pixelImages';
+import {centeredBounds, type Point} from '../editor/camera';
 
-export function NewRepeatingImage({store, onClose}: {store: EditorStore; onClose: () => void}) {
+export function NewRepeatingImage({
+    store,
+    getCenter,
+    onClose,
+}: {
+    store: EditorStore;
+    /** Document point to center the new pattern on, read when it is created. */
+    getCenter: () => Point;
+    onClose: () => void;
+}) {
     const images = store.getSnapshot().document.images;
     const [imageId, setImageId] = useState(images[0]?.id ?? '');
     const image = images.find(item => item.id === imageId);
@@ -24,7 +34,7 @@ export function NewRepeatingImage({store, onClose}: {store: EditorStore; onClose
                         const shape = makeRepeatingImageShape(
                             image.id,
                             {x: 0, y: 0, width: image.width, height: image.height},
-                            {x: 50, y: 50, width: 320, height: 240},
+                            centeredBounds(getCenter(), 320, 240),
                             `${image.name} pattern`,
                         );
                         store.addShape(shape);

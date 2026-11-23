@@ -1,6 +1,7 @@
 import type {Document, Shape} from '../model/types';
 import {deserializeDocument, serializeDocument} from './serialization';
 import {drawTextShape} from '../shapes/text';
+import {pageExportBounds} from './exportArtwork';
 
 const PNG_SIGNATURE = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
 export const DOCUMENT_CHUNK_KEYWORD = 'DrawDocument';
@@ -271,13 +272,17 @@ function renderShape(ctx: CanvasRenderingContext2D, shape: Shape, document: Docu
 export function renderDocumentPreview(document: Document, maxSize = DOCUMENT_PREVIEW_MAX_SIZE): Uint8Array {
     const page = document.pages[0];
     if (!page) throw new Error('Document must contain at least one page');
+    const shapes = document.shapes.filter(shape => shape.pageId === page.id);
+    // The canvas is infinite, so the preview frames the first page's content.
+    const area = pageExportBounds(shapes);
     const contentSize = Math.max(1, maxSize - 40);
-    const scale = Math.min(1, contentSize / 1024);
-    const innerSize = Math.ceil(1024 * scale);
+    const scale = Math.min(1, contentSize / Math.max(area.width, area.height));
+    const innerWidth = Math.max(1, Math.ceil(area.width * scale));
+    const innerHeight = Math.max(1, Math.ceil(area.height * scale));
     const border = 16;
     const canvas = globalThis.document.createElement('canvas');
-    canvas.width = innerSize + border * 2;
-    canvas.height = innerSize + border * 2;
+    canvas.width = innerWidth + border * 2;
+    canvas.height = innerHeight + border * 2;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Unable to render document preview');
     ctx.fillStyle = '#ffffff';
@@ -285,13 +290,12 @@ export function renderDocumentPreview(document: Document, maxSize = DOCUMENT_PRE
     ctx.save();
     ctx.translate(border, border);
     ctx.scale(scale, scale);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, 1024, 1024);
-    document.shapes.filter(shape => shape.pageId === page.id).forEach(shape => renderShape(ctx, shape, document));
+    ctx.translate(-area.x, -area.y);
+    shapes.forEach(shape => renderShape(ctx, shape, document));
     ctx.restore();
     ctx.strokeStyle = '#888888';
     ctx.lineWidth = 1;
-    ctx.strokeRect(border - 0.5, border - 0.5, innerSize + 1, innerSize + 1);
+    ctx.strokeRect(border - 0.5, border - 0.5, innerWidth + 1, innerHeight + 1);
     ctx.fillStyle = '#666666';
     ctx.font = '12px sans-serif';
     ctx.textAlign = 'right';

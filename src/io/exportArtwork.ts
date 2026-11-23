@@ -3,6 +3,7 @@ import type {Bounds, Document, PixelImageData, Shape} from '../model/types';
 import {spanControls, vectorBounds} from '../shapes/vectorNetworks';
 import {layoutText} from '../shapes/text';
 import {fontFamilyFor, waitForTextFont} from '../shapes/googleFonts';
+import {unionBounds} from '../editor/camera';
 
 export type ArtworkFormat = 'png' | 'svg';
 
@@ -138,12 +139,15 @@ function shapeSvg(shape: Shape, doc: Document, index: number): string {
     return `<rect x="${b.x}" y="${b.y}" width="${b.width}" height="${b.height}" rx="${shape.components.cornerRadius.radius}" fill="${fill}"${strokeAttrs}/>`;
 }
 
-export function artworkSvg(doc: Document, shapes: readonly Shape[], pageSized = false): string {
-    if (!shapes.length && !pageSized) throw new Error('There is no artwork to export');
-    let view: Bounds;
-    if (pageSized) view = {x: 0, y: 0, width: 1024, height: 1024};
-    else {
-        const list = shapes.map(shape => {
+/** Margin around page content in page exports and document previews. */
+export const PAGE_EXPORT_MARGIN = 32;
+/** Size of the blank image exported for an empty page, which has no bounds of its own. */
+export const EMPTY_PAGE_SIZE = 64;
+
+/** The area the shapes paint, including the outer half of their strokes, or null when there are none. */
+export function artworkBounds(shapes: readonly Shape[]): Bounds | null {
+    const painted = unionBounds(
+        shapes.map(shape => {
             const b = bounds(shape);
             const padding =
                 shape.type === 'vector' ||
@@ -153,15 +157,33 @@ export function artworkSvg(doc: Document, shapes: readonly Shape[], pageSized = 
                     ? shape.components.stroke.width / 2
                     : 0;
             return {x: b.x - padding, y: b.y - padding, width: b.width + padding * 2, height: b.height + padding * 2};
-        });
-        const minX = Math.min(...list.map(b => b.x)),
-            minY = Math.min(...list.map(b => b.y));
-        const maxX = Math.max(...list.map(b => b.x + b.width)),
-            maxY = Math.max(...list.map(b => b.y + b.height));
-        view = {x: minX, y: minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY)};
-    }
+        }),
+    );
+    return painted && {...painted, width: Math.max(1, painted.width), height: Math.max(1, painted.height)};
+}
+
+/**
+ * The area a whole-page export covers. Pages have no bounds on the infinite canvas,
+ * so this is all of the page's content plus a margin, or a small blank square for
+ * an empty page.
+ */
+export function pageExportBounds(shapes: readonly Shape[]): Bounds {
+    const content = artworkBounds(shapes);
+    if (!content) return {x: 0, y: 0, width: EMPTY_PAGE_SIZE, height: EMPTY_PAGE_SIZE};
+    // Round each edge outward on its own, so fractional strokes are never clipped.
+    const left = Math.floor(content.x - PAGE_EXPORT_MARGIN);
+    const top = Math.floor(content.y - PAGE_EXPORT_MARGIN);
+    const right = Math.ceil(content.x + content.width + PAGE_EXPORT_MARGIN);
+    const bottom = Math.ceil(content.y + content.height + PAGE_EXPORT_MARGIN);
+    return {x: left, y: top, width: right - left, height: bottom - top};
+}
+
+export function artworkSvg(doc: Document, shapes: readonly Shape[], pageSized = false): string {
+    const content = artworkBounds(shapes);
+    if (!content && !pageSized) throw new Error('There is no artwork to export');
+    const view = pageSized || !content ? pageExportBounds(shapes) : content;
     const background = pageSized
-        ? `<rect x="0" y="0" width="${view.width}" height="${view.height}" fill="#ffffff"/>`
+        ? `<rect x="${view.x}" y="${view.y}" width="${view.width}" height="${view.height}" fill="#ffffff"/>`
         : '';
     const usedFontIds = new Set(
         shapes
