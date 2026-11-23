@@ -18,12 +18,36 @@ export const inspector = (page: Page) => page.getByRole('complementary', {name: 
 export const treeItem = (page: Page, name: string | RegExp) =>
     layers(page).getByRole('button', {name: typeof name === 'string' ? new RegExp(`^${name}$`) : name});
 
-/** Click (or press) at a point in document coordinates on the canvas, at its current zoom. */
+/** The canvas camera: the document point at the canvas's top-left corner, and the zoom. */
+export async function canvasCamera(page: Page) {
+    await expect(canvas(page)).toHaveAttribute('data-camera', /,/);
+    const [x, y, zoom] = (await canvas(page).getAttribute('data-camera'))!.split(',').map(Number);
+    return {x, y, zoom};
+}
+
+/** The screen position of a point in document coordinates, at the canvas's current pan and zoom. */
 export async function canvasPoint(page: Page, x: number, y: number) {
     const box = await canvas(page).boundingBox();
     if (!box) throw new Error('Canvas is not visible');
-    const zoom = box.width / 1024;
-    return {x: box.x + x * zoom, y: box.y + y * zoom};
+    const camera = await canvasCamera(page);
+    const point = {x: box.x + (x - camera.x) * camera.zoom, y: box.y + (y - camera.y) * camera.zoom};
+    // The canvas is only as big as its viewport now; a point outside it would hit other UI.
+    if (point.x < box.x || point.y < box.y || point.x > box.x + box.width || point.y > box.y + box.height)
+        throw new Error(`Document point (${x}, ${y}) is outside the visible canvas`);
+    return point;
+}
+
+/** Scrolls the mouse wheel over a screen point on the canvas; with ControlOrMeta held this zooms. */
+export async function wheelCanvas(
+    page: Page,
+    at: {x: number; y: number},
+    delta: {x?: number; y?: number},
+    {zoom = false}: {zoom?: boolean} = {},
+) {
+    await page.mouse.move(at.x, at.y);
+    if (zoom) await page.keyboard.down('ControlOrMeta');
+    await page.mouse.wheel(delta.x ?? 0, delta.y ?? 0);
+    if (zoom) await page.keyboard.up('ControlOrMeta');
 }
 
 export async function clickCanvas(

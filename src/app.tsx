@@ -1,14 +1,4 @@
-import {
-    Maximize2,
-    PanelLeftClose,
-    PanelLeftOpen,
-    PanelRightClose,
-    PanelRightOpen,
-    SunMoon,
-    Trash2,
-    ZoomIn,
-    ZoomOut,
-} from 'lucide-react';
+import {PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, SunMoon, Trash2} from 'lucide-react';
 import {type CSSProperties, type MouseEvent, useEffect, useEffectEvent, useLayoutEffect, useRef, useState} from 'react';
 import {isTauri} from '@tauri-apps/api/core';
 import {listen} from '@tauri-apps/api/event';
@@ -41,7 +31,9 @@ import {IconButton, MenuItem, ToolbarGroup} from './ui/controls';
 import {useThemeSettings} from './ui/theme';
 import '@joshmarinacci/tooltheme/react';
 import {useEditorStore} from './model/useEditorStore';
-import VisualEditor from './editor/VisualEditor';
+import VisualEditor, {selectionBounds} from './editor/VisualEditor';
+import {CanvasZoomControls} from './editor/CanvasZoomControls';
+import {unionBounds} from './editor/camera';
 import './app.css';
 import {
     type ClipboardState,
@@ -57,6 +49,7 @@ import {
     SelectionDuplicateCommand,
     SelectionPasteCommand,
     type Workspace,
+    viewCenter,
 } from './commands';
 import {CommandIconButton, CommandMenuItem, DocumentTabButton} from './common/common';
 
@@ -98,7 +91,6 @@ export default function App() {
     const [fileKind, setFileKind] = useState<'json' | 'png' | 'svg'>('json');
     const paletteFile = useRef<HTMLInputElement>(null);
     const [error, setError] = useState('');
-    const [canvasZoom, setCanvasZoom] = useState(1);
     const [leftPanelVisible, setLeftPanelVisible] = useState(true);
     const [rightPanelVisible, setRightPanelVisible] = useState(true);
     const [panelWidths, setPanelWidth] = usePanelWidths();
@@ -757,22 +749,20 @@ export default function App() {
                             </button>
                         )}
                         {!selectedAsset && !selectedPalette && (
-                            <div className="canvas-zoom-controls" role="group" aria-label="Canvas zoom controls">
-                                <IconButton
-                                    label="Zoom out"
-                                    icon={ZoomOut}
-                                    disabled={canvasZoom <= 0.25}
-                                    onClick={() => setCanvasZoom(value => Math.max(0.25, value / 1.25))}
-                                />
-                                <span aria-live="polite">{Math.round(canvasZoom * 100)}%</span>
-                                <IconButton
-                                    label="Zoom in"
-                                    icon={ZoomIn}
-                                    disabled={canvasZoom >= 4}
-                                    onClick={() => setCanvasZoom(value => Math.min(4, value * 1.25))}
-                                />
-                                <IconButton label="Reset zoom" icon={Maximize2} onClick={() => setCanvasZoom(1)} />
-                            </div>
+                            <CanvasZoomControls
+                                camera={activeTab.camera}
+                                pageId={state.selectedPageId}
+                                onZoomToFit={() =>
+                                    activeTab.camera.fit(
+                                        state.selectedPageId,
+                                        unionBounds(
+                                            doc.shapes
+                                                .filter(shape => shape.pageId === state.selectedPageId)
+                                                .map(selectionBounds),
+                                        ),
+                                    )
+                                }
+                            />
                         )}
                         {!selectedAsset &&
                             !selectedPalette &&
@@ -845,8 +835,7 @@ export default function App() {
                                 <VisualEditor
                                     key={activeTab.id}
                                     store={store}
-                                    zoom={canvasZoom}
-                                    onZoomChange={setCanvasZoom}
+                                    camera={activeTab.camera}
                                     vectorId={vectorId}
                                     onEditVector={setVectorId}
                                     pixelEditor={pixelEditor}
@@ -1238,6 +1227,7 @@ export default function App() {
             {imageDialog?.kind === 'create' && (
                 <NewPixelImage
                     store={store}
+                    getCenter={() => viewCenter(ctx)}
                     onClose={() => setImageDialog(null)}
                     onCreated={imageId =>
                         setImageDialog({
@@ -1247,7 +1237,13 @@ export default function App() {
                     }
                 />
             )}
-            {repeatingImageDialog && <NewRepeatingImage store={store} onClose={() => setRepeatingImageDialog(false)} />}
+            {repeatingImageDialog && (
+                <NewRepeatingImage
+                    store={store}
+                    getCenter={() => viewCenter(ctx)}
+                    onClose={() => setRepeatingImageDialog(false)}
+                />
+            )}
             {savedDocumentsOpen && (
                 <SavedDocumentsDialog
                     onClose={() => setSavedDocumentsOpen(false)}
