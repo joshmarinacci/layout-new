@@ -430,11 +430,20 @@ test.describe('infinite canvas', () => {
         await page.getByRole('button', {name: 'Page', exact: true}).click();
         await page.getByRole('menuitem', {name: 'New Page'}).click();
         await expect.poll(async () => canvasCamera(page)).toEqual({x: 0, y: 0, zoom: 1});
-        // Select something first: switching pages with an empty selection is a separate,
-        // pre-existing bug (EditorStore.selectPage does not publish).
-        await page.getByRole('button', {name: 'Shape', exact: true}).click();
-        await page.getByRole('menuitem', {name: 'New Rectangle'}).click();
         await treeItem(page, /Page 1/).click();
         await expect.poll(async () => canvasCamera(page)).toEqual({x: 400, y: 400, zoom: 1});
+    });
+
+    test('switches pages from the tree right after creating one, with nothing selected', async ({page}) => {
+        await openEditor(page);
+        const row = (name: RegExp) => treeItem(page, name).locator('xpath=ancestor::div[contains(@class, "tree-row")]');
+        await page.getByRole('button', {name: 'Page', exact: true}).click();
+        await page.getByRole('menuitem', {name: 'New Page'}).click();
+        await expect(row(/Page 2/)).toHaveClass(/\b(selected|current)\b/);
+        await treeItem(page, /Page 1/).click();
+        await expect(row(/Page 1/)).toHaveClass(/\b(selected|current)\b/);
+        await expect(row(/Page 2/)).not.toHaveClass(/\b(selected|current)\b/);
+        await treeItem(page, /Page 2/).click();
+        await expect(row(/Page 2/)).toHaveClass(/\b(selected|current)\b/);
     });
 });

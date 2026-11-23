@@ -110,7 +110,10 @@ export class EditorStore {
     selectPage(id: string) {
         if (!this.document.pages.some(page => page.id === id)) throw new Error('Unknown page');
         this.selectedPageId = id;
-        this.setSelection([]);
+        // Publish even when nothing was selected: the page change alone must reach subscribers.
+        this.selectedIds = [];
+        this.selectedId = null;
+        this.publish();
     }
 
     createPage(name = `Page ${this.document.pages.length + 1}`) {
