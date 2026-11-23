@@ -55,12 +55,51 @@ fn write_saved_documents(app: tauri::AppHandle, records: Vec<serde_json::Value>)
     write_documents_file(&documents_path(&app)?, &records)
 }
 
+/// The standard AppKit action for a text-editing shortcut the native menu took over.
+fn text_edit_action(action: &str) -> Option<&'static std::ffi::CStr> {
+    match action {
+        "undo" => Some(c"undo:"),
+        "redo" => Some(c"redo:"),
+        "cut" => Some(c"cut:"),
+        "copy" => Some(c"copy:"),
+        "paste" => Some(c"paste:"),
+        "selectAll" => Some(c"selectAll:"),
+        _ => None,
+    }
+}
+
+/// The native menu's ⌘Z/⌘X/⌘C/⌘V/⌘A items reach the app as menu events, so the
+/// focused text field never sees them. While one has focus, the frontend calls
+/// this to send the standard action down the responder chain to the web view,
+/// which then edits the text exactly as it would in any other Mac app.
+#[tauri::command]
+fn native_text_edit(app: tauri::AppHandle, action: String) -> Result<(), String> {
+    let selector = text_edit_action(&action).ok_or_else(|| format!("Unknown text edit: {action}"))?;
+    #[cfg(target_os = "macos")]
+    {
+        app.run_on_main_thread(move || {
+            use objc2::{runtime::Sel, MainThreadMarker};
+            use objc2_app_kit::NSApplication;
+            let Some(main) = MainThreadMarker::new() else { return };
+            let ns_app = NSApplication::sharedApplication(main);
+            // SAFETY: a nil target sends a standard editing action to the first responder.
+            unsafe { ns_app.sendAction_to_from(Sel::register(selector), None, None) };
+        })
+        .map_err(|error| error.to_string())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (app, selector);
+        Err("Native text editing is only available on macOS".into())
+    }
+}
+
 #[cfg_attr(mobile, export_name = "mobile_entry")]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![read_saved_documents, write_saved_documents])
+        .invoke_handler(tauri::generate_handler![read_saved_documents, write_saved_documents, native_text_edit])
         .setup(|app| {
             let handle = app.handle();
             let item = |id: &'static str, title: &'static str, accelerator: Option<&'static str>| {
@@ -100,9 +139,10 @@ pub fn run() {
             let cut = item("selection-cut", "Cut", Some("CmdOrCtrl+X"))?;
             let copy = item("selection-copy", "Copy", Some("CmdOrCtrl+C"))?;
             let paste = item("selection-paste", "Paste", Some("CmdOrCtrl+V"))?;
+            let select_all = item("select-all", "Select All", Some("CmdOrCtrl+A"))?;
             let edit_menu = Submenu::with_items(handle, "Edit", true, &[
                 &undo, &redo, &PredefinedMenuItem::separator(handle)?, &duplicate, &delete,
-                &PredefinedMenuItem::separator(handle)?, &cut, &copy, &paste,
+                &PredefinedMenuItem::separator(handle)?, &cut, &copy, &paste, &select_all,
             ])?;
 
             // Keep these menus in step with the web menubar in src/app.tsx, which the
@@ -201,6 +241,15 @@ mod tests {
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn text_edits_map_to_standard_appkit_actions() {
+        assert_eq!(text_edit_action("copy"), Some(c"copy:"));
+        assert_eq!(text_edit_action("selectAll"), Some(c"selectAll:"));
+        assert_eq!(text_edit_action("undo"), Some(c"undo:"));
+        assert_eq!(text_edit_action("terminate"), None);
+        assert_eq!(text_edit_action("copy:"), None);
     }
 
     #[test]
