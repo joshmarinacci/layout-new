@@ -20,8 +20,11 @@ test.describe('app shell', () => {
         await expect(page.getByRole('banner')).toBeVisible();
         await expect(page.getByRole('tablist', {name: 'Open documents'})).toBeVisible();
         await expect(layers(page)).toBeVisible();
-        // <main> carries role="tabpanel" for the open document's tab.
-        await expect(page.getByRole('tabpanel')).toBeVisible();
+        await expect(page.getByRole('main')).toBeVisible();
+        // The open document's tab panel sits inside <main>, labelled by the selected tab.
+        const panel = page.getByRole('main').getByRole('tabpanel', {name: /test doc/});
+        await expect(panel).toBeVisible();
+        await expect(panel.getByRole('toolbar', {name: 'Canvas tools'})).toBeVisible();
         await expect(inspector(page)).toBeVisible();
         await expect(page.getByRole('contentinfo')).toBeVisible();
         await expect(page.getByRole('toolbar', {name: 'Canvas tools'})).toBeVisible();
@@ -166,6 +169,22 @@ test.describe('layers tree', () => {
         await expect
             .poll(async () => (await order()).filter(name => ['rect', 'circle'].includes(name)))
             .toEqual(['circle', 'rect']);
+    });
+
+    test('switching tabs keeps an unfinished rename from the inspector', async ({page}) => {
+        await openEditor(page);
+        await page.getByRole('button', {name: 'File'}).click();
+        await page.getByRole('menuitem', {name: /^New Document/}).click();
+        const tabs = page.getByRole('tab');
+        await expect(tabs).toHaveCount(2);
+        await tabs.first().click();
+        await treeItem(page, 'rect').click();
+        const name = inspector(page).getByRole('textbox', {name: 'Shape name'});
+        await name.fill('Header');
+        await expect(name).toBeFocused();
+        await tabs.nth(1).click();
+        await tabs.first().click();
+        await expect(treeItem(page, 'Header')).toBeVisible();
     });
 
     test('selecting the document shows its properties and renames it', async ({page}) => {

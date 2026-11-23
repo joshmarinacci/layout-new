@@ -172,6 +172,15 @@
     touch-action: auto;
 }
 
+/* The open document's tab panel: canvas toolbar, then the canvas or an asset view.
+   It sits inside <main> so <main> keeps its landmark role. */
+.document-panel {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
 .canvas-toolbar {
     flex: none;
     flex-wrap: wrap;
