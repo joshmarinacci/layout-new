@@ -1,5 +1,6 @@
 import {beforeEach, describe, expect, it, vi} from 'vitest';
 import {EditorStore, emptyDocument} from '../src/model/EditorStore';
+import {DOCUMENT_PREVIEW_MAX_SIZE} from '../src/io/pngDocument';
 
 const mocks = vi.hoisted(() => ({
     download: vi.fn(),
@@ -26,7 +27,7 @@ describe('Save as JSON PNG command', () => {
             finishEditing: vi.fn(),
             workspace: {tabs: [], activeId: ''},
             setWorkspace: vi.fn(),
-            clipboard: {shapes: [], images: [], fonts: []},
+            clipboard: {shapes: [], images: [], fonts: [], photos: []},
             setClipboard: vi.fn(),
             commandPaletteOpen: false,
             setCommandPaletteOpen: vi.fn(),
@@ -54,7 +55,7 @@ describe('Save as JSON PNG command', () => {
         expect(mocks.download).toHaveBeenCalledOnce();
         expect(mocks.download.mock.calls[0][1]).toBe('My drawing.json.png');
         expect(mocks.download.mock.calls[0][0]).toEqual(new Uint8Array([2]));
-        expect(mocks.render).toHaveBeenCalledWith(state.document);
+        expect(mocks.render).toHaveBeenCalledWith(state.document, DOCUMENT_PREVIEW_MAX_SIZE, new Map());
         expect(mocks.encode).toHaveBeenCalledWith(new Uint8Array([1]), state.document);
         expect(setError).toHaveBeenCalledWith('');
     });

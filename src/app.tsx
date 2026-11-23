@@ -3,6 +3,8 @@ import {type CSSProperties, type MouseEvent, useEffect, useEffectEvent, useLayou
 import {isTauri} from '@tauri-apps/api/core';
 import {listen} from '@tauri-apps/api/event';
 import {performNativeTextEdit, textEditFor} from './common/nativeTextEdit';
+import {chooseImageFiles, importPhotoFile} from './io/photoImport';
+import {photoPlacement} from './shapes/photos';
 import {DropdownMenu, Separator} from './ui/DropdownMenu';
 import {CommandPalette} from './common/CommandPalette';
 import {keybindings, matchesKeybinding} from './common/keybindings';
@@ -27,7 +29,7 @@ import {decodeDocumentPng} from './io/pngDocument';
 import {importSvg} from './io/svgImport';
 import {fetchGoogleFont, installDocumentFonts} from './shapes/googleFonts';
 import TreeView from './common/TreeView';
-import type {FontAsset, Shape} from './model/types';
+import type {FontAsset, PhotoAsset, Shape} from './model/types';
 import {IconButton, MenuItem, ToolbarGroup} from './ui/controls';
 import {useThemeSettings} from './ui/theme';
 import '@joshmarinacci/tooltheme/react';
@@ -38,6 +40,8 @@ import {unionBounds} from './editor/camera';
 import './app.css';
 import {
     type ClipboardState,
+    type FileDialogKind,
+    importImageFiles,
     type CommandContext,
     commandRegistry,
     type ImageDialogConfig,
@@ -92,7 +96,7 @@ export default function App() {
     const pageShapes = doc.shapes.filter(shape => shape.pageId === state.selectedPageId);
     const selectedShapes = pageShapes.filter(shape => state.selectedIds.includes(shape.id));
     const file = useRef<HTMLInputElement>(null);
-    const [fileKind, setFileKind] = useState<'json' | 'png' | 'svg'>('json');
+    const [fileKind, setFileKind] = useState<FileDialogKind>('json');
     const paletteFile = useRef<HTMLInputElement>(null);
     const [error, setError] = useState('');
     const [leftPanelVisible, setLeftPanelVisible] = useState(true);
@@ -111,6 +115,26 @@ export default function App() {
     const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
     const [selectedPaletteId, setSelectedPaletteId] = useState<string | null>(null);
     const [vectorId, setVectorId] = useState<string | null>(null);
+    /** The photo shape in crop mode. The crop session is one store transaction. */
+    const [cropId, setCropId] = useState<string | null>(null);
+    const startCrop = (id: string) => {
+        if (store.getSnapshot().transactionActive) return;
+        setVectorId(null);
+        store.beginTransaction('Crop image');
+        setCropId(id);
+    };
+    /** Adds another shape showing an existing photo, in the middle of the view. */
+    const placePhoto = (photo: PhotoAsset) => {
+        store.addPhotoShape(photo, photoPlacement(photo, viewCenter(ctx), viewBounds(ctx)));
+        setPhotoMenu(null);
+    };
+    const finishCrop = (commit: boolean) => {
+        if (store.getSnapshot().transactionActive) {
+            if (commit) store.commitTransaction();
+            else store.cancelTransaction();
+        }
+        setCropId(null);
+    };
     const [pixelEditor, setPixelEditor] = useState<PixelEditorController | null>(null);
     // Leave image and vector editing when the active document or page changes.
     const [editingScope, setEditingScope] = useState({store, pageId: state.selectedPageId});
@@ -136,6 +160,7 @@ export default function App() {
         shapes: [],
         images: [],
         fonts: [],
+        photos: [],
     });
     const [contextMenu, setContextMenu] = useState<{
         x: number;
@@ -156,6 +181,11 @@ export default function App() {
     } | null>(null);
     const [assetsMenu, setAssetsMenu] = useState<{x: number; y: number} | null>(null);
     const [paletteMenu, setPaletteMenu] = useState<{x: number; y: number; paletteId: string} | null>(null);
+    const [photoMenu, setPhotoMenu] = useState<{x: number; y: number; photoId: string} | null>(null);
+    const menuPhoto = photoMenu ? doc.photos.find(item => item.id === photoMenu.photoId) : undefined;
+    const menuPhotoUses = menuPhoto
+        ? doc.shapes.filter(shape => shape.type === 'photo' && shape.components.photo.photoId === menuPhoto.id)
+        : [];
     const [renamePageDialog, setRenamePageDialog] = useState<{
         pageId: string;
         name: string;
@@ -348,6 +378,7 @@ export default function App() {
             setPagesMenu(null);
             setAssetsMenu(null);
             setPaletteMenu(null);
+            setPhotoMenu(null);
         };
         window.addEventListener('pointerdown', close);
         window.addEventListener('blur', close);
@@ -463,6 +494,7 @@ export default function App() {
                         <CommandMenuItem ctx={ctx} commandId="open-local-document" />
                         <CommandMenuItem ctx={ctx} commandId="open-json-document" />
                         <CommandMenuItem ctx={ctx} commandId="import-svg" />
+                        <CommandMenuItem ctx={ctx} commandId="import-image" />
                         <CommandMenuItem ctx={ctx} commandId="open-png-document" />
                         <Separator />
                         <CommandMenuItem ctx={ctx} commandId="save-json-document" />
@@ -495,6 +527,7 @@ export default function App() {
                             <CommandMenuItem ctx={ctx} commandId="new-pixelimage" />
                             <CommandMenuItem ctx={ctx} commandId="new-repeatingimage" />
                             <CommandMenuItem ctx={ctx} commandId="import-png" />
+                            <CommandMenuItem ctx={ctx} commandId="import-image" />
                         </DropdownMenu>
                     )}
                     <DropdownMenu title="Assets">
@@ -680,6 +713,17 @@ export default function App() {
                         })
                     }
                     onRenameImage={(id, name) => store.renamePixelImage(id, name)}
+                    onRenamePhoto={(id, name) => store.renamePhoto(id, name)}
+                    onPhotoContextMenu={(event, photo) => {
+                        event.preventDefault();
+                        setContextMenu(null);
+                        setDocumentMenu(null);
+                        setPageMenu(null);
+                        setPagesMenu(null);
+                        setAssetsMenu(null);
+                        setPaletteMenu(null);
+                        setPhotoMenu({x: event.clientX, y: event.clientY, photoId: photo.id});
+                    }}
                     onSelect={(shape, additive) => {
                         setSelectedAssetId(null);
                         setSelectedPaletteId(null);
@@ -851,6 +895,16 @@ export default function App() {
                                     camera={activeTab.camera}
                                     vectorId={vectorId}
                                     onEditVector={setVectorId}
+                                    cropId={cropId}
+                                    onStartCrop={startCrop}
+                                    onFinishCrop={finishCrop}
+                                    onImportFiles={(files, at) =>
+                                        void importImageFiles(
+                                            ctx,
+                                            files.map(item => ({blob: item, name: item.name})),
+                                            at,
+                                        )
+                                    }
                                     pixelEditor={pixelEditor}
                                     onEditImage={(reference, palettePosition, imageScreenRect) => {
                                         setVectorId(null);
@@ -913,6 +967,23 @@ export default function App() {
                             store={store}
                             documentSelected={documentSelected}
                             onAddGoogleFont={openGoogleFontDialog}
+                            photoActions={{
+                                cropId,
+                                onStartCrop: startCrop,
+                                onFinishCrop: finishCrop,
+                                onReplace: id =>
+                                    void chooseImageFiles(false)
+                                        .then(async ([file]) => {
+                                            if (!file) return;
+                                            store.replacePhoto(id, await importPhotoFile(file.blob, file.name));
+                                            setError('');
+                                        })
+                                        .catch(reason =>
+                                            setError(
+                                                reason instanceof Error ? reason.message : 'Unable to replace image',
+                                            ),
+                                        ),
+                            }}
                         />
                     </aside>
                 </>
@@ -1000,6 +1071,7 @@ export default function App() {
                     <CommandMenuItem ctx={ctx} commandId="new-pixelimage" />
                     <CommandMenuItem ctx={ctx} commandId="new-repeatingimage" />
                     <CommandMenuItem ctx={ctx} commandId="import-png" />
+                    <CommandMenuItem ctx={ctx} commandId="import-image" />
                 </ContextMenu>
             )}
             {pagesMenu && (
@@ -1071,6 +1143,42 @@ export default function App() {
                         </ContextMenu>
                     );
                 })()}
+            {photoMenu && menuPhoto && (
+                <ContextMenu
+                    x={photoMenu.x}
+                    y={photoMenu.y}
+                    label={`${menuPhoto.name} image actions`}
+                    onClose={() => setPhotoMenu(null)}
+                >
+                    <MenuItem
+                        label="Place on Canvas"
+                        disabled={state.transactionActive}
+                        onClick={() => placePhoto(menuPhoto)}
+                    />
+                    <MenuItem
+                        label="Select Uses on This Page"
+                        disabled={!menuPhotoUses.some(shape => shape.pageId === state.selectedPageId)}
+                        onClick={() => {
+                            store.setSelection(
+                                menuPhotoUses
+                                    .filter(shape => shape.pageId === state.selectedPageId)
+                                    .map(shape => shape.id),
+                            );
+                            setPhotoMenu(null);
+                        }}
+                    />
+                    <MenuItem
+                        label="Delete"
+                        data-variant="danger"
+                        disabled={menuPhotoUses.length > 0 || state.transactionActive}
+                        title={menuPhotoUses.length ? 'Remove the shapes that show this image first' : undefined}
+                        onClick={() => {
+                            store.deletePhoto(menuPhoto.id);
+                            setPhotoMenu(null);
+                        }}
+                    />
+                </ContextMenu>
+            )}
             {renamePageDialog && (
                 <EditorDialog title="Rename Page" onClose={() => setRenamePageDialog(null)}>
                     <form

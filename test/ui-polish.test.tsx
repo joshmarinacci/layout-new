@@ -244,6 +244,8 @@ function treeProps() {
         onRenameShape: vi.fn(),
         onRenamePalette: vi.fn(),
         onRenameImage: vi.fn(),
+        onRenamePhoto: vi.fn(),
+        onPhotoContextMenu: vi.fn(),
         onUngroup: vi.fn(),
         onRenameGroup: vi.fn(),
         onSelectGroup: vi.fn(),

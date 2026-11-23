@@ -1,6 +1,6 @@
-import {ChevronDown, ChevronRight, File, FileText, Folder, Layers, Square} from 'lucide-react';
+import {ChevronDown, ChevronRight, File, FileText, Folder, Image, Layers, Square} from 'lucide-react';
 import {Children, type DragEvent, type MouseEvent, type ReactNode, useEffect, useRef, useState} from 'react';
-import type {ColorPalette, DrawDocument, PixelImageData, Shape} from '../model/types';
+import type {ColorPalette, DrawDocument, PhotoAsset, PixelImageData, Shape} from '../model/types';
 
 /** How long a click on a renameable folder waits to see whether it's the start of a double-click. */
 export const DOUBLE_CLICK_DELAY = 250;
@@ -219,6 +219,8 @@ export default function TreeView(props: {
     onRenameShape: (id: string, name: string) => void;
     onRenamePalette: (id: string, name: string) => void;
     onRenameImage: (id: string, name: string) => void;
+    onRenamePhoto: (id: string, name: string) => void;
+    onPhotoContextMenu: (event: MouseEvent<HTMLButtonElement>, photo: PhotoAsset) => void;
     onUngroup: (id: string) => void;
     onRenameGroup: (id: string, name: string) => void;
     onSelectGroup: (ids: string[]) => void;
@@ -427,6 +429,22 @@ export default function TreeView(props: {
                         onRename={name => props.onRenameImage(image.id, name)}
                     />
                 ))}
+                {doc.photos.map(photo => {
+                    const uses = doc.shapes.filter(
+                        shape => shape.type === 'photo' && shape.components.photo.photoId === photo.id,
+                    ).length;
+                    return (
+                        <TreeNode
+                            key={photo.id}
+                            label={`${photo.name} (${photo.width} × ${photo.height}, ${uses === 0 ? 'unused' : uses === 1 ? '1 use' : `${uses} uses`})`}
+                            editValue={photo.name}
+                            depth={2}
+                            icon={<Image aria-hidden="true" />}
+                            onRename={name => props.onRenamePhoto(photo.id, name)}
+                            onContextMenu={event => props.onPhotoContextMenu(event, photo)}
+                        />
+                    );
+                })}
             </TreeNode>
         </ul>
     );

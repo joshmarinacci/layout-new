@@ -82,7 +82,7 @@ function commandContext(store: EditorStore, overrides: Partial<CommandContext> =
         finishEditing: vi.fn(),
         workspace: {tabs: [], activeId: ''},
         setWorkspace: vi.fn(),
-        clipboard: {shapes: [], images: [], fonts: []},
+        clipboard: {shapes: [], images: [], fonts: [], photos: []},
         setClipboard: vi.fn(),
         commandPaletteOpen: false,
         setCommandPaletteOpen: vi.fn(),

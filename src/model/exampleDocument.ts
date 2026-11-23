@@ -63,8 +63,9 @@ export function makeExampleDocument(): DrawDocument {
         },
     };
     return {
-        version: 9,
+        version: 10,
         images: [],
+        photos: [],
         palettes: [],
         fonts: [],
         pages: [{id: 'page_1', name: 'Page 1', groups: []}],

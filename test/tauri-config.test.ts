@@ -13,7 +13,7 @@ const read = (path: string) => readFileSync(join(root, path), 'utf8');
 
 interface TauriConfig {
     build: {devUrl: string; frontendDist: string};
-    app: {windows: {label?: string}[]};
+    app: {windows: {label?: string; dragDropEnabled?: boolean}[]};
 }
 interface Capability {
     windows: string[];
@@ -42,6 +42,11 @@ describe('Tauri configuration', () => {
 
     it('bundles the directory Vite builds into', () => {
         expect(tauriConfig.build.frontendDist).toBe(`../${viteConfig.build?.outDir ?? 'dist'}`);
+    });
+
+    it('lets dropped files reach the page, so images can be dropped onto the canvas', () => {
+        // With Tauri's own file-drop handling on, the web view never sees DOM drop events.
+        for (const window of tauriConfig.app.windows) expect(window.dragDropEnabled).toBe(false);
     });
 
     it('grants the capability to the window the app creates', () => {

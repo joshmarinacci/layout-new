@@ -43,8 +43,9 @@ describe('document PNG metadata', () => {
     it('upgrades version 6 documents to the current version when loading', () => {
         const version6 = {...emptyDocument(), version: 6} as unknown as Record<string, unknown>;
         delete version6.fonts;
+        delete version6.photos;
         const loaded = deserializeDocument(JSON.stringify(version6));
-        expect(loaded.version).toBe(9);
-        expect(JSON.parse(serializeDocument(loaded)).version).toBe(9);
+        expect(loaded.version).toBe(10);
+        expect(JSON.parse(serializeDocument(loaded)).version).toBe(10);
     });
 });
