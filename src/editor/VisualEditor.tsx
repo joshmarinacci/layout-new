@@ -16,6 +16,7 @@ import type {
     CircleLikeComponent,
     PixelImageData,
     PixelImageReferenceComponent,
+    Point,
     Shape,
     VectorNetwork,
 } from '../model/types';
@@ -24,6 +25,8 @@ import {useVectorEditor} from '../shapes/VectorEditor';
 import {drawVector, resizeVector, vectorBounds, vectorHit} from '../shapes/vectorNetworks';
 import {drawTextShape} from '../shapes/text';
 import {installDocumentFonts} from '../shapes/googleFonts';
+import {onPhotoDecoded, photoBitmap} from '../shapes/photos';
+import {drawCropMode, usePhotoCrop} from './usePhotoCrop';
 import {
     type Camera,
     type CameraStore,
@@ -57,6 +60,8 @@ export function selectionBounds(shape: Shape): Bounds {
         case 'rectangle':
             return shape.components.rect.bounds;
         case 'text':
+            return shape.components.rect.bounds;
+        case 'photo':
             return shape.components.rect.bounds;
         case 'oval':
             return shape.components.oval.bounds;
@@ -118,6 +123,10 @@ export default function VisualEditor({
     pixelEditor,
     vectorId,
     onEditVector,
+    cropId,
+    onStartCrop,
+    onFinishCrop,
+    onImportFiles,
 }: {
     store: EditorStore;
     onEditImage: (
@@ -134,6 +143,12 @@ export default function VisualEditor({
     pixelEditor?: PixelEditorController | null;
     vectorId: string | null;
     onEditVector: (id: string | null) => void;
+    /** The photo shape in crop mode, if any. */
+    cropId: string | null;
+    onStartCrop: (id: string) => void;
+    onFinishCrop: (commit: boolean) => void;
+    /** Image files dropped on (with the document point) or pasted into the canvas. */
+    onImportFiles: (files: File[], at?: Point) => void;
 }) {
     const state = useEditorStore(store);
     const pageId = state.selectedPageId;
@@ -145,6 +160,18 @@ export default function VisualEditor({
     );
     const vector = useVectorEditor(store, vectorShape?.type === 'vector' ? vectorShape : undefined, zoom, () =>
         onEditVector(null),
+    );
+    const cropShape = state.document.shapes.find(s => s.id === cropId && s.type === 'photo' && s.pageId === pageId);
+    const cropPhoto =
+        cropShape?.type === 'photo'
+            ? state.document.photos.find(photo => photo.id === cropShape.components.photo.photoId)
+            : undefined;
+    const crop = usePhotoCrop(
+        store,
+        cropShape?.type === 'photo' ? cropShape : undefined,
+        cropPhoto,
+        zoom,
+        onFinishCrop,
     );
     const ref = useRef<HTMLCanvasElement>(null);
     const viewport = useRef<HTMLDivElement>(null);
@@ -223,6 +250,7 @@ export default function VisualEditor({
                 return [image.id, bitmap];
             }),
         );
+        const photos = new Map(state.document.photos.map(photo => [photo.id, photo]));
         ctx.imageSmoothingEnabled = false;
         state.document.shapes
             .filter(shape => shape.pageId === pageId)
@@ -232,6 +260,7 @@ export default function VisualEditor({
                 // Text may paint outside its box, and is cheap to keep.
                 if (
                     shape.type !== 'text' &&
+                    shape.id !== cropId &&
                     !intersects(
                         {x: b.x - margin, y: b.y - margin, width: b.width + margin * 2, height: b.height + margin * 2},
                         visible,
@@ -267,6 +296,23 @@ export default function VisualEditor({
                     ctx.strokeStyle = '#657b83';
                     ctx.lineWidth = 1;
                     ctx.strokeRect(b.x, b.y, b.width, b.height);
+                } else if (shape.type === 'photo') {
+                    const photo = photos.get(shape.components.photo.photoId);
+                    const bitmap = photo ? photoBitmap(photo) : null;
+                    if (photo && shape.id === cropId) drawCropMode(ctx, shape, photo, bitmap, zoom);
+                    else if (bitmap) {
+                        const c = shape.components.photo.crop;
+                        // Photos are scaled smoothly; pixel art (the default here) stays crisp.
+                        ctx.save();
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        ctx.drawImage(bitmap, c.x, c.y, c.width, c.height, b.x, b.y, b.width, b.height);
+                        ctx.restore();
+                    } else {
+                        // Still decoding (or unreadable): a placeholder keeps the shape visible.
+                        ctx.fillStyle = '#8882';
+                        ctx.fillRect(b.x, b.y, b.width, b.height);
+                    }
                 } else if (shape.type === 'repeating-image') {
                     const image = state.document.images.find(item => item.id === shape.components.image.imageId);
                     const bitmap = images.get(shape.components.image.imageId);
@@ -332,7 +378,7 @@ export default function VisualEditor({
                     ctx.strokeStyle = shape.components.stroke.color;
                     if (ctx.lineWidth > 0 && shape.components.stroke.width > 0) ctx.stroke();
                 }
-                if (state.selectedIds.includes(shape.id) && !pixelEditor && !vectorShape) {
+                if (state.selectedIds.includes(shape.id) && !pixelEditor && !vectorShape && shape.id !== cropId) {
                     ctx.strokeStyle = 'yellow';
                     ctx.lineWidth = 2 / zoom;
                     ctx.strokeRect(b.x, b.y, b.width, b.height);
@@ -347,6 +393,7 @@ export default function VisualEditor({
                         (shape.type === 'vector' ||
                             shape.type === 'rectangle' ||
                             shape.type === 'text' ||
+                            shape.type === 'photo' ||
                             shape.type === 'pixel-image' ||
                             shape.type === 'repeating-image')
                     ) {
@@ -402,6 +449,8 @@ export default function VisualEditor({
     // so redraw after every render; frames coalesce to one per animation frame.
     useEffect(() => scheduleDraw());
     useEffect(() => camera.subscribe(() => scheduleDraw()), [camera]);
+    // Photos decode asynchronously; redraw when one is ready.
+    useEffect(() => onPhotoDecoded(() => scheduleDraw()), []);
     useEffect(() => {
         const element = viewport.current;
         if (!element) return;
@@ -511,6 +560,24 @@ export default function VisualEditor({
                 tabIndex={0}
                 ref={ref}
                 style={{touchAction: 'none'}}
+                onDragOver={event => {
+                    if (event.dataTransfer.types.includes('Files')) {
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = 'copy';
+                    }
+                }}
+                onDrop={event => {
+                    const files = [...event.dataTransfer.files].filter(file => file.type.startsWith('image/'));
+                    if (!files.length) return;
+                    event.preventDefault();
+                    onImportFiles(files, point(event));
+                }}
+                onPaste={event => {
+                    const files = [...event.clipboardData.files].filter(file => file.type.startsWith('image/'));
+                    if (!files.length) return;
+                    event.preventDefault();
+                    onImportFiles(files);
+                }}
                 onContextMenu={event => {
                     event.preventDefault();
                     if (vectorShape) return;
@@ -559,6 +626,13 @@ export default function VisualEditor({
                         onEditVector(shape.id);
                         return;
                     }
+                    if (shape?.type === 'photo') {
+                        finish(false);
+                        if (cropId) return;
+                        store.select(shape.id);
+                        onStartCrop(shape.id);
+                        return;
+                    }
                     if (shape?.type === 'pixel-image') {
                         finish(false);
                         const view = viewport.current;
@@ -580,11 +654,19 @@ export default function VisualEditor({
                     }
                 }}
                 onKeyDown={event => {
+                    if (crop.active) {
+                        if (crop.keyDown(event)) event.preventDefault();
+                        return;
+                    }
                     if (event.key === 'Enter' && !vectorShape) {
                         const s = state.document.shapes.find(s => s.id === state.selectedId);
                         if (s?.type === 'vector') {
                             event.preventDefault();
                             onEditVector(s.id);
+                        }
+                        if (s?.type === 'photo' && !store.getSnapshot().transactionActive) {
+                            event.preventDefault();
+                            onStartCrop(s.id);
                         }
                     }
                     if (event.key === 'Escape') {
@@ -624,6 +706,11 @@ export default function VisualEditor({
                     if (vectorShape) {
                         vector.pointerDown(point(event), event.pointerId, event.shiftKey);
                         if (vector.active(event.pointerId)) event.currentTarget.setPointerCapture(event.pointerId);
+                        return;
+                    }
+                    if (crop.active) {
+                        if (crop.pointerDown(point(event), event.pointerId) && crop.isDragging(event.pointerId))
+                            event.currentTarget.setPointerCapture(event.pointerId);
                         return;
                     }
                     if (pixelEditor) {
@@ -673,6 +760,7 @@ export default function VisualEditor({
                         (selected?.type === 'vector' ||
                             selected?.type === 'rectangle' ||
                             selected?.type === 'text' ||
+                            selected?.type === 'photo' ||
                             selected?.type === 'pixel-image' ||
                             selected?.type === 'repeating-image') &&
                         selectedBounds &&
@@ -756,6 +844,10 @@ export default function VisualEditor({
                         vector.pointerMove(point(event), event.pointerId);
                         return;
                     }
+                    if (crop.isDragging(event.pointerId)) {
+                        crop.pointerMove(point(event), event.pointerId);
+                        return;
+                    }
                     if (pixelEditor?.isActive(event.pointerId)) {
                         const pointOnCanvas = point(event);
                         const shape = state.document.shapes.find(item => item.id === pixelTargetId.current);
@@ -821,6 +913,7 @@ export default function VisualEditor({
                             if (
                                 shape.type === 'rectangle' ||
                                 shape.type === 'text' ||
+                                shape.type === 'photo' ||
                                 shape.type === 'pixel-image' ||
                                 shape.type === 'repeating-image'
                             )
@@ -830,14 +923,25 @@ export default function VisualEditor({
                                               bounds,
                                               dx,
                                               dy,
-                                              (shape.type === 'pixel-image' || shape.type === 'repeating-image') &&
-                                                  event.shiftKey,
+                                              // Photos keep their proportions unless Shift is held;
+                                              // pixel art is the reverse.
+                                              shape.type === 'photo'
+                                                  ? !event.shiftKey
+                                                  : (shape.type === 'pixel-image' ||
+                                                        shape.type === 'repeating-image') &&
+                                                        event.shiftKey,
                                           )
                                         : {...bounds, x: bounds.x + dx, y: bounds.y + dy};
                         }),
                     );
                 }}
                 onPointerUp={event => {
+                    if (crop.isDragging(event.pointerId)) {
+                        crop.pointerUp(event.pointerId);
+                        if (ref.current?.hasPointerCapture(event.pointerId))
+                            ref.current.releasePointerCapture(event.pointerId);
+                        return;
+                    }
                     if (vector.active(event.pointerId)) {
                         vector.pointerUp(point(event), event.pointerId);
                         if (ref.current?.hasPointerCapture(event.pointerId))
@@ -895,16 +999,19 @@ export default function VisualEditor({
                         ref.current.releasePointerCapture(event.pointerId);
                 }}
                 onPointerCancel={() => {
+                    crop.cancelDrag();
                     pixelEditor?.cancel();
                     vector.cancel();
                     finish(true);
                 }}
                 onLostPointerCapture={() => {
+                    crop.cancelDrag();
                     pixelEditor?.cancel();
                     vector.cancel();
                     finish(true);
                 }}
                 onBlur={() => {
+                    crop.cancelDrag();
                     pixelEditor?.cancel();
                     vector.cancel();
                     finish(true);

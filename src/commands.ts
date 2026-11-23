@@ -1,7 +1,7 @@
 import {type EditorSnapshot, EditorStore, emptyDocument} from './model/EditorStore';
 import {makeCircle, makeRect, makeText} from './model/reducer';
 
-import type {Bounds, Document as DrawingDocument, PixelImageData, FontAsset, Shape} from './model/types';
+import type {Bounds, Document as DrawingDocument, PhotoAsset, PixelImageData, FontAsset, Shape} from './model/types';
 import {makeVector} from './shapes/vectorNetworks';
 import type {PixelEditorController} from './shapes/PixelImageEditor';
 import {isTauri} from '@tauri-apps/api/core';
@@ -9,10 +9,14 @@ import {readSavedDocuments, type SavedDocumentRecord, writeSavedDocuments} from 
 import {type ShapeAlignment, shapeAlignmentOffsets, translateShape} from './model/shapeAlignment';
 import {CommandRegistry} from './common/CommandRegistry';
 import {CameraStore, centeredBounds, type Point, visibleBounds} from './editor/camera';
+import {chooseImageFiles, type ChosenFile, importPhotoFile} from './io/photoImport';
+import {loadPhotoBitmaps, photoPlacement} from './shapes/photos';
+import {withoutUnusedPhotos} from './io/serialization';
 import type {Theme} from './ui/theme';
 import {type LucideIcon, Redo2Icon, Undo2Icon} from 'lucide-react';
 import {newPalette, pico8Colors} from './shapes/palettes';
 import {
+    DOCUMENT_PREVIEW_MAX_SIZE,
     downloadDocumentPng,
     encodeDocumentPng,
     openDocumentPngWithTauri,
@@ -36,10 +40,17 @@ export type Workspace = {
     tabs: DocumentTab[];
     activeId: string;
 };
+/** The asset selected in the Assets tree: a pixel image, palette, font or photo. */
+export type AssetSelection = {kind: 'image' | 'palette' | 'font' | 'photo'; id: string} | null;
+
+/** What the shared hidden file input is choosing a file for. */
+export type FileDialogKind = 'json' | 'png' | 'svg';
+
 export type ClipboardState = {
     shapes: Shape[];
     images: PixelImageData[];
     fonts: FontAsset[];
+    photos: PhotoAsset[];
 };
 export type RenamePageState = {
     pageId: string;
@@ -83,11 +94,10 @@ export type CommandContext = {
     setVectorId: Setter<string | null>;
     setPixelEditor: Setter<PixelEditorController | null>;
     setError: Setter<string>;
-    setFileDialogOpen: (open: boolean, kind?: 'json' | 'png' | 'svg') => void;
+    setFileDialogOpen: (open: boolean, kind?: FileDialogKind) => void;
     setTheme: (theme: Theme) => void;
     setThemeSettingsOpen: Setter<boolean>;
-    setSelectedAssetId: Setter<string | null>;
-    setSelectedPaletteId: Setter<string | null>;
+    setSelectedAsset: Setter<AssetSelection>;
     openPaletteImport: () => void;
 };
 
@@ -107,6 +117,7 @@ export type CommandId =
     | 'export-page-png'
     | 'export-page-svg'
     | 'import-svg'
+    | 'import-image'
     | 'export-json'
     | 'new-page'
     | 'rename-page'
@@ -334,8 +345,7 @@ export const NewColorPaletteCommand: Command = {
                 draft.palettes.push(palette);
             });
             ctx.store.select(null);
-            ctx.setSelectedAssetId(null);
-            ctx.setSelectedPaletteId(palette.id);
+            ctx.setSelectedAsset({kind: 'palette', id: palette.id});
             ctx.setError('');
         } catch (error) {
             ctx.setError(error instanceof Error ? error.message : 'Unable to create palette');
@@ -374,6 +384,47 @@ export const ImportSVGCommand: Command = {
         })().catch(error => ctx.setError(error instanceof Error ? error.message : 'Unable to import SVG'));
     },
 };
+/**
+ * Adds image files to the canvas as photos: at `at` (a drop point) or else the
+ * middle of the view, cascading when there are several. Each file is its own undo step.
+ */
+export async function importImageFiles(
+    ctx: Pick<CommandContext, 'store' | 'state' | 'workspace' | 'setError'>,
+    files: readonly ChosenFile[],
+    at?: Point,
+) {
+    const errors: string[] = [];
+    let placed = 0;
+    for (const {blob, name} of files) {
+        try {
+            const photo = await importPhotoFile(blob, name);
+            const center = at ?? viewCenter(ctx);
+            const offset = placed * 24;
+            ctx.store.addPhotoShape(
+                photo,
+                photoPlacement(photo, {x: center.x + offset, y: center.y + offset}, viewBounds(ctx)),
+            );
+            placed++;
+        } catch (error) {
+            errors.push(error instanceof Error ? error.message : `Unable to import ${name}`);
+        }
+    }
+    ctx.setError(errors.join(' · '));
+}
+
+export const ImportImageCommand: Command = {
+    id: 'import-image',
+    title: 'Import Image…',
+    description: 'Add JPEG, PNG, WebP or GIF images to the canvas',
+    keywords: ['import', 'image', 'photo', 'picture', 'jpeg', 'jpg', 'png', 'webp', 'gif'],
+    enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => {
+        void chooseImageFiles(true)
+            .then(files => importImageFiles(ctx, files))
+            .catch(error => ctx.setError(error instanceof Error ? error.message : 'Unable to import image'));
+    },
+};
+
 export const OpenPngDocumentCommand: Command = {
     id: 'open-png-document',
     title: 'Open Draw PNG',
@@ -409,7 +460,12 @@ export const SavePngDocumentCommand: Command = {
                         .filter((shape): shape is Extract<Shape, {type: 'text'}> => shape.type === 'text')
                         .map(shape => waitForTextFont(ctx.state.document.fonts, shape.components.text)),
                 );
-                const preview = renderDocumentPreview(ctx.state.document);
+                const document = withoutUnusedPhotos(ctx.state.document);
+                const preview = renderDocumentPreview(
+                    document,
+                    DOCUMENT_PREVIEW_MAX_SIZE,
+                    await loadPhotoBitmaps(document.photos),
+                );
                 const png = encodeDocumentPng(preview, ctx.state.document);
                 const safeTitle =
                     ctx.state.document.title
@@ -496,8 +552,7 @@ export const NewPico8PaletteCommand: Command = {
         ctx.store.edit('Create PICO-8 palette', draft => {
             draft.palettes.push(palette);
         });
-        ctx.setSelectedAssetId(null);
-        ctx.setSelectedPaletteId(palette.id);
+        ctx.setSelectedAsset({kind: 'palette', id: palette.id});
         ctx.store.select(null);
     },
 };
@@ -586,6 +641,12 @@ export const SelectionCopyCommand: Command = {
             shapes: structuredClone(shapes),
             images: structuredClone(ctx.store.getSnapshot().document.images.filter(image => ids.has(image.id))),
             fonts: structuredClone(ctx.store.getSnapshot().document.fonts.filter(font => fontIds.has(font.id))),
+            // Photos are immutable, so the clipboard can share them rather than clone megabytes.
+            photos: ctx.store
+                .getSnapshot()
+                .document.photos.filter(photo =>
+                    shapes.some(shape => shape.type === 'photo' && shape.components.photo.photoId === photo.id),
+                ),
         });
     },
 };
@@ -606,7 +667,13 @@ export const SelectionPasteCommand: Command = {
     enabled: ctx => ctx.clipboard.shapes.length > 0 && !ctx.state.transactionActive,
     run: ctx => {
         if (ctx.clipboard.shapes.length)
-            ctx.store.pasteShapes(ctx.clipboard.shapes, ctx.clipboard.images, ctx.clipboard.fonts, viewBounds(ctx));
+            ctx.store.pasteShapes(
+                ctx.clipboard.shapes,
+                ctx.clipboard.images,
+                ctx.clipboard.fonts,
+                viewBounds(ctx),
+                ctx.clipboard.photos,
+            );
     },
 };
 
@@ -872,6 +939,7 @@ export const allCommands: Command[] = [
     NewRepeatingImageCommand,
     ImportPNGCommand,
     ImportSVGCommand,
+    ImportImageCommand,
     NewColorPaletteCommand,
     ImportColorPaletteCommand,
     NewPico8PaletteCommand,

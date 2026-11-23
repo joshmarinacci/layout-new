@@ -1,6 +1,17 @@
+import {useRef} from 'react';
 import {PropertySection} from '../ui/controls';
 import type {Draft} from 'immer';
-import type {ColorPalette, DrawDocument, FontAsset, Shape, ShapeComponent, TextComponent} from '../model/types';
+import type {
+    Bounds,
+    ColorPalette,
+    DrawDocument,
+    FontAsset,
+    PhotoShape,
+    Shape,
+    ShapeComponent,
+    TextComponent,
+} from '../model/types';
+import {actualSize, cropTo, resetCrop} from '../shapes/photos';
 import type {EditorStore} from '../model/EditorStore';
 import {useEditorStore} from '../model/useEditorStore';
 import {NameField} from './NameField';
@@ -28,13 +39,21 @@ function Field({
     palettes?: ColorPalette[];
     update: (value: string) => void;
 }) {
-    const onFocus = () => store.beginTransaction(title);
+    // Join a transaction that is already open (such as crop mode) instead of starting
+    // one; only the field that started a transaction commits or cancels it.
+    const owns = useRef(false);
+    const onFocus = () => {
+        owns.current = !store.getSnapshot().transactionActive;
+        if (owns.current) store.beginTransaction(title);
+    };
     const onBlur = () => {
-        if (store.getSnapshot().transactionActive) store.commitTransaction();
+        if (owns.current && store.getSnapshot().transactionActive) store.commitTransaction();
+        owns.current = false;
     };
     const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
         if (event.key === 'Escape') {
-            store.cancelTransaction();
+            if (owns.current && store.getSnapshot().transactionActive) store.cancelTransaction();
+            owns.current = false;
             event.currentTarget.blur();
         }
         if (event.key === 'Enter') event.currentTarget.blur();
@@ -157,11 +176,13 @@ export default function PropSheet({
     store,
     documentSelected = false,
     onAddGoogleFont,
+    photoActions = NO_PHOTO_ACTIONS,
 }: {
     store: EditorStore;
     /** The document row is selected: show document properties when no shapes are selected. */
     documentSelected?: boolean;
     onAddGoogleFont: () => void;
+    photoActions?: PhotoActions;
 }) {
     const state = useEditorStore(store);
     const shapes = state.document.shapes.filter(shape => state.selectedIds.includes(shape.id));
@@ -234,6 +255,7 @@ export default function PropSheet({
                                 stroke: 'Stroke',
                                 cornerRadius: 'Corners',
                                 image: 'Image source',
+                                photo: 'Image',
                                 pattern: 'Pattern',
                                 text: 'Text',
                             } as Record<string, string>
@@ -331,6 +353,9 @@ export default function PropSheet({
                                 name === 'width' || name === 'height',
                             ),
                         )}
+                    {comp.kind === 'photo-reference' && shapes.length === 1 && shapes[0].type === 'photo' && (
+                        <PhotoSection store={store} shape={shapes[0]} actions={photoActions} />
+                    )}
                     {comp.kind === 'pattern-size-component' &&
                         (['width', 'height'] as const).map(name =>
                             field(
@@ -510,5 +535,81 @@ export default function PropSheet({
                 </PropertySection>
             ))}
         </div>
+    );
+}
+
+export interface PhotoActions {
+    /** The photo shape in crop mode, if any. */
+    cropId: string | null;
+    onStartCrop: (id: string) => void;
+    onFinishCrop: (commit: boolean) => void;
+    onReplace: (id: string) => void;
+}
+
+const NO_PHOTO_ACTIONS: PhotoActions = {
+    cropId: null,
+    onStartCrop: () => {},
+    onFinishCrop: () => {},
+    onReplace: () => {},
+};
+
+/** Crop and image controls for one photo shape. Crop values are in the photo's own pixels. */
+function PhotoSection({store, shape, actions}: {store: EditorStore; shape: PhotoShape; actions: PhotoActions}) {
+    const state = useEditorStore(store);
+    const photo = state.document.photos.find(item => item.id === shape.components.photo.photoId);
+    if (!photo) return <p>This image's data is missing.</p>;
+    const placement = {rect: shape.components.rect.bounds, crop: shape.components.photo.crop};
+    const place = (label: string, next: {rect: Bounds; crop: Bounds}) => {
+        const apply = () =>
+            store.updateShape(shape.id, draft => {
+                if (draft.type !== 'photo') return;
+                draft.components.rect.bounds = next.rect;
+                draft.components.photo.crop = next.crop;
+            });
+        // Inside crop mode the edit joins the crop session; otherwise it is its own undo step.
+        if (store.getSnapshot().transactionActive) apply();
+        else {
+            store.beginTransaction(label);
+            apply();
+            store.commitTransaction();
+        }
+    };
+    const cropping = actions.cropId === shape.id;
+    const round = (value: number) => Math.round(value * 100) / 100;
+    return (
+        <>
+            <p className="photo-info">
+                {photo.name} · {photo.width} × {photo.height} px
+            </p>
+            {(['x', 'y', 'width', 'height'] as const).map(name => (
+                <Field
+                    key={name}
+                    store={store}
+                    title={`Crop ${name}`}
+                    value={round(placement.crop[name])}
+                    nonnegative
+                    update={value =>
+                        place('Crop image', cropTo(placement, photo, {...placement.crop, [name]: Number(value)}))
+                    }
+                />
+            ))}
+            <div className="photo-actions">
+                {cropping ? (
+                    <>
+                        <button onClick={() => actions.onFinishCrop(true)}>Apply Crop</button>
+                        <button onClick={() => actions.onFinishCrop(false)}>Cancel</button>
+                    </>
+                ) : (
+                    <button disabled={state.transactionActive} onClick={() => actions.onStartCrop(shape.id)}>
+                        Crop…
+                    </button>
+                )}
+                <button onClick={() => place('Reset crop', resetCrop(placement, photo))}>Reset Crop</button>
+                <button onClick={() => place('Actual size', actualSize(placement))}>Actual Size</button>
+                <button disabled={state.transactionActive} onClick={() => actions.onReplace(shape.id)}>
+                    Replace Image…
+                </button>
+            </div>
+        </>
     );
 }

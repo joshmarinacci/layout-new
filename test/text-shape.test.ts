@@ -53,7 +53,7 @@ describe('text shapes', () => {
             pages: [{id: 'page_1', name: 'Page 1', groups: []}],
         };
         const loaded = deserializeDocument(JSON.stringify(legacy));
-        expect(loaded.version).toBe(9);
+        expect(loaded.version).toBe(10);
         expect(loaded.fonts).toEqual([]);
     });
 

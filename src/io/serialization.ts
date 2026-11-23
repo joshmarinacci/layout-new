@@ -1,6 +1,6 @@
 import {deriveFaces} from '../shapes/vectorNetworks';
 import {normalizeColor} from '../shapes/palettes';
-import type {Document} from '../model/types';
+import {PHOTO_MIME_TYPES, type Document} from '../model/types';
 
 type ObjectValue = Record<string, unknown>;
 function object(value: unknown): ObjectValue {
@@ -30,22 +30,94 @@ function component(value: unknown, kind: string, fields: string[]) {
     if (c.kind !== kind) throw new Error(`Expected ${kind}`);
     return c;
 }
-function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9): asserts value is Document {
+/** Photo assets are capped at 4096 px when imported (see io/photoImport.ts). */
+export const MAX_PHOTO_SIZE = 4096;
+const MAX_PHOTO_DATA_LENGTH = 100_000_000;
+const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
+/**
+ * Photos already checked. Documents are validated on every edit (each pointer move
+ * of a drag), and Immer keeps unchanged photos as the same objects, so this avoids
+ * rescanning megabytes of base64 each time. Assets are frozen, so a checked one stays valid.
+ */
+const validPhotos = new WeakSet<object>();
+
+function validatePhotos(value: unknown): Map<string, ObjectValue> {
+    if (!Array.isArray(value)) throw new Error('Expected photos array');
+    const photos = new Map<string, ObjectValue>();
+    for (const item of value) {
+        const photo = object(item);
+        if (validPhotos.has(photo)) {
+            if (photos.has(photo.id as string)) throw new Error('Photo IDs must be nonempty and unique');
+            photos.set(photo.id as string, photo);
+            continue;
+        }
+        keys(photo, ['id', 'name', 'originalName', 'mimeType', 'width', 'height', 'data']);
+        text(photo.id);
+        text(photo.name);
+        if (photo.originalName !== null) text(photo.originalName);
+        text(photo.data);
+        if (!photo.id || photos.has(photo.id as string)) throw new Error('Photo IDs must be nonempty and unique');
+        if (!(PHOTO_MIME_TYPES as readonly unknown[]).includes(photo.mimeType))
+            throw new Error('Unsupported photo type');
+        for (const size of [photo.width, photo.height])
+            if (typeof size !== 'number' || !Number.isInteger(size) || size < 1 || size > MAX_PHOTO_SIZE)
+                throw new Error('Invalid photo dimensions');
+        const data = photo.data as string;
+        if (!data || data.length > MAX_PHOTO_DATA_LENGTH || data.length % 4 !== 0 || !BASE64.test(data))
+            throw new Error('Invalid photo data');
+        photos.set(photo.id as string, photo);
+        if (Object.isFrozen(photo)) validPhotos.add(photo);
+    }
+    return photos;
+}
+
+function validatePhotoShape(c: ObjectValue, photos: Map<string, ObjectValue>) {
+    keys(c, ['photo', 'rect']);
+    const reference = component(c.photo, 'photo-reference', ['photoId', 'crop']);
+    const photo = photos.get(reference.photoId as string);
+    if (!photo) throw new Error('Missing photo data');
+    const crop = object(reference.crop);
+    keys(crop, ['x', 'y', 'width', 'height']);
+    for (const field of ['x', 'y', 'width', 'height']) number(crop[field]);
+    const {x, y, width, height} = crop as unknown as {x: number; y: number; width: number; height: number};
+    // Crops come from floating-point maths, so allow for rounding at the photo's edges.
+    const slack = 1e-6;
+    if (
+        x < -slack ||
+        y < -slack ||
+        width <= 0 ||
+        height <= 0 ||
+        x + width > (photo.width as number) + slack ||
+        y + height > (photo.height as number) + slack
+    )
+        throw new Error('Photo crop must be inside its photo');
+    const bounds = object(component(c.rect, 'resizable-bounds-component', ['bounds']).bounds);
+    keys(bounds, ['x', 'y', 'width', 'height']);
+    number(bounds.x);
+    number(bounds.y);
+    number(bounds.width, true);
+    number(bounds.height, true);
+}
+
+function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10): asserts value is Document {
     const doc = object(value);
     keys(
         doc,
-        version >= 8
-            ? ['version', 'title', 'shapes', 'images', 'palettes', 'pages', 'fonts']
-            : version >= 6
-              ? ['version', 'title', 'shapes', 'images', 'palettes', 'pages']
-              : version >= 4
-                ? ['version', 'title', 'shapes', 'images', 'pages']
-                : ['version', 'title', 'shapes', 'images'],
+        version >= 10
+            ? ['version', 'title', 'shapes', 'images', 'photos', 'palettes', 'pages', 'fonts']
+            : version >= 8
+              ? ['version', 'title', 'shapes', 'images', 'palettes', 'pages', 'fonts']
+              : version >= 6
+                ? ['version', 'title', 'shapes', 'images', 'palettes', 'pages']
+                : version >= 4
+                  ? ['version', 'title', 'shapes', 'images', 'pages']
+                  : ['version', 'title', 'shapes', 'images'],
     );
     if (doc.version !== version) throw new Error('Unsupported document version');
     text(doc.title);
     if (!Array.isArray(doc.shapes)) throw new Error('Expected shapes array');
     if (!Array.isArray(doc.images)) throw new Error('Expected images array');
+    const photos = version >= 10 ? validatePhotos(doc.photos) : new Map<string, ObjectValue>();
     if (version >= 6) {
         if (!Array.isArray(doc.palettes)) throw new Error('Expected palettes array');
         const paletteIds = new Set<string>();
@@ -177,6 +249,7 @@ function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
         if (s.type === 'repeating-image' && version < 4)
             throw new Error('Repeating image shapes require document version 4');
         if (s.type === 'text' && version < 8) throw new Error('Text shapes require document version 8');
+        if (s.type === 'photo' && version < 10) throw new Error('Photo shapes require document version 10');
         const expectedShapeKeys =
             version >= 4 ? ['id', 'name', 'type', 'components', 'pageId'] : ['id', 'name', 'type', 'components'];
         if (version < 4 && Object.hasOwn(s, 'pageId')) expectedShapeKeys.push('pageId');
@@ -198,6 +271,10 @@ function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
             const stroke = component(c.stroke, 'stroke-component', ['width', 'color']);
             text(stroke.color);
             number(stroke.width, true);
+            continue;
+        }
+        if (s.type === 'photo') {
+            validatePhotoShape(c, photos);
             continue;
         }
         if (s.type === 'pixel-image' || s.type === 'repeating-image') {
@@ -339,10 +416,24 @@ function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
     }
 }
 export function validateDocument(value: unknown): asserts value is Document {
-    validateSchema(value, 9);
+    validateSchema(value, 10);
 }
+
+/**
+ * Photos no shape uses any more. The live document keeps them so undo can bring a
+ * deleted photo back, but they are large, so saves, exports and copies leave them out.
+ */
+export function withoutUnusedPhotos(document: Document): Document {
+    const used = new Set(
+        document.shapes.flatMap(shape => (shape.type === 'photo' ? [shape.components.photo.photoId] : [])),
+    );
+    return document.photos.every(photo => used.has(photo.id))
+        ? document
+        : {...document, photos: document.photos.filter(photo => used.has(photo.id))};
+}
+
 export function serializeDocument(document: Document): string {
-    const normalized = structuredClone(document) as Document;
+    const normalized = structuredClone(withoutUnusedPhotos(document)) as Document;
     const legacyPage = normalized.pages?.[0] ?? {id: 'page_1', name: 'Page 1', groups: []};
     if (!normalized.pages?.length) normalized.pages = [legacyPage];
     normalized.shapes.forEach(shape => {
@@ -429,6 +520,10 @@ export function deserializeDocument(json: string): Document {
                     : shape,
             ),
         };
+    }
+    if (source.version === 9) {
+        validateSchema(source, 9);
+        source = {...source, version: 10, photos: []};
     }
     validateDocument(source);
     for (const shape of source.shapes)

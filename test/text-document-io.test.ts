@@ -109,11 +109,12 @@ describe('text documents: JSON export and import', () => {
     it('migrates version 8 text to top vertical alignment and keeps font references', () => {
         const version8 = serializedObject(textDocument()) as unknown as Document;
         (version8 as unknown as Record<string, unknown>).version = 8;
+        delete (version8 as Partial<Document>).photos;
         for (const shape of version8.shapes)
             if (shape.type === 'text')
                 delete (shape.components.text as Partial<TextShape['components']['text']>).verticalAlign;
         const loaded = deserializeDocument(JSON.stringify(version8));
-        expect(loaded.version).toBe(9);
+        expect(loaded.version).toBe(10);
         expect(loaded.fonts).toEqual([lobster, inter]);
         expect(
             loaded.shapes.map(shape =>
@@ -130,6 +131,7 @@ describe('text documents: JSON export and import', () => {
     it('rejects version 8 documents that already contain a vertical alignment field', () => {
         const raw = serializedObject(textDocument());
         raw.version = 8;
+        delete raw.photos;
         expect(() => deserializeDocument(JSON.stringify(raw))).toThrow(/Expected fields/);
     });
 
@@ -137,6 +139,7 @@ describe('text documents: JSON export and import', () => {
         const raw = serializedObject(textDocument());
         raw.version = 7;
         delete raw.fonts;
+        delete raw.photos;
         expect(() => deserializeDocument(JSON.stringify(raw))).toThrow(/Text shapes require document version 8/);
     });
 });

@@ -82,7 +82,7 @@ function commandContext(store: EditorStore, overrides: Partial<CommandContext> =
         finishEditing: vi.fn(),
         workspace: {tabs: [], activeId: ''},
         setWorkspace: vi.fn(),
-        clipboard: {shapes: [], images: [], fonts: []},
+        clipboard: {shapes: [], images: [], fonts: [], photos: []},
         setClipboard: vi.fn(),
         commandPaletteOpen: false,
         setCommandPaletteOpen: vi.fn(),
@@ -102,8 +102,7 @@ function commandContext(store: EditorStore, overrides: Partial<CommandContext> =
         setFileDialogOpen: vi.fn(),
         setTheme: vi.fn(),
         setThemeSettingsOpen: vi.fn(),
-        setSelectedAssetId: vi.fn(),
-        setSelectedPaletteId: vi.fn(),
+        setSelectedAsset: vi.fn(),
         openPaletteImport: vi.fn(),
         ...overrides,
     };

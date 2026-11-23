@@ -95,7 +95,7 @@ test.describe('menus', () => {
         await page.keyboard.press('ArrowDown'); // skips the disabled "Delete page"
         expect(await focusedText(page)).toBe('Export Page as PNG');
         await page.keyboard.press('End');
-        expect(await focusedText(page)).toBe('New Image from PNG');
+        expect(await focusedText(page)).toBe('Import Image…');
         await page.keyboard.press('Escape');
         await expect(menu).toBeHidden();
     });

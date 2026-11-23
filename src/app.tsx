@@ -3,6 +3,9 @@ import {type CSSProperties, type MouseEvent, useEffect, useEffectEvent, useLayou
 import {isTauri} from '@tauri-apps/api/core';
 import {listen} from '@tauri-apps/api/event';
 import {performNativeTextEdit, textEditFor} from './common/nativeTextEdit';
+import {AssetProperties, resolveAsset} from './common/AssetProperties';
+import {chooseImageFiles, importPhotoFile} from './io/photoImport';
+import {photoPlacement} from './shapes/photos';
 import {DropdownMenu, Separator} from './ui/DropdownMenu';
 import {CommandPalette} from './common/CommandPalette';
 import {keybindings, matchesKeybinding} from './common/keybindings';
@@ -27,7 +30,7 @@ import {decodeDocumentPng} from './io/pngDocument';
 import {importSvg} from './io/svgImport';
 import {fetchGoogleFont, installDocumentFonts} from './shapes/googleFonts';
 import TreeView from './common/TreeView';
-import type {FontAsset, Shape} from './model/types';
+import type {FontAsset, PhotoAsset, Shape} from './model/types';
 import {IconButton, MenuItem, ToolbarGroup} from './ui/controls';
 import {useThemeSettings} from './ui/theme';
 import '@joshmarinacci/tooltheme/react';
@@ -37,7 +40,10 @@ import {CanvasZoomControls} from './editor/CanvasZoomControls';
 import {unionBounds} from './editor/camera';
 import './app.css';
 import {
+    type AssetSelection,
     type ClipboardState,
+    type FileDialogKind,
+    importImageFiles,
     type CommandContext,
     commandRegistry,
     type ImageDialogConfig,
@@ -82,8 +88,7 @@ export default function App() {
     const activateTab = (id: string) => {
         if (id === workspace.activeId) return;
         finishEditing();
-        setSelectedAssetId(null);
-        setSelectedPaletteId(null);
+        setSelectedAsset(null);
         setWorkspace(current => ({...current, activeId: id}));
     };
     const state = useEditorStore(store);
@@ -92,7 +97,7 @@ export default function App() {
     const pageShapes = doc.shapes.filter(shape => shape.pageId === state.selectedPageId);
     const selectedShapes = pageShapes.filter(shape => state.selectedIds.includes(shape.id));
     const file = useRef<HTMLInputElement>(null);
-    const [fileKind, setFileKind] = useState<'json' | 'png' | 'svg'>('json');
+    const [fileKind, setFileKind] = useState<FileDialogKind>('json');
     const paletteFile = useRef<HTMLInputElement>(null);
     const [error, setError] = useState('');
     const [leftPanelVisible, setLeftPanelVisible] = useState(true);
@@ -108,9 +113,29 @@ export default function App() {
     useEffect(() => {
         installDocumentFonts(googleFontPreview ? [...doc.fonts, googleFontPreview] : doc.fonts);
     }, [doc.fonts, googleFontPreview]);
-    const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
-    const [selectedPaletteId, setSelectedPaletteId] = useState<string | null>(null);
+    /** The asset selected in the Assets tree, shown in the Properties panel. */
+    const [selectedAsset, setSelectedAsset] = useState<AssetSelection>(null);
     const [vectorId, setVectorId] = useState<string | null>(null);
+    /** The photo shape in crop mode. The crop session is one store transaction. */
+    const [cropId, setCropId] = useState<string | null>(null);
+    const startCrop = (id: string) => {
+        if (store.getSnapshot().transactionActive) return;
+        setVectorId(null);
+        store.beginTransaction('Crop image');
+        setCropId(id);
+    };
+    /** Adds another shape showing an existing photo, in the middle of the view. */
+    const placePhoto = (photo: PhotoAsset) => {
+        store.addPhotoShape(photo, photoPlacement(photo, viewCenter(ctx), viewBounds(ctx)));
+        setPhotoMenu(null);
+    };
+    const finishCrop = (commit: boolean) => {
+        if (store.getSnapshot().transactionActive) {
+            if (commit) store.commitTransaction();
+            else store.cancelTransaction();
+        }
+        setCropId(null);
+    };
     const [pixelEditor, setPixelEditor] = useState<PixelEditorController | null>(null);
     // Leave image and vector editing when the active document or page changes.
     const [editingScope, setEditingScope] = useState({store, pageId: state.selectedPageId});
@@ -124,11 +149,18 @@ export default function App() {
         setPixelEditor(null);
     }
     // Stop vector editing once its shape is deleted or deselected, or an asset is opened.
-    if (documentSelected && (state.selectedIds.length || selectedAssetId || selectedPaletteId))
-        setDocumentSelected(false);
+    if (documentSelected && (state.selectedIds.length || selectedAsset)) setDocumentSelected(false);
+    // Selecting a shape (fonts and photos leave the canvas visible) or deleting the
+    // asset, including by undo, ends the asset selection.
+    if (
+        selectedAsset &&
+        (!resolveAsset(doc, selectedAsset) ||
+            (state.selectedIds.length && (selectedAsset.kind === 'font' || selectedAsset.kind === 'photo')))
+    )
+        setSelectedAsset(null);
     if (
         vectorId &&
-        (!doc.shapes.some(s => s.id === vectorId) || !state.selectedIds.includes(vectorId) || selectedAssetId)
+        (!doc.shapes.some(s => s.id === vectorId) || !state.selectedIds.includes(vectorId) || selectedAsset)
     )
         setVectorId(null);
     const [repeatingImageDialog, setRepeatingImageDialog] = useState(false);
@@ -136,6 +168,7 @@ export default function App() {
         shapes: [],
         images: [],
         fonts: [],
+        photos: [],
     });
     const [contextMenu, setContextMenu] = useState<{
         x: number;
@@ -156,6 +189,11 @@ export default function App() {
     } | null>(null);
     const [assetsMenu, setAssetsMenu] = useState<{x: number; y: number} | null>(null);
     const [paletteMenu, setPaletteMenu] = useState<{x: number; y: number; paletteId: string} | null>(null);
+    const [photoMenu, setPhotoMenu] = useState<{x: number; y: number; photoId: string} | null>(null);
+    const menuPhoto = photoMenu ? doc.photos.find(item => item.id === photoMenu.photoId) : undefined;
+    const menuPhotoUses = menuPhoto
+        ? doc.shapes.filter(shape => shape.type === 'photo' && shape.components.photo.photoId === menuPhoto.id)
+        : [];
     const [renamePageDialog, setRenamePageDialog] = useState<{
         pageId: string;
         name: string;
@@ -164,8 +202,12 @@ export default function App() {
     const [savedDocumentsOpen, setSavedDocumentsOpen] = useState(false);
     const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
     const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
-    const selectedAsset = doc.images.find(image => image.id === selectedAssetId);
-    const selectedPalette = doc.palettes.find(palette => palette.id === selectedPaletteId);
+    const selectedImage =
+        selectedAsset?.kind === 'image' ? doc.images.find(image => image.id === selectedAsset.id) : undefined;
+    const selectedPalette =
+        selectedAsset?.kind === 'palette' ? doc.palettes.find(palette => palette.id === selectedAsset.id) : undefined;
+    /** Pixel images and palettes open an editor in place of the canvas. */
+    const assetEditor = !!(selectedImage || selectedPalette);
     const ctx: CommandContext = {
         store,
         state,
@@ -202,8 +244,7 @@ export default function App() {
         },
         setTheme: theme.setMode,
         setThemeSettingsOpen,
-        setSelectedAssetId,
-        setSelectedPaletteId,
+        setSelectedAsset,
         openPaletteImport: () => paletteFile.current?.click(),
     };
     const onWindowKeyDown = useEffectEvent((event: KeyboardEvent) => {
@@ -348,6 +389,7 @@ export default function App() {
             setPagesMenu(null);
             setAssetsMenu(null);
             setPaletteMenu(null);
+            setPhotoMenu(null);
         };
         window.addEventListener('pointerdown', close);
         window.addEventListener('blur', close);
@@ -393,7 +435,7 @@ export default function App() {
         if (id === NATIVE_SELECT_ALL) return;
         if (store.getSnapshot().transactionActive) return;
         if (
-            (selectedAssetId || selectedPaletteId) &&
+            assetEditor &&
             [
                 'new-vector-network',
                 'new-rectangle',
@@ -405,7 +447,7 @@ export default function App() {
             ].includes(id)
         )
             return;
-        if ((selectedAssetId || selectedPaletteId) && id.startsWith('align-')) return;
+        if (assetEditor && id.startsWith('align-')) return;
         if (id === 'new-repeatingimage' && !doc.images.length) return;
         if (id === NATIVE_ADD_GOOGLE_FONT) {
             openGoogleFontDialog();
@@ -442,7 +484,7 @@ export default function App() {
         isTauri() && 'tauri-mode',
         !leftPanelVisible && 'hide-left',
         !rightPanelVisible && 'hide-right',
-        (selectedAsset || selectedPalette) && 'asset-mode',
+        assetEditor && 'asset-mode',
     ]
         .filter(Boolean)
         .join(' ');
@@ -463,6 +505,7 @@ export default function App() {
                         <CommandMenuItem ctx={ctx} commandId="open-local-document" />
                         <CommandMenuItem ctx={ctx} commandId="open-json-document" />
                         <CommandMenuItem ctx={ctx} commandId="import-svg" />
+                        <CommandMenuItem ctx={ctx} commandId="import-image" />
                         <CommandMenuItem ctx={ctx} commandId="open-png-document" />
                         <Separator />
                         <CommandMenuItem ctx={ctx} commandId="save-json-document" />
@@ -486,7 +529,7 @@ export default function App() {
                         <CommandMenuItem ctx={ctx} commandId="rename-page" />
                         <CommandMenuItem ctx={ctx} commandId="delete-page" />
                     </DropdownMenu>
-                    {!selectedAsset && !selectedPalette && (
+                    {!assetEditor && (
                         <DropdownMenu title="Shape">
                             <CommandMenuItem ctx={ctx} commandId="new-vector-network" />
                             <CommandMenuItem ctx={ctx} commandId="new-rectangle" />
@@ -495,6 +538,7 @@ export default function App() {
                             <CommandMenuItem ctx={ctx} commandId="new-pixelimage" />
                             <CommandMenuItem ctx={ctx} commandId="new-repeatingimage" />
                             <CommandMenuItem ctx={ctx} commandId="import-png" />
+                            <CommandMenuItem ctx={ctx} commandId="import-image" />
                         </DropdownMenu>
                     )}
                     <DropdownMenu title="Assets">
@@ -505,7 +549,7 @@ export default function App() {
                         <Separator />
                         <CommandMenuItem ctx={ctx} commandId="new-pico8-palette" />
                     </DropdownMenu>
-                    {!selectedAsset && !selectedPalette && selectedShapes.length > 1 && (
+                    {!assetEditor && selectedShapes.length > 1 && (
                         <DropdownMenu title="Align">
                             <CommandMenuItem ctx={ctx} commandId="align-left" />
                             <CommandMenuItem ctx={ctx} commandId="align-center" />
@@ -642,8 +686,7 @@ export default function App() {
                                 draft.palettes.push(palette);
                             });
                             store.select(null);
-                            setSelectedAssetId(null);
-                            setSelectedPaletteId(palette.id);
+                            setSelectedAsset({kind: 'palette', id: palette.id});
                             setError('');
                         } catch (error) {
                             setError(error instanceof Error ? error.message : 'Unable to import palette');
@@ -653,8 +696,7 @@ export default function App() {
                 <TreeView
                     document={doc}
                     selectedIds={state.selectedIds}
-                    selectedAssetId={selectedAssetId}
-                    selectedPaletteId={selectedPaletteId}
+                    selectedAsset={selectedAsset}
                     onDocumentContextMenu={event => {
                         event.preventDefault();
                         setContextMenu(null);
@@ -666,8 +708,7 @@ export default function App() {
                     onSelectDocument={() => {
                         finishEditing();
                         store.select(null);
-                        setSelectedAssetId(null);
-                        setSelectedPaletteId(null);
+                        setSelectedAsset(null);
                         setDocumentSelected(true);
                     }}
                     onRenameDocument={name => store.setTitle(name)}
@@ -680,23 +721,43 @@ export default function App() {
                         })
                     }
                     onRenameImage={(id, name) => store.renamePixelImage(id, name)}
+                    onRenamePhoto={(id, name) => store.renamePhoto(id, name)}
+                    onPhotoContextMenu={(event, photo) => {
+                        event.preventDefault();
+                        setContextMenu(null);
+                        setDocumentMenu(null);
+                        setPageMenu(null);
+                        setPagesMenu(null);
+                        setAssetsMenu(null);
+                        setPaletteMenu(null);
+                        setPhotoMenu({x: event.clientX, y: event.clientY, photoId: photo.id});
+                    }}
                     onSelect={(shape, additive) => {
-                        setSelectedAssetId(null);
-                        setSelectedPaletteId(null);
+                        setSelectedAsset(null);
                         if (additive) store.toggleSelection(shape.id);
                         else store.select(shape.id);
+                    }}
+                    onSelectFont={font => {
+                        finishEditing();
+                        store.select(null);
+                        setDocumentSelected(false);
+                        setSelectedAsset({kind: 'font', id: font.id});
+                    }}
+                    onSelectPhoto={photo => {
+                        finishEditing();
+                        store.select(null);
+                        setDocumentSelected(false);
+                        setSelectedAsset({kind: 'photo', id: photo.id});
                     }}
                     onSelectAsset={image => {
                         finishEditing();
                         store.select(null);
-                        setSelectedAssetId(image.id);
-                        setSelectedPaletteId(null);
+                        setSelectedAsset({kind: 'image', id: image.id});
                     }}
                     onSelectPalette={palette => {
                         finishEditing();
                         store.select(null);
-                        setSelectedAssetId(null);
-                        setSelectedPaletteId(palette.id);
+                        setSelectedAsset({kind: 'palette', id: palette.id});
                     }}
                     onPaletteContextMenu={(event, palette) => {
                         event.preventDefault();
@@ -710,8 +771,7 @@ export default function App() {
                     onShapeContextMenu={(event, shape) => showShapeContextMenu(event, shape)}
                     selectedPageId={state.selectedPageId}
                     onSelectPage={id => {
-                        setSelectedAssetId(null);
-                        setSelectedPaletteId(null);
+                        setSelectedAsset(null);
                         setDocumentSelected(false);
                         store.selectPage(id);
                     }}
@@ -751,17 +811,16 @@ export default function App() {
                     aria-labelledby={`tab-${activeTab.id}`}
                 >
                     <Toolbar className="canvas-toolbar" label="Canvas tools" key={activeTab.id}>
-                        {(selectedAsset || selectedPalette) && (
+                        {assetEditor && (
                             <button
                                 onClick={() => {
-                                    setSelectedAssetId(null);
-                                    setSelectedPaletteId(null);
+                                    setSelectedAsset(null);
                                 }}
                             >
                                 Back to canvas
                             </button>
                         )}
-                        {!selectedAsset && !selectedPalette && (
+                        {!assetEditor && (
                             <CanvasZoomControls
                                 camera={activeTab.camera}
                                 pageId={state.selectedPageId}
@@ -777,47 +836,41 @@ export default function App() {
                                 }
                             />
                         )}
-                        {!selectedAsset &&
-                            !selectedPalette &&
-                            selectedShapes.length === 1 &&
-                            selected?.type === 'vector' && (
+                        {!assetEditor && selectedShapes.length === 1 && selected?.type === 'vector' && (
+                            <button
+                                disabled={state.transactionActive}
+                                onClick={() => {
+                                    setImageDialog(null);
+                                    setPixelEditor(null);
+                                    setVectorId(selected.id);
+                                }}
+                            >
+                                Edit Vector
+                            </button>
+                        )}
+                        {!assetEditor && selectedShapes.length === 1 && selected?.type === 'pixel-image' && (
+                            <>
                                 <button
                                     disabled={state.transactionActive}
-                                    onClick={() => {
-                                        setImageDialog(null);
-                                        setPixelEditor(null);
-                                        setVectorId(selected.id);
-                                    }}
+                                    onClick={() =>
+                                        setImageDialog({
+                                            kind: 'edit',
+                                            imageId: selected.components.image.imageId,
+                                            source: selected.components.image.source,
+                                        })
+                                    }
                                 >
-                                    Edit Vector
+                                    Edit Pixels
                                 </button>
-                            )}
-                        {!selectedAsset &&
-                            !selectedPalette &&
-                            selectedShapes.length === 1 &&
-                            selected?.type === 'pixel-image' && (
-                                <>
-                                    <button
-                                        disabled={state.transactionActive}
-                                        onClick={() =>
-                                            setImageDialog({
-                                                kind: 'edit',
-                                                imageId: selected.components.image.imageId,
-                                                source: selected.components.image.source,
-                                            })
-                                        }
-                                    >
-                                        Edit Pixels
-                                    </button>
-                                    <button
-                                        disabled={state.transactionActive}
-                                        onClick={() => store.select(store.linkImageShape(selected.id, viewBounds(ctx)))}
-                                    >
-                                        Linked Copy
-                                    </button>
-                                </>
-                            )}
-                        {!selectedAsset && !selectedPalette && (
+                                <button
+                                    disabled={state.transactionActive}
+                                    onClick={() => store.select(store.linkImageShape(selected.id, viewBounds(ctx)))}
+                                >
+                                    Linked Copy
+                                </button>
+                            </>
+                        )}
+                        {!assetEditor && (
                             <IconButton
                                 label="Delete selected shapes"
                                 icon={Trash2}
@@ -831,16 +884,12 @@ export default function App() {
                             <PaletteAssetView
                                 store={store}
                                 palette={selectedPalette}
-                                onBack={() => setSelectedPaletteId(null)}
+                                onBack={() => setSelectedAsset(null)}
                             />
                         </div>
-                    ) : selectedAsset ? (
+                    ) : selectedImage ? (
                         <div className="asset-center">
-                            <PixelAssetView
-                                store={store}
-                                image={selectedAsset}
-                                onBack={() => setSelectedAssetId(null)}
-                            />
+                            <PixelAssetView store={store} image={selectedImage} onBack={() => setSelectedAsset(null)} />
                         </div>
                     ) : (
                         <>
@@ -851,6 +900,16 @@ export default function App() {
                                     camera={activeTab.camera}
                                     vectorId={vectorId}
                                     onEditVector={setVectorId}
+                                    cropId={cropId}
+                                    onStartCrop={startCrop}
+                                    onFinishCrop={finishCrop}
+                                    onImportFiles={(files, at) =>
+                                        void importImageFiles(
+                                            ctx,
+                                            files.map(item => ({blob: item, name: item.name})),
+                                            at,
+                                        )
+                                    }
                                     pixelEditor={pixelEditor}
                                     onEditImage={(reference, palettePosition, imageScreenRect) => {
                                         setVectorId(null);
@@ -893,30 +952,50 @@ export default function App() {
                     )}
                 </div>
             </main>
-            {!selectedAsset && !selectedPalette && (
-                <>
-                    {rightPanelVisible && (
-                        <PanelResizer
-                            side="right"
-                            label="Resize properties panel"
-                            width={panelWidths.right}
-                            target={documentEditor}
-                            onCommit={width => setPanelWidth('right', width)}
-                        />
-                    )}
-                    <aside className="inspector" aria-labelledby="inspector-heading">
-                        <h2 id="inspector-heading" className="panel-heading">
-                            Properties
-                        </h2>
-                        <PropSheet
-                            key={activeTab.id}
-                            store={store}
-                            documentSelected={documentSelected}
-                            onAddGoogleFont={openGoogleFontDialog}
-                        />
-                    </aside>
-                </>
+            {rightPanelVisible && (
+                <PanelResizer
+                    side="right"
+                    label="Resize properties panel"
+                    width={panelWidths.right}
+                    target={documentEditor}
+                    onCommit={width => setPanelWidth('right', width)}
+                />
             )}
+            <aside className="inspector" aria-labelledby="inspector-heading">
+                <h2 id="inspector-heading" className="panel-heading">
+                    Properties
+                </h2>
+                {selectedAsset && resolveAsset(doc, selectedAsset) ? (
+                    <AssetProperties
+                        key={activeTab.id}
+                        store={store}
+                        selection={selectedAsset}
+                        actions={{onPlacePhoto: placePhoto, onDeleted: () => setSelectedAsset(null)}}
+                    />
+                ) : (
+                    <PropSheet
+                        key={activeTab.id}
+                        store={store}
+                        documentSelected={documentSelected}
+                        onAddGoogleFont={openGoogleFontDialog}
+                        photoActions={{
+                            cropId,
+                            onStartCrop: startCrop,
+                            onFinishCrop: finishCrop,
+                            onReplace: id =>
+                                void chooseImageFiles(false)
+                                    .then(async ([file]) => {
+                                        if (!file) return;
+                                        store.replacePhoto(id, await importPhotoFile(file.blob, file.name));
+                                        setError('');
+                                    })
+                                    .catch(reason =>
+                                        setError(reason instanceof Error ? reason.message : 'Unable to replace image'),
+                                    ),
+                        }}
+                    />
+                )}
+            </aside>
             <footer className="statusbar">
                 <IconButton
                     label={leftPanelVisible ? 'Hide tree panel' : 'Show tree panel'}
@@ -1000,6 +1079,7 @@ export default function App() {
                     <CommandMenuItem ctx={ctx} commandId="new-pixelimage" />
                     <CommandMenuItem ctx={ctx} commandId="new-repeatingimage" />
                     <CommandMenuItem ctx={ctx} commandId="import-png" />
+                    <CommandMenuItem ctx={ctx} commandId="import-image" />
                 </ContextMenu>
             )}
             {pagesMenu && (
@@ -1064,13 +1144,50 @@ export default function App() {
                                         store.edit('Delete palette', draft => {
                                             draft.palettes = draft.palettes.filter(item => item.id !== palette.id);
                                         });
-                                        if (selectedPaletteId === palette.id) setSelectedPaletteId(null);
+                                        if (selectedAsset?.kind === 'palette' && selectedAsset.id === palette.id)
+                                            setSelectedAsset(null);
                                     }
                                 }}
                             />
                         </ContextMenu>
                     );
                 })()}
+            {photoMenu && menuPhoto && (
+                <ContextMenu
+                    x={photoMenu.x}
+                    y={photoMenu.y}
+                    label={`${menuPhoto.name} image actions`}
+                    onClose={() => setPhotoMenu(null)}
+                >
+                    <MenuItem
+                        label="Place on Canvas"
+                        disabled={state.transactionActive}
+                        onClick={() => placePhoto(menuPhoto)}
+                    />
+                    <MenuItem
+                        label="Select Uses on This Page"
+                        disabled={!menuPhotoUses.some(shape => shape.pageId === state.selectedPageId)}
+                        onClick={() => {
+                            store.setSelection(
+                                menuPhotoUses
+                                    .filter(shape => shape.pageId === state.selectedPageId)
+                                    .map(shape => shape.id),
+                            );
+                            setPhotoMenu(null);
+                        }}
+                    />
+                    <MenuItem
+                        label="Delete"
+                        data-variant="danger"
+                        disabled={menuPhotoUses.length > 0 || state.transactionActive}
+                        title={menuPhotoUses.length ? 'Remove the shapes that show this image first' : undefined}
+                        onClick={() => {
+                            store.deletePhoto(menuPhoto.id);
+                            setPhotoMenu(null);
+                        }}
+                    />
+                </ContextMenu>
+            )}
             {renamePageDialog && (
                 <EditorDialog title="Rename Page" onClose={() => setRenamePageDialog(null)}>
                     <form

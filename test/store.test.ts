@@ -204,6 +204,7 @@ describe('serialization', () => {
         expect(Object.keys(JSON.parse(store.toJSON()))).toEqual([
             'version',
             'images',
+            'photos',
             'palettes',
             'fonts',
             'pages',
@@ -217,6 +218,7 @@ describe('serialization', () => {
         const old = {...makeExampleDocument(), version: 5} as Record<string, unknown>;
         delete old.palettes;
         delete old.fonts;
+        delete old.photos;
         expect(deserializeDocument(JSON.stringify(old)).palettes).toEqual([]);
     });
     it.each(['{', 'null', '{"version":1,"title":"x","shapes":[]}', '{"version":0,"title":"x","shapes":[{}]}'])(

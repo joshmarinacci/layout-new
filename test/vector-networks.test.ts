@@ -317,7 +317,8 @@ describe('vector documents', () => {
         const old = {...emptyDocument(), version: 4};
         delete (old as Partial<typeof old>).palettes;
         delete (old as Partial<typeof old>).fonts;
-        expect(deserializeDocument(JSON.stringify(old)).version).toBe(9);
+        delete (old as Partial<typeof old>).photos;
+        expect(deserializeDocument(JSON.stringify(old)).version).toBe(10);
         const {store} = fixture();
         const corruptions: ((s: VectorShape) => unknown)[] = [
             s => (s.components.network.segments[0].a = 'missing'),

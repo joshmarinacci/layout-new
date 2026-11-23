@@ -8,8 +8,7 @@ function context() {
     return {
         store,
         state: store.getSnapshot(),
-        setSelectedAssetId: () => {},
-        setSelectedPaletteId: () => {},
+        setSelectedAsset: () => {},
     } as unknown as CommandContext;
 }
 

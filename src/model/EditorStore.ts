@@ -2,7 +2,8 @@ import {applyPatches, type Draft, enablePatches, freeze, type Patch, produceWith
 import {makeImageShape, makePixelImage} from '../shapes/pixelImages';
 import {convertImportedPixels, type DecodedPixels, type TileSize} from '../io/pngImport';
 import {deserializeDocument, serializeDocument, validateDocument} from '../io/serialization';
-import type {Bounds, Document, FontAsset, PixelImageData, Shape, VectorNetwork, VectorShape} from './types';
+import type {Bounds, Document, FontAsset, PhotoAsset, PixelImageData, Shape, VectorNetwork, VectorShape} from './types';
+import {makePhotoShape, wholePhoto} from '../shapes/photos';
 import {bringShapesIntoView, centerShapesAt} from './shapeAlignment';
 import {centeredBounds, type Point} from '../editor/camera';
 import {reconcileRegions} from '../shapes/vectorNetworks';
@@ -26,8 +27,9 @@ export interface EditorSnapshot {
 }
 
 export const emptyDocument = (): Document => ({
-    version: 9,
+    version: 10,
     images: [],
+    photos: [],
     palettes: [],
     fonts: [],
     title: 'Untitled',
@@ -353,7 +355,8 @@ export class EditorStore {
                 const bounds = copy.components.oval.bounds;
                 bounds.x += 20;
                 bounds.y += 20;
-            } else if (copy.type === 'text') {
+            } else if (copy.type === 'text' || copy.type === 'photo') {
+                // Photo copies keep sharing their photo asset; only pixel art gets its own copy.
                 copy.components.rect.bounds.x += 20;
                 copy.components.rect.bounds.y += 20;
             }
@@ -382,8 +385,21 @@ export class EditorStore {
         images: readonly PixelImageData[],
         fonts: readonly FontAsset[] = [],
         view?: Bounds,
+        photos: readonly PhotoAsset[] = [],
     ) {
         this.requireIdle();
+        // Photos keep their IDs, so pasting into the document they came from (or pasting
+        // twice) reuses the one stored photo instead of adding another copy of it.
+        const photoIds = new Set(
+            shapes.flatMap(shape => (shape.type === 'photo' ? [shape.components.photo.photoId] : [])),
+        );
+        const photoCopies = [...photoIds]
+            .filter(id => !this.document.photos.some(photo => photo.id === id))
+            .map(id => {
+                const photo = photos.find(item => item.id === id);
+                if (!photo) throw new Error('Clipboard is missing a photo');
+                return structuredClone(photo);
+            });
         const referencedImageIds = new Set(
             shapes
                 .filter(
@@ -449,12 +465,58 @@ export class EditorStore {
         if (!copies.length) return [];
         if (view) bringShapesIntoView(copies, view);
         this.edit('Paste shapes', draft => {
+            draft.photos.push(...photoCopies);
             draft.images.push(...imageCopies);
             draft.fonts.push(...fontCopies);
             draft.shapes.push(...copies);
         });
         this.setSelection(copies.map(shape => shape.id));
         return copies.map(shape => shape.id);
+    }
+
+    /** Adds a shape showing `photo` at `bounds`, adding the photo itself if the document lacks it. */
+    addPhotoShape(photo: PhotoAsset, bounds: Bounds, name?: string) {
+        this.requireIdle();
+        const shape = makePhotoShape(photo, bounds, name);
+        shape.pageId = this.selectedPageId;
+        const isNew = !this.document.photos.some(item => item.id === photo.id);
+        this.edit(isNew ? 'Import image' : 'Place image', draft => {
+            if (isNew) draft.photos.push(structuredClone(photo));
+            draft.shapes.push(shape);
+        });
+        this.setSelection([shape.id]);
+        return shape.id;
+    }
+
+    /** Swaps the photo a shape shows, keeping its position and width and showing the whole new photo. */
+    replacePhoto(shapeId: string, photo: PhotoAsset) {
+        this.requireIdle();
+        const isNew = !this.document.photos.some(item => item.id === photo.id);
+        this.edit('Replace image', draft => {
+            const shape = draft.shapes.find(item => item.id === shapeId);
+            if (shape?.type !== 'photo') throw new Error('Expected a photo shape');
+            if (isNew) draft.photos.push(structuredClone(photo));
+            const bounds = shape.components.rect.bounds;
+            bounds.height = (bounds.width * photo.height) / photo.width;
+            shape.components.photo = {kind: 'photo-reference', photoId: photo.id, crop: wholePhoto(photo)};
+        });
+    }
+
+    renamePhoto(id: string, name: string) {
+        this.edit('Rename image', draft => {
+            const photo = draft.photos.find(item => item.id === id);
+            if (!photo) throw new Error('Unknown photo');
+            photo.name = name;
+        });
+    }
+
+    /** Removes a photo from the document's assets; only allowed once no shape shows it. */
+    deletePhoto(id: string) {
+        if (this.document.shapes.some(shape => shape.type === 'photo' && shape.components.photo.photoId === id))
+            throw new Error('This image is still used on the canvas');
+        this.edit('Delete image', draft => {
+            draft.photos = draft.photos.filter(photo => photo.id !== id);
+        });
     }
 
     updateShape(id: string, recipe: (shape: Draft<Shape>) => void) {
@@ -626,6 +688,8 @@ export class EditorStore {
             if (JSON.stringify(transaction.before.pages) !== JSON.stringify(final.pages)) draft.pages = final.pages;
             if (JSON.stringify(transaction.before.palettes) !== JSON.stringify(final.palettes))
                 draft.palettes = final.palettes;
+            // Photos never change in place, so comparing the arrays by identity is enough.
+            if (transaction.before.photos !== final.photos) draft.photos = final.photos;
             draft.images.length = final.images.length;
             final.images.forEach((image, i) => {
                 if (JSON.stringify(transaction.before.images[i]) !== JSON.stringify(image)) draft.images[i] = image;

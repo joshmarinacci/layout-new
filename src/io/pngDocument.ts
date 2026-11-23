@@ -142,12 +142,40 @@ function shapeBounds(shape: Shape) {
             return shape.components.oval.bounds;
         case 'pixel-image':
         case 'repeating-image':
+        case 'photo':
             return shape.components.rect.bounds;
     }
 }
 
-function renderShape(ctx: CanvasRenderingContext2D, shape: Shape, document: Document) {
+function renderShape(
+    ctx: CanvasRenderingContext2D,
+    shape: Shape,
+    document: Document,
+    photos: ReadonlyMap<string, CanvasImageSource>,
+) {
     const bounds = shapeBounds(shape);
+    if (shape.type === 'photo') {
+        const bitmap = photos.get(shape.components.photo.photoId);
+        const crop = shape.components.photo.crop;
+        if (bitmap) {
+            ctx.save();
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(
+                bitmap,
+                crop.x,
+                crop.y,
+                crop.width,
+                crop.height,
+                bounds.x,
+                bounds.y,
+                bounds.width,
+                bounds.height,
+            );
+            ctx.restore();
+        }
+        return;
+    }
     if (shape.type === 'text') {
         drawTextShape(ctx, shape, document.fonts);
         return;
@@ -269,7 +297,15 @@ function renderShape(ctx: CanvasRenderingContext2D, shape: Shape, document: Docu
     }
 }
 
-export function renderDocumentPreview(document: Document, maxSize = DOCUMENT_PREVIEW_MAX_SIZE): Uint8Array {
+/**
+ * Draws the first page as a PNG thumbnail. Drawing is synchronous, so photos must
+ * be decoded beforehand (see loadPhotoBitmaps); any missing from `photos` are left out.
+ */
+export function renderDocumentPreview(
+    document: Document,
+    maxSize = DOCUMENT_PREVIEW_MAX_SIZE,
+    photos: ReadonlyMap<string, CanvasImageSource> = new Map(),
+): Uint8Array {
     const page = document.pages[0];
     if (!page) throw new Error('Document must contain at least one page');
     const shapes = document.shapes.filter(shape => shape.pageId === page.id);
@@ -291,7 +327,7 @@ export function renderDocumentPreview(document: Document, maxSize = DOCUMENT_PRE
     ctx.translate(border, border);
     ctx.scale(scale, scale);
     ctx.translate(-area.x, -area.y);
-    shapes.forEach(shape => renderShape(ctx, shape, document));
+    shapes.forEach(shape => renderShape(ctx, shape, document, photos));
     ctx.restore();
     ctx.strokeStyle = '#888888';
     ctx.lineWidth = 1;

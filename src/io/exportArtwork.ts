@@ -4,6 +4,7 @@ import {spanControls, vectorBounds} from '../shapes/vectorNetworks';
 import {layoutText} from '../shapes/text';
 import {fontFamilyFor, waitForTextFont} from '../shapes/googleFonts';
 import {unionBounds} from '../editor/camera';
+import {photoDataUrl, photoRect} from '../shapes/photos';
 
 export type ArtworkFormat = 'png' | 'svg';
 
@@ -37,8 +38,23 @@ function bounds(shape: Shape): Bounds {
             return shape.components.oval.bounds;
         case 'pixel-image':
         case 'repeating-image':
+        case 'photo':
             return shape.components.rect.bounds;
     }
+}
+
+const photoDefId = (photoId: string) => `photo-${photoId}`;
+
+/** Each photo once, at its own pixel size; shapes then show it with <use>, scaled and clipped to their crop. */
+function photoDefs(doc: Document, shapes: readonly Shape[]): string {
+    const used = new Set(shapes.flatMap(shape => (shape.type === 'photo' ? [shape.components.photo.photoId] : [])));
+    const images = doc.photos
+        .filter(photo => used.has(photo.id))
+        .map(
+            photo =>
+                `<image id="${esc(photoDefId(photo.id))}" width="${photo.width}" height="${photo.height}" preserveAspectRatio="none" href="${photoDataUrl(photo)}"/>`,
+        );
+    return images.length ? `<defs>${images.join('')}</defs>` : '';
 }
 
 function pixelRuns(image: PixelImageData, source: Bounds, dest: Bounds): string {
@@ -114,6 +130,14 @@ function shapeSvg(shape: Shape, doc: Document, index: number): string {
             })
             .join(' ');
         return `<g transform="translate(${n.origin.x} ${n.origin.y})">${paths}<path d="${lines}" fill="none" stroke="${esc(stroke.color)}" stroke-width="${stroke.width}" stroke-linecap="round" stroke-linejoin="round"/></g>`;
+    }
+    if (shape.type === 'photo') {
+        const photo = doc.photos.find(item => item.id === shape.components.photo.photoId);
+        if (!photo) return '';
+        const b = shape.components.rect.bounds;
+        const full = photoRect({rect: b, crop: shape.components.photo.crop}, photo);
+        const id = `photo-clip-${index}`;
+        return `<defs><clipPath id="${id}"><rect x="${b.x}" y="${b.y}" width="${b.width}" height="${b.height}"/></clipPath></defs><g clip-path="url(#${id})"><use href="#${esc(photoDefId(photo.id))}" transform="translate(${full.x} ${full.y}) scale(${full.width / photo.width} ${full.height / photo.height})"/></g>`;
     }
     if (shape.type === 'pixel-image' || shape.type === 'repeating-image') {
         const image = doc.images.find(item => item.id === shape.components.image.imageId);
@@ -195,7 +219,11 @@ export function artworkSvg(doc: Document, shapes: readonly Shape[], pageSized = 
         .filter(font => usedFontIds.has(font.id))
         .map(font => `<style>${font.css.replaceAll('&', '&amp;').replaceAll('<', '&lt;')}</style>`)
         .join('');
-    const body = styles + background + shapes.map((shape, index) => shapeSvg(shape, doc, index)).join('');
+    const body =
+        styles +
+        photoDefs(doc, shapes) +
+        background +
+        shapes.map((shape, index) => shapeSvg(shape, doc, index)).join('');
     return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="${view.width}" height="${view.height}" viewBox="${view.x} ${view.y} ${view.width} ${view.height}">${body}</svg>`;
 }
 

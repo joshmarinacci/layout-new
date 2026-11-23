@@ -40,14 +40,23 @@ export interface GradientAsset {
     stops: GradientStop[];
 }
 
-export interface ImageAsset {
+/** The image formats a photo asset can hold; anything else is converted on import. */
+export const PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
+export type PhotoMimeType = (typeof PHOTO_MIME_TYPES)[number];
+
+/**
+ * A photo or other ordinary bitmap, stored once per document however many shapes
+ * show it. `data` is the encoded file (base64, without a `data:` prefix), already
+ * upright (EXIF orientation applied) and no larger than 4096 px on its longest side.
+ */
+export interface PhotoAsset {
     id: string;
-    kind: 'image';
     name: string;
-    mimeType: string;
-    dataUrl: string;
+    originalName: string | null;
+    mimeType: PhotoMimeType;
     width: number;
     height: number;
+    data: string;
 }
 
 export interface PaletteColor {
@@ -188,6 +197,21 @@ export interface RepeatingImageShape extends BaseShape {
     };
 }
 
+export interface PhotoReferenceComponent {
+    kind: 'photo-reference';
+    photoId: string;
+    /** The visible part of the photo, in its pixels; the whole photo when uncropped. */
+    crop: Bounds;
+}
+
+export interface PhotoShape extends BaseShape {
+    type: 'photo';
+    components: {
+        photo: PhotoReferenceComponent;
+        rect: ResizableBoundsComponent;
+    };
+}
+
 export interface TextComponent {
     kind: 'text-component';
     text: string;
@@ -212,7 +236,14 @@ export interface TextShape extends BaseShape {
 /* ========== document ======== */
 
 export type Shape =
-    VectorShape | RectangleShape | CircleShape | OvalShape | PixelImageShape | RepeatingImageShape | TextShape;
+    | VectorShape
+    | RectangleShape
+    | CircleShape
+    | OvalShape
+    | PixelImageShape
+    | RepeatingImageShape
+    | TextShape
+    | PhotoShape;
 
 export interface ShapeGroup {
     id: string;
@@ -227,10 +258,11 @@ export interface Page {
 }
 
 export interface Document {
-    version: 9;
+    version: 10;
     title: string;
     shapes: Shape[];
     images: PixelImageData[];
+    photos: PhotoAsset[];
     palettes: ColorPalette[];
     fonts: FontAsset[];
     pages: Page[];
