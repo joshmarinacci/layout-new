@@ -7,7 +7,7 @@
   "type": "module",
   "main": "index.js",
   "dependencies": {
-    "@joshmarinacci/tooltheme": "^0.1.1",
+    "@joshmarinacci/tooltheme": "^0.1.2",
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-dialog": "^2.8.3",
     "@tauri-apps/plugin-fs": "^2.7.1",
