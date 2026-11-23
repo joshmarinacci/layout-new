@@ -44,6 +44,24 @@ export function zoomAt(camera: Camera, zoom: number, anchor: Point): Camera {
     return {x: pinned.x - anchor.x / next, y: pinned.y - anchor.y / next, zoom: next};
 }
 
+/**
+ * Chromium turns a trackpad pinch into wheel events with `ctrlKey` set and
+ * `deltaY = -100 · ln(scale change)`, so this rate makes the content follow the
+ * fingers exactly. A mouse wheel with Ctrl held sends much bigger deltas (about
+ * 100 per notch), so each event is capped to keep those steps to ~1.65×.
+ */
+const PINCH_RATE = 0.01;
+const PINCH_MAX_DELTA = 50;
+/** ⌘+scroll (a two-finger trackpad scroll or a mouse wheel) zooms more gently. */
+const SCROLL_ZOOM_RATE = 0.002;
+
+/** How much one zooming wheel event scales the view, given its delta in CSS pixels. */
+export function wheelZoomFactor(deltaY: number, {pinch}: {pinch: boolean}): number {
+    if (!pinch) return Math.exp(-deltaY * SCROLL_ZOOM_RATE);
+    const capped = Math.max(-PINCH_MAX_DELTA, Math.min(PINCH_MAX_DELTA, deltaY));
+    return Math.exp(-capped * PINCH_RATE);
+}
+
 /** Moves the view by a screen-space distance, as when dragging the canvas or scrolling. */
 export const panBy = (camera: Camera, dx: number, dy: number): Camera => ({
     ...camera,

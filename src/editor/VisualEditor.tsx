@@ -32,8 +32,19 @@ import {
     panBy,
     screenToDocument,
     visibleBounds,
+    wheelZoomFactor,
     zoomAt,
 } from './camera';
+
+/** WebKit's (Safari, Tauri) non-standard trackpad pinch event. */
+interface GestureEvent extends UIEvent {
+    scale: number;
+    clientX: number;
+    clientY: number;
+}
+
+const isGestureEvent = (event: Event): event is GestureEvent =>
+    'scale' in event && typeof event.scale === 'number' && 'clientX' in event && 'clientY' in event;
 
 export function selectionBounds(shape: Shape): Bounds {
     switch (shape.type) {
@@ -442,28 +453,56 @@ export default function VisualEditor({
         }
         if (ref.current?.hasPointerCapture(pointer)) ref.current.releasePointerCapture(pointer);
     };
+    /** The zoom when a WebKit pinch gesture began, while one is in progress. */
+    const pinchStart = useRef<number | null>(null);
     const onWheel = useEffectEvent((event: WheelEvent) => {
         event.preventDefault();
         const rect = viewport.current?.getBoundingClientRect();
         if (!rect) return;
         const view = camera.get(pageId);
         const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? rect.height : 1;
-        if (event.ctrlKey || event.metaKey)
+        if (event.ctrlKey || event.metaKey) {
+            // WebKit reports the same pinch through gesture events below; don't zoom twice.
+            if (pinchStart.current) return;
+            const factor = wheelZoomFactor(event.deltaY * unit, {pinch: event.ctrlKey && !event.metaKey});
             camera.set(
                 pageId,
-                zoomAt(view, view.zoom * Math.exp(-event.deltaY * unit * 0.002), {
+                zoomAt(view, view.zoom * factor, {x: event.clientX - rect.left, y: event.clientY - rect.top}),
+            );
+        } else camera.set(pageId, panBy(view, event.deltaX * unit, event.deltaY * unit));
+    });
+    /**
+     * Safari and Tauri's WebKit report a trackpad pinch as gesture events whose
+     * `scale` is relative to where the pinch began, so zooming to start × scale
+     * keeps the content under the fingers, like a native app.
+     */
+    const onGesture = useEffectEvent((event: Event) => {
+        event.preventDefault();
+        const rect = viewport.current?.getBoundingClientRect();
+        if (!rect || !isGestureEvent(event)) return;
+        if (event.type === 'gesturestart') pinchStart.current = camera.get(pageId).zoom;
+        else if (event.type === 'gestureend') pinchStart.current = null;
+        else if (pinchStart.current !== null)
+            camera.set(
+                pageId,
+                zoomAt(camera.get(pageId), pinchStart.current * event.scale, {
                     x: event.clientX - rect.left,
                     y: event.clientY - rect.top,
                 }),
             );
-        else camera.set(pageId, panBy(view, event.deltaX * unit, event.deltaY * unit));
     });
     useEffect(() => {
         const element = viewport.current;
         if (!element) return;
         const handleWheel = (event: WheelEvent) => onWheel(event);
+        const handleGesture = (event: Event) => onGesture(event);
+        const gestures = ['gesturestart', 'gesturechange', 'gestureend'];
         element.addEventListener('wheel', handleWheel, {passive: false});
-        return () => element.removeEventListener('wheel', handleWheel);
+        for (const type of gestures) element.addEventListener(type, handleGesture, {passive: false});
+        return () => {
+            element.removeEventListener('wheel', handleWheel);
+            for (const type of gestures) element.removeEventListener(type, handleGesture);
+        };
     }, []);
     return (
         <div className="canvas-viewport" ref={viewport}>
