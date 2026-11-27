@@ -318,7 +318,8 @@ describe('vector documents', () => {
         delete (old as Partial<typeof old>).palettes;
         delete (old as Partial<typeof old>).fonts;
         delete (old as Partial<typeof old>).photos;
-        expect(deserializeDocument(JSON.stringify(old)).version).toBe(10);
+        delete (old as Partial<typeof old>).settings;
+        expect(deserializeDocument(JSON.stringify(old)).version).toBe(11);
         const {store} = fixture();
         const corruptions: ((s: VectorShape) => unknown)[] = [
             s => (s.components.network.segments[0].a = 'missing'),

@@ -2,7 +2,18 @@ import {applyPatches, type Draft, enablePatches, freeze, type Patch, produceWith
 import {makeImageShape, makePixelImage} from '../shapes/pixelImages';
 import {convertImportedPixels, type DecodedPixels, type TileSize} from '../io/pngImport';
 import {deserializeDocument, serializeDocument, validateDocument} from '../io/serialization';
-import type {Bounds, Document, FontAsset, PhotoAsset, PixelImageData, Shape, VectorNetwork, VectorShape} from './types';
+import type {
+    Bounds,
+    Document,
+    FontAsset,
+    GridSettings,
+    PhotoAsset,
+    PixelImageData,
+    Shape,
+    VectorNetwork,
+    VectorShape,
+} from './types';
+import {DEFAULT_GRID} from './grid';
 import {makePhotoShape, wholePhoto} from '../shapes/photos';
 import {bringShapesIntoView, centerShapesAt} from './shapeAlignment';
 import {centeredBounds, type Point} from '../editor/camera';
@@ -27,7 +38,7 @@ export interface EditorSnapshot {
 }
 
 export const emptyDocument = (): Document => ({
-    version: 10,
+    version: 11,
     images: [],
     photos: [],
     palettes: [],
@@ -35,6 +46,7 @@ export const emptyDocument = (): Document => ({
     title: 'Untitled',
     shapes: [],
     pages: [{id: 'page_1', name: 'Page 1', groups: []}],
+    settings: {grid: {...DEFAULT_GRID}},
 });
 
 export class EditorStore {
@@ -306,6 +318,22 @@ export class EditorStore {
         this.document = next;
         if (!this.transaction) this.record({label, patches, inversePatches});
         this.publish();
+    }
+
+    setDocumentGrid(grid: GridSettings) {
+        this.edit('Document grid', draft => {
+            draft.settings.grid = {...grid};
+        });
+    }
+
+    /** Gives a page its own grid, or with `null` returns it to the document's grid. */
+    setPageGrid(pageId: string, grid: GridSettings | null) {
+        this.edit(grid ? 'Page grid' : 'Use document grid', draft => {
+            const page = draft.pages.find(item => item.id === pageId);
+            if (!page) throw new Error('Unknown page');
+            if (grid) page.grid = {...grid};
+            else delete page.grid;
+        });
     }
 
     setTitle(title: string) {
@@ -685,6 +713,8 @@ export class EditorStore {
         // Reconcile once against the baseline: bounded by changed shapes/images, not pointer events.
         const [next, patches, inversePatches] = produceWithPatches(transaction.before, draft => {
             draft.title = final.title;
+            if (JSON.stringify(transaction.before.settings) !== JSON.stringify(final.settings))
+                draft.settings = final.settings;
             if (JSON.stringify(transaction.before.pages) !== JSON.stringify(final.pages)) draft.pages = final.pages;
             if (JSON.stringify(transaction.before.palettes) !== JSON.stringify(final.palettes))
                 draft.palettes = final.palettes;

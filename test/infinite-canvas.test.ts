@@ -12,7 +12,7 @@ import {
 } from '../src/io/exportArtwork';
 import {makeTab, NewCircleCommand, NewRectCommand, NewTextCommand, viewCenter} from '../src/commands';
 import type {CommandContext} from '../src/commands';
-import {gridStep, selectionBounds} from '../src/editor/VisualEditor';
+import {selectionBounds} from '../src/editor/VisualEditor';
 import type {Shape} from '../src/model/types';
 
 const viewBox = (svg: string) =>
@@ -122,19 +122,6 @@ describe('new shapes on an infinite canvas', () => {
             width: 128,
             height: 128,
         });
-    });
-});
-
-describe('canvas grid', () => {
-    it('keeps grid lines 24–96 screen pixels apart at every zoom level', () => {
-        for (const zoom of [0.02, 0.05, 0.1, 0.25, 0.5, 1, 2, 4, 16, 64]) {
-            const spacing = gridStep(zoom) * zoom;
-            const step = gridStep(zoom);
-            if (step > 1) expect(spacing).toBeGreaterThanOrEqual(24);
-            expect(spacing).toBeLessThanOrEqual(96);
-        }
-        expect(gridStep(1)).toBe(64);
-        expect(gridStep(64)).toBe(1);
     });
 });
 

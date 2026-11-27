@@ -32,6 +32,7 @@ export const keybindings: Keybinding[] = [
         mac: '⌘⇧P',
         other: 'Ctrl+Shift+P',
     },
+    {commandId: 'ui-toggle-grid', key: "cmd-'", mac: "⌘'", other: "Ctrl+'"},
     {
         commandId: 'ui-toggle-left-sidebar',
         key: 'cmd-shift-b',

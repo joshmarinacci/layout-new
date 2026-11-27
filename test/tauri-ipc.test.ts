@@ -88,6 +88,7 @@ function commandContext(store: EditorStore, overrides: Partial<CommandContext> =
         setCommandPaletteOpen: vi.fn(),
         setKeyboardShortcutsOpen: vi.fn(),
         setSavedDocumentsOpen: vi.fn(),
+        setDocumentSettingsOpen: vi.fn(),
         leftPanelVisible: true,
         setLeftPanelVisible: vi.fn(),
         rightPanelVisible: true,

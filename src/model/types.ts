@@ -251,14 +251,30 @@ export interface ShapeGroup {
     shapeIds: string[];
 }
 
+export const GRID_STYLES = ['lines', 'dots', 'hidden'] as const;
+/** How the snapping grid is drawn while it is on; `hidden` still snaps. */
+export type GridStyle = (typeof GRID_STYLES)[number];
+
+export interface GridSettings {
+    /** Spacing in document units. */
+    size: number;
+    style: GridStyle;
+}
+
+export interface DocumentSettings {
+    grid: GridSettings;
+}
+
 export interface Page {
     id: string;
     name: string;
     groups: ShapeGroup[];
+    /** Replaces the document's grid on this page; absent means use the document's. */
+    grid?: GridSettings;
 }
 
 export interface Document {
-    version: 10;
+    version: 11;
     title: string;
     shapes: Shape[];
     images: PixelImageData[];
@@ -266,6 +282,7 @@ export interface Document {
     palettes: ColorPalette[];
     fonts: FontAsset[];
     pages: Page[];
+    settings: DocumentSettings;
 }
 
 export type DrawDocument = Document;

@@ -13,7 +13,7 @@ import {chooseImageFiles, type ChosenFile, importPhotoFile} from './io/photoImpo
 import {loadPhotoBitmaps, photoPlacement} from './shapes/photos';
 import {withoutUnusedPhotos} from './io/serialization';
 import type {Theme} from './ui/theme';
-import {type LucideIcon, Redo2Icon, Undo2Icon} from 'lucide-react';
+import {Grid3x3Icon, type LucideIcon, Redo2Icon, Undo2Icon} from 'lucide-react';
 import {newPalette, pico8Colors} from './shapes/palettes';
 import {
     DOCUMENT_PREVIEW_MAX_SIZE,
@@ -32,6 +32,8 @@ export interface DocumentTab {
     store: EditorStore;
     /** Where this tab's canvas is looking, per page. View state, not saved with the document. */
     camera: CameraStore;
+    /** Whether the grid is drawn and shapes snap to it. View state, off for every newly opened tab. */
+    gridEnabled: boolean;
     savedDocumentId: string | null;
     savedJson: string | null;
 }
@@ -83,6 +85,7 @@ export type CommandContext = {
     setCommandPaletteOpen: Setter<boolean>;
     setKeyboardShortcutsOpen: Setter<boolean>;
     setSavedDocumentsOpen: Setter<boolean>;
+    setDocumentSettingsOpen: Setter<boolean>;
     leftPanelVisible: boolean;
     setLeftPanelVisible: Setter<boolean>;
     rightPanelVisible: boolean;
@@ -144,6 +147,8 @@ export type CommandId =
     | 'ui-toggle-left-sidebar'
     | 'ui-show-command-palette'
     | 'ui-show-keyboard-shortcuts'
+    | 'ui-toggle-grid'
+    | 'document-settings'
     | 'new-vector-network'
     | 'new-pixelimage'
     | 'new-repeatingimage'
@@ -714,6 +719,30 @@ export const ToggleRightSidebar: Command = {
     run: ctx => ctx.setRightPanelVisible(!ctx.rightPanelVisible),
 };
 
+export const ToggleGridCommand: Command = {
+    id: 'ui-toggle-grid',
+    title: 'Toggle Grid',
+    description: 'Show the grid and snap moved and resized shapes to it',
+    keywords: ['view', 'grid', 'snap', 'snapping'],
+    icon: Grid3x3Icon,
+    enabled: () => true,
+    run: ctx =>
+        ctx.setWorkspace(workspace => ({
+            ...workspace,
+            tabs: workspace.tabs.map(tab =>
+                tab.id === workspace.activeId ? {...tab, gridEnabled: !tab.gridEnabled} : tab,
+            ),
+        })),
+};
+export const DocumentSettingsCommand: Command = {
+    id: 'document-settings',
+    title: 'Document Settings…',
+    description: 'Change the grid size and style for the document or the current page',
+    keywords: ['file', 'grid', 'snap', 'settings', 'page'],
+    enabled: ctx => !ctx.state.transactionActive,
+    run: ctx => ctx.setDocumentSettingsOpen(true),
+};
+
 export const SystemThemeCommand: Command = {
     id: 'theme-system',
     title: 'System Theme',
@@ -753,6 +782,7 @@ export function makeTab(
         id: crypto.randomUUID(),
         store: new EditorStore(document),
         camera: new CameraStore(),
+        gridEnabled: false,
         savedDocumentId,
         savedJson,
     };
@@ -916,6 +946,7 @@ export const AlignDistributeVerticalCommand: Command = {
 export const allCommands: Command[] = [
     NewDocumentCommand,
     RenameDocumentCommand,
+    DocumentSettingsCommand,
     OpenDocumentCommand,
     SaveDocumentCommand,
     OpenJsonCommand,
@@ -954,6 +985,7 @@ export const allCommands: Command[] = [
     ShowKeyboardShortcutsCommand,
     ToggleLeftSidebar,
     ToggleRightSidebar,
+    ToggleGridCommand,
     SystemThemeCommand,
     LightThemeCommand,
     DarkThemeCommand,

@@ -1,4 +1,4 @@
-import {PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, SunMoon, Trash2} from 'lucide-react';
+import {Grid3x3, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, SunMoon, Trash2} from 'lucide-react';
 import {type CSSProperties, type MouseEvent, useEffect, useEffectEvent, useLayoutEffect, useRef, useState} from 'react';
 import {isTauri} from '@tauri-apps/api/core';
 import {listen} from '@tauri-apps/api/event';
@@ -15,6 +15,8 @@ import {Toolbar} from './ui/Toolbar';
 import {usePanelWidths} from './ui/usePanelWidths';
 import {EditorDialog} from './common/EditorDialog';
 import {KeyboardShortcutsDialog} from './common/KeyboardShortcutsDialog';
+import {DocumentSettingsDialog} from './common/DocumentSettingsDialog';
+import {effectiveGrid} from './model/grid';
 import {makeExampleDocument} from './model/exampleDocument';
 import {ImportPixelImage} from './shapes/ImportPixelImage';
 import {NewPixelImage} from './shapes/NewPixelImage';
@@ -200,6 +202,7 @@ export default function App() {
     } | null>(null);
     const [renameDocumentName, setRenameDocumentName] = useState<string | null>(null);
     const [savedDocumentsOpen, setSavedDocumentsOpen] = useState(false);
+    const [documentSettingsOpen, setDocumentSettingsOpen] = useState(false);
     const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
     const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
     const selectedImage =
@@ -220,6 +223,7 @@ export default function App() {
         setCommandPaletteOpen,
         setKeyboardShortcutsOpen,
         setSavedDocumentsOpen,
+        setDocumentSettingsOpen,
         leftPanelVisible,
         setLeftPanelVisible,
         rightPanelVisible,
@@ -510,6 +514,8 @@ export default function App() {
                         <Separator />
                         <CommandMenuItem ctx={ctx} commandId="save-json-document" />
                         <CommandMenuItem ctx={ctx} commandId="save-png-document" />
+                        <Separator />
+                        <CommandMenuItem ctx={ctx} commandId="document-settings" />
                     </DropdownMenu>
                     <DropdownMenu title="Edit">
                         <CommandMenuItem ctx={ctx} commandId="selection-duplicate" />
@@ -523,6 +529,8 @@ export default function App() {
                         <Separator />
                         <CommandMenuItem ctx={ctx} commandId="ui-toggle-left-sidebar" />
                         <CommandMenuItem ctx={ctx} commandId="ui-toggle-right-sidebar" />
+                        <Separator />
+                        <CommandMenuItem ctx={ctx} commandId="ui-toggle-grid" />
                     </DropdownMenu>
                     <DropdownMenu title="Page">
                         <CommandMenuItem ctx={ctx} commandId="new-page" />
@@ -836,6 +844,14 @@ export default function App() {
                                 }
                             />
                         )}
+                        {!assetEditor && (
+                            <IconButton
+                                label="Grid"
+                                icon={Grid3x3}
+                                aria-pressed={activeTab.gridEnabled}
+                                onClick={() => commandRegistry.require('ui-toggle-grid').run(ctx)}
+                            />
+                        )}
                         {!assetEditor && selectedShapes.length === 1 && selected?.type === 'vector' && (
                             <button
                                 disabled={state.transactionActive}
@@ -898,6 +914,7 @@ export default function App() {
                                     key={activeTab.id}
                                     store={store}
                                     camera={activeTab.camera}
+                                    grid={activeTab.gridEnabled ? effectiveGrid(doc, state.selectedPageId) : null}
                                     vectorId={vectorId}
                                     onEditVector={setVectorId}
                                     cropId={cropId}
@@ -1379,6 +1396,9 @@ export default function App() {
                     getCenter={() => viewCenter(ctx)}
                     onClose={() => setRepeatingImageDialog(false)}
                 />
+            )}
+            {documentSettingsOpen && (
+                <DocumentSettingsDialog store={store} onClose={() => setDocumentSettingsOpen(false)} />
             )}
             {savedDocumentsOpen && (
                 <SavedDocumentsDialog

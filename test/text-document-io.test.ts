@@ -110,11 +110,12 @@ describe('text documents: JSON export and import', () => {
         const version8 = serializedObject(textDocument()) as unknown as Document;
         (version8 as unknown as Record<string, unknown>).version = 8;
         delete (version8 as Partial<Document>).photos;
+        delete (version8 as Partial<Document>).settings;
         for (const shape of version8.shapes)
             if (shape.type === 'text')
                 delete (shape.components.text as Partial<TextShape['components']['text']>).verticalAlign;
         const loaded = deserializeDocument(JSON.stringify(version8));
-        expect(loaded.version).toBe(10);
+        expect(loaded.version).toBe(11);
         expect(loaded.fonts).toEqual([lobster, inter]);
         expect(
             loaded.shapes.map(shape =>
@@ -132,6 +133,7 @@ describe('text documents: JSON export and import', () => {
         const raw = serializedObject(textDocument());
         raw.version = 8;
         delete raw.photos;
+        delete raw.settings;
         expect(() => deserializeDocument(JSON.stringify(raw))).toThrow(/Expected fields/);
     });
 
@@ -140,6 +142,7 @@ describe('text documents: JSON export and import', () => {
         raw.version = 7;
         delete raw.fonts;
         delete raw.photos;
+        delete raw.settings;
         expect(() => deserializeDocument(JSON.stringify(raw))).toThrow(/Text shapes require document version 8/);
     });
 });

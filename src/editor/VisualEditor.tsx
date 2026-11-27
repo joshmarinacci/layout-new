@@ -11,9 +11,11 @@ import {circleContains, circleHandles, dragCircle} from '../shapes/circleGeometr
 import type {EditorStore} from '../model/EditorStore';
 import type {PixelEditorController} from '../shapes/PixelImageEditor';
 import {drawPixelImage, resizeImageBounds} from '../shapes/pixelImages';
+import {gridDrawStep, snapMoveDelta, snapRadius, snapResizeDelta} from '../model/grid';
 import type {
     Bounds,
     CircleLikeComponent,
+    GridSettings,
     PixelImageData,
     PixelImageReferenceComponent,
     Point,
@@ -77,29 +79,47 @@ export function selectionBounds(shape: Shape): Bounds {
     }
 }
 
-/** Spacing of the background grid in document units: a power of two times 64 that stays 24–96px on screen. */
-export function gridStep(zoom: number) {
-    let step = 64;
-    while (step * zoom < 24) step *= 2;
-    while (step > 1 && step * zoom > 96) step /= 2;
-    return step;
+/** Screen positions (CSS px, snapped to the pixel grid) of the grid lines crossing one axis of the viewport. */
+function gridPositions(start: number, zoom: number, step: number, extent: number) {
+    const positions: number[] = [];
+    for (let value = Math.ceil(start / step) * step; ; value += step) {
+        const screen = Math.round((value - start) * zoom);
+        if (screen > extent) break;
+        positions.push(screen);
+    }
+    return positions;
 }
 
-/** Draws the background grid in screen space so its lines stay one pixel wide at any zoom. */
-function drawGrid(ctx: CanvasRenderingContext2D, view: Camera, width: number, height: number, color: string) {
-    const step = gridStep(view.zoom);
+/**
+ * Draws the snapping grid in screen space, so lines stay one pixel wide and dots one size at any zoom.
+ * When the grid would be too dense on screen only every 2nd, 5th, 10th… line is drawn.
+ */
+function drawGrid(
+    ctx: CanvasRenderingContext2D,
+    view: Camera,
+    width: number,
+    height: number,
+    grid: GridSettings,
+    color: string,
+) {
+    if (grid.style === 'hidden') return;
+    const step = gridDrawStep(grid.size, view.zoom);
+    const xs = gridPositions(view.x, view.zoom, step, width);
+    const ys = gridPositions(view.y, view.zoom, step, height);
     ctx.beginPath();
-    for (let x = Math.ceil(view.x / step) * step; ; x += step) {
-        const screenX = Math.round((x - view.x) * view.zoom) + 0.5;
-        if (screenX > width) break;
-        ctx.moveTo(screenX, 0);
-        ctx.lineTo(screenX, height);
+    if (grid.style === 'dots') {
+        for (const x of xs) for (const y of ys) ctx.rect(x - 1, y - 1, 2, 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        return;
     }
-    for (let y = Math.ceil(view.y / step) * step; ; y += step) {
-        const screenY = Math.round((y - view.y) * view.zoom) + 0.5;
-        if (screenY > height) break;
-        ctx.moveTo(0, screenY);
-        ctx.lineTo(width, screenY);
+    for (const x of xs) {
+        ctx.moveTo(x + 0.5, 0);
+        ctx.lineTo(x + 0.5, height);
+    }
+    for (const y of ys) {
+        ctx.moveTo(0, y + 0.5);
+        ctx.lineTo(width, y + 0.5);
     }
     ctx.strokeStyle = color;
     ctx.lineWidth = 1;
@@ -116,6 +136,7 @@ function paintMargin(shape: Shape, zoom: number) {
 }
 export default function VisualEditor({
     store,
+    grid,
     onEditImage,
     onShapeContextMenu,
     onCanvasContextMenu,
@@ -129,6 +150,8 @@ export default function VisualEditor({
     onImportFiles,
 }: {
     store: EditorStore;
+    /** The grid to draw and snap to, or null while the grid is off. */
+    grid: GridSettings | null;
     onEditImage: (
         reference: PixelImageReferenceComponent,
         position: {
@@ -227,7 +250,8 @@ export default function VisualEditor({
         canvas.dataset.camera = `${view.x},${view.y},${zoom}`;
         ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
         ctx.clearRect(0, 0, width, height);
-        drawGrid(ctx, view, width, height, getComputedStyle(canvas).color);
+        canvas.dataset.grid = grid ? `${grid.size},${grid.style}` : 'off';
+        if (grid) drawGrid(ctx, view, width, height, grid, getComputedStyle(canvas).color);
         ctx.setTransform(
             zoom * pixelRatio,
             0,
@@ -870,20 +894,27 @@ export default function VisualEditor({
                         return;
                     }
                     const p = point(event);
-                    const dx = p.x - g.x,
-                        dy = p.y - g.y;
+                    const rawDx = p.x - g.x,
+                        rawDy = p.y - g.y;
                     if (g.kind === 'marquee') {
                         setMarquee({
                             x: Math.min(g.x, p.x),
                             y: Math.min(g.y, p.y),
-                            width: Math.abs(dx),
-                            height: Math.abs(dy),
+                            width: Math.abs(rawDx),
+                            height: Math.abs(rawDy),
                         });
                         return;
                     }
+                    // Moves snap the selection's top-left corner to the grid; resizes snap the dragged corner.
+                    const moved = grid && g.kind === 'move' ? snapMoveDelta(g.bounds, rawDx, rawDy, grid.size) : null;
                     g.ids.forEach((id, index) =>
                         store.updateShape(id, shape => {
                             const bounds = g.bounds[index];
+                            const {dx, dy} =
+                                moved ??
+                                (grid && g.kind === 'resize'
+                                    ? snapResizeDelta(bounds, rawDx, rawDy, grid.size)
+                                    : {dx: rawDx, dy: rawDy});
                             const network = g.vectors?.get(id);
                             if (shape.type === 'vector' && network) {
                                 if (g.kind === 'resize')
@@ -902,12 +933,13 @@ export default function VisualEditor({
                             }
                             const circle = g.circles?.get(id);
                             if (shape.type === 'circle' && circle) {
-                                shape.components.circle = dragCircle(
-                                    circle,
-                                    g,
-                                    p,
-                                    g.kind === 'resize' && g.ids.length === 1,
-                                );
+                                const resize = g.kind === 'resize' && g.ids.length === 1;
+                                // A moved circle follows the snapped offset; a resized one snaps its diameter.
+                                const dragged = dragCircle(circle, g, resize ? p : {x: g.x + dx, y: g.y + dy}, resize);
+                                shape.components.circle =
+                                    resize && grid
+                                        ? {...dragged, radius: snapRadius(dragged.radius, grid.size)}
+                                        : dragged;
                                 return;
                             }
                             if (

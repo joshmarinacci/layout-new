@@ -57,7 +57,8 @@ describe('circles', () => {
     it.each([false, true])('groups circle gesture updates, undo/redo and cancellation (resize=%s)', resize => {
         const shape = circle();
         const store = new EditorStore({
-            version: 10,
+            version: 11,
+            settings: {grid: {size: 10, style: 'lines'}},
             images: [],
             photos: [],
             palettes: [],
@@ -97,7 +98,8 @@ describe('circles', () => {
     it('rejects invalid circle geometry atomically', () => {
         const shape = circle();
         const store = new EditorStore({
-            version: 10,
+            version: 11,
+            settings: {grid: {size: 10, style: 'lines'}},
             images: [],
             photos: [],
             palettes: [],

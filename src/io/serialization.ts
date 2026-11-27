@@ -1,6 +1,7 @@
 import {deriveFaces} from '../shapes/vectorNetworks';
 import {normalizeColor} from '../shapes/palettes';
-import {PHOTO_MIME_TYPES, type Document} from '../model/types';
+import {GRID_STYLES, PHOTO_MIME_TYPES, type Document} from '../model/types';
+import {DEFAULT_GRID, isValidGridSize} from '../model/grid';
 
 type ObjectValue = Record<string, unknown>;
 function object(value: unknown): ObjectValue {
@@ -29,6 +30,12 @@ function component(value: unknown, kind: string, fields: string[]) {
     keys(c, ['kind', ...fields]);
     if (c.kind !== kind) throw new Error(`Expected ${kind}`);
     return c;
+}
+function validateGrid(value: unknown) {
+    const grid = object(value);
+    keys(grid, ['size', 'style']);
+    if (typeof grid.size !== 'number' || !isValidGridSize(grid.size)) throw new Error('Invalid grid size');
+    if (!(GRID_STYLES as readonly unknown[]).includes(grid.style)) throw new Error('Invalid grid style');
 }
 /** Photo assets are capped at 4096 px when imported (see io/photoImport.ts). */
 export const MAX_PHOTO_SIZE = 4096;
@@ -99,22 +106,32 @@ function validatePhotoShape(c: ObjectValue, photos: Map<string, ObjectValue>) {
     number(bounds.height, true);
 }
 
-function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10): asserts value is Document {
+function validateSchema(
+    value: unknown,
+    version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11,
+): asserts value is Document {
     const doc = object(value);
     keys(
         doc,
-        version >= 10
-            ? ['version', 'title', 'shapes', 'images', 'photos', 'palettes', 'pages', 'fonts']
-            : version >= 8
-              ? ['version', 'title', 'shapes', 'images', 'palettes', 'pages', 'fonts']
-              : version >= 6
-                ? ['version', 'title', 'shapes', 'images', 'palettes', 'pages']
-                : version >= 4
-                  ? ['version', 'title', 'shapes', 'images', 'pages']
-                  : ['version', 'title', 'shapes', 'images'],
+        version >= 11
+            ? ['version', 'title', 'shapes', 'images', 'photos', 'palettes', 'pages', 'fonts', 'settings']
+            : version >= 10
+              ? ['version', 'title', 'shapes', 'images', 'photos', 'palettes', 'pages', 'fonts']
+              : version >= 8
+                ? ['version', 'title', 'shapes', 'images', 'palettes', 'pages', 'fonts']
+                : version >= 6
+                  ? ['version', 'title', 'shapes', 'images', 'palettes', 'pages']
+                  : version >= 4
+                    ? ['version', 'title', 'shapes', 'images', 'pages']
+                    : ['version', 'title', 'shapes', 'images'],
     );
     if (doc.version !== version) throw new Error('Unsupported document version');
     text(doc.title);
+    if (version >= 11) {
+        const settings = object(doc.settings);
+        keys(settings, ['grid']);
+        validateGrid(settings.grid);
+    }
     if (!Array.isArray(doc.shapes)) throw new Error('Expected shapes array');
     if (!Array.isArray(doc.images)) throw new Error('Expected images array');
     const photos = version >= 10 ? validatePhotos(doc.photos) : new Map<string, ObjectValue>();
@@ -221,7 +238,13 @@ function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
         const membership = new Set<string>();
         for (const pageValue of doc.pages) {
             const page = object(pageValue);
-            keys(page, ['id', 'name', 'groups']);
+            keys(
+                page,
+                version >= 11 && Object.hasOwn(page, 'grid')
+                    ? ['id', 'name', 'groups', 'grid']
+                    : ['id', 'name', 'groups'],
+            );
+            if (Object.hasOwn(page, 'grid')) validateGrid(page.grid);
             text(page.id);
             text(page.name);
             if (!page.id || pageIds.has(page.id as string) || !Array.isArray(page.groups))
@@ -416,7 +439,7 @@ function validateSchema(value: unknown, version: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
     }
 }
 export function validateDocument(value: unknown): asserts value is Document {
-    validateSchema(value, 10);
+    validateSchema(value, 11);
 }
 
 /**
@@ -524,6 +547,10 @@ export function deserializeDocument(json: string): Document {
     if (source.version === 9) {
         validateSchema(source, 9);
         source = {...source, version: 10, photos: []};
+    }
+    if (source.version === 10) {
+        validateSchema(source, 10);
+        source = {...source, version: 11, settings: {grid: {...DEFAULT_GRID}}};
     }
     validateDocument(source);
     for (const shape of source.shapes)
