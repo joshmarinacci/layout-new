@@ -18,7 +18,7 @@ export function CommandIconButton({commandId, ctx}: {commandId: CommandId; ctx: 
     const command = commandRegistry.require(commandId);
     return (
         <IconButton
-            label="Undo"
+            label={command.title}
             icon={command.icon ? command.icon : BugIcon}
             disabled={!command.enabled(ctx)}
             onClick={() => command.run(ctx)}
