@@ -148,6 +148,7 @@ export default function VisualEditor({
     onStartCrop,
     onFinishCrop,
     onImportFiles,
+    onShapeGesture,
 }: {
     store: EditorStore;
     /** The grid to draw and snap to, or null while the grid is off. */
@@ -172,6 +173,8 @@ export default function VisualEditor({
     onFinishCrop: (commit: boolean) => void;
     /** Image files dropped on (with the document point) or pasted into the canvas. */
     onImportFiles: (files: File[], at?: Point) => void;
+    /** A move or resize drag started (true, on its first movement) or ended (false). */
+    onShapeGesture?: (active: boolean) => void;
 }) {
     const state = useEditorStore(store);
     const pageId = state.selectedPageId;
@@ -214,6 +217,8 @@ export default function VisualEditor({
         camera?: Camera;
         duplicate?: boolean;
         duplicateStarted?: boolean;
+        /** The pointer has moved since a move or resize began; a plain click never sets this. */
+        started?: boolean;
     } | null>(null);
     const [marquee, setMarquee] = useState<Bounds | null>(null);
     const [, setFontEpoch] = useState(0);
@@ -499,9 +504,11 @@ export default function VisualEditor({
             frame.current = 0;
         };
     }, [camera]);
+    const endShapeGesture = useEffectEvent(() => onShapeGesture?.(false));
     useEffect(
         () => () => {
             if (gesture.current) {
+                if (gesture.current.started) endShapeGesture();
                 gesture.current = null;
                 if (store.getSnapshot().transactionActive) store.cancelTransaction();
             }
@@ -517,6 +524,7 @@ export default function VisualEditor({
         const current = gesture.current;
         const pointer = current.pointer;
         gesture.current = null;
+        if (current.started) onShapeGesture?.(false);
         if (current.kind === 'marquee') setMarquee(null);
         else if (current.kind === 'pan') {
             /* viewport offsets already reflect the pan */
@@ -904,6 +912,10 @@ export default function VisualEditor({
                             height: Math.abs(rawDy),
                         });
                         return;
+                    }
+                    if (!g.started && (rawDx || rawDy)) {
+                        g.started = true;
+                        onShapeGesture?.(true);
                     }
                     // Moves snap the selection's top-left corner to the grid; resizes snap the dragged corner.
                     const moved = grid && g.kind === 'move' ? snapMoveDelta(g.bounds, rawDx, rawDy, grid.size) : null;
