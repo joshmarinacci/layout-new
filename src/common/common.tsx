@@ -33,7 +33,7 @@ export function CommandMenuItem(props: {ctx: CommandContext; commandId: CommandI
         <MenuItem
             disabled={!command.enabled(ctx)}
             shortcut={shortcutLabel(command.id)}
-            onClick={() => {
+            onAction={() => {
                 command.run(ctx);
                 onRun?.();
             }}

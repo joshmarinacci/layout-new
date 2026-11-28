@@ -114,8 +114,42 @@ test.describe('menus', () => {
         expect(await focusedText(page)).toBe('Export Page as PNG');
         await page.keyboard.press('End');
         expect(await focusedText(page)).toBe('Import Image…');
+        await page.keyboard.press('Home');
+        expect(await focusedText(page)).toBe('Rename page');
         await page.keyboard.press('Escape');
         await expect(menu).toBeHidden();
+    });
+
+    test('a context menu runs the focused item with Enter and returns focus on Escape', async ({page}) => {
+        await openEditor(page);
+        const pages = treeItem(page, 'Pages');
+        await pages.focus();
+        await pages.click({button: 'right'});
+        await expect(page.getByRole('menu', {name: 'Pages actions'})).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(page.getByRole('menu')).toBeHidden();
+        await expect(pages).toBeFocused();
+
+        await clickCanvas(page, 600, 300, {button: 'right'});
+        for (let step = 0; step < 3; step++) await page.keyboard.press('ArrowDown');
+        expect(await focusedText(page)).toBe('New Rectangle');
+        await page.keyboard.press('Enter');
+        await expect(page.getByRole('menu')).toBeHidden();
+        await expect(inspector(page).getByRole('textbox', {name: 'Shape name'})).toHaveValue('Rectangle');
+    });
+
+    test('Tab closes a context menu or a menubar menu', async ({page}) => {
+        await openEditor(page);
+        await clickCanvas(page, 600, 300, {button: 'right'});
+        await expect(page.getByRole('menu', {name: 'Page actions'})).toBeVisible();
+        await page.keyboard.press('Tab');
+        await expect(page.getByRole('menu')).toBeHidden();
+
+        const file = page.getByRole('button', {name: 'File'});
+        await file.click();
+        await page.keyboard.press('Tab');
+        await expect(page.getByRole('menu')).toBeHidden();
+        await expect(file).toBeFocused();
     });
 
     test('running a context menu item closes the menu', async ({page}) => {
@@ -137,13 +171,25 @@ test.describe('menus', () => {
         await expect(page.getByRole('menuitem', {name: 'New Image from PNG'})).toBeInViewport();
     });
 
+    test('a menubar dropdown opens from the keyboard too', async ({page}) => {
+        await openEditor(page);
+        const edit = page.getByRole('button', {name: 'Edit'});
+        await edit.focus();
+        await page.keyboard.press('ArrowDown');
+        await expect(page.getByRole('menu', {name: 'Edit'})).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(edit).toBeFocused();
+    });
+
     test('a menubar dropdown opens, navigates and returns focus on Escape', async ({page}) => {
         await openEditor(page);
         const file = page.getByRole('button', {name: 'File'});
         await file.click();
         await expect(page.getByRole('menu', {name: 'File'})).toBeVisible();
-        await page.keyboard.press('ArrowDown');
+        // Opening the menu focuses its first item.
         expect(await focusedText(page)).toMatch(/^New Document/);
+        await page.keyboard.press('ArrowDown');
+        expect(await focusedText(page)).toBe('Open from Browser');
         await page.keyboard.press('Escape');
         await expect(page.getByRole('menu', {name: 'File'})).toBeHidden();
         await expect(file).toBeFocused();

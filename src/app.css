@@ -256,15 +256,88 @@
     display: none;
 }
 
-/* ---------- Menus (tooltheme draws `[popover] > menu`) ------------------- */
+/* ---------- Menus ------------------------------------------------------- */
+/* React Aria renders menus as divs, not tooltheme's `[popover] > menu` of buttons, so these
+   rules repeat tooltheme's popover menu look: a raised surface of full-width quiet rows that
+   fill with the accent color under the pointer and show the focus ring from the keyboard. */
 .menu-popover {
+    min-width: 180px;
     max-width: calc(100vw - 16px);
     max-height: 70vh;
     overflow: auto;
+    padding: var(--s2);
+    color: var(--text);
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
 }
 
-.menu-popover button {
+.menu-popover [role='menu'] {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s1);
+    outline: none;
+}
+
+.menu-popover [role='menuitem'] {
+    display: flex;
+    align-items: center;
     gap: var(--s5);
+    height: var(--control);
+    padding: 0 var(--s3);
+    border-radius: var(--radius);
+    white-space: nowrap;
+    cursor: default;
+    outline: none;
+    transition:
+        background-color 0.08s,
+        color 0.08s;
+}
+
+.menu-popover [role='menuitem'][data-hovered] {
+    background: var(--accent-ui);
+    color: var(--on-accent);
+}
+
+.menu-popover [role='menuitem'][data-focus-visible] {
+    outline: var(--focus-w) solid var(--accent-ui);
+    outline-offset: 1px;
+}
+
+.menu-popover [role='menuitem'][data-disabled] {
+    opacity: 0.45;
+}
+
+.menu-popover [role='menuitem'][data-variant='danger'] {
+    color: var(--danger);
+}
+
+.menu-popover [role='menuitem'][data-variant='danger'][data-hovered] {
+    background: var(--danger);
+    color: white;
+}
+
+.menu-popover kbd {
+    margin-left: auto;
+    border: 0;
+    background: none;
+    color: inherit;
+    opacity: 0.7;
+}
+
+.menu-separator {
+    margin: var(--s2) 0;
+    border: 0;
+    border-top: 1px solid var(--border);
+}
+
+/* The point a context menu opens from. */
+.context-menu-anchor {
+    position: fixed;
+    width: 0;
+    height: 0;
+    pointer-events: none;
 }
 
 /* ---------- Command palette --------------------------------------------- */

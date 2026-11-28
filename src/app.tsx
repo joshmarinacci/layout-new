@@ -556,7 +556,7 @@ export default function App() {
                         <CommandMenuItem ctx={ctx} commandId="new-color-palette" />
                         <CommandMenuItem ctx={ctx} commandId="import-color-palette" />
                         <Separator />
-                        <MenuItem label="Add Google Font…" onClick={openGoogleFontDialog} />
+                        <MenuItem label="Add Google Font…" onAction={openGoogleFontDialog} />
                         <Separator />
                         <CommandMenuItem ctx={ctx} commandId="new-pico8-palette" />
                     </DropdownMenu>
@@ -1127,7 +1127,7 @@ export default function App() {
                     <CommandMenuItem ctx={ctx} commandId="new-color-palette" />
                     <CommandMenuItem ctx={ctx} commandId="import-color-palette" />
                     <Separator />
-                    <MenuItem label="Add Google Font…" onClick={openGoogleFontDialog} />
+                    <MenuItem label="Add Google Font…" onAction={openGoogleFontDialog} />
                     <Separator />
                     <CommandMenuItem ctx={ctx} commandId="new-pico8-palette" />
                 </ContextMenu>
@@ -1145,7 +1145,7 @@ export default function App() {
                         >
                             <MenuItem
                                 label="Rename"
-                                onClick={() => {
+                                onAction={() => {
                                     const name = window.prompt('Palette name', palette.name)?.trim();
                                     if (name)
                                         store.edit('Rename palette', draft => {
@@ -1156,7 +1156,7 @@ export default function App() {
                             />
                             <MenuItem
                                 label="Duplicate"
-                                onClick={() => {
+                                onAction={() => {
                                     const copy = structuredClone(palette);
                                     copy.id = crypto.randomUUID();
                                     copy.name += ' copy';
@@ -1168,8 +1168,8 @@ export default function App() {
                             />
                             <MenuItem
                                 label="Delete"
-                                data-variant="danger"
-                                onClick={() => {
+                                variant="danger"
+                                onAction={() => {
                                     if (window.confirm(`Delete palette “${palette.name}”?`)) {
                                         store.edit('Delete palette', draft => {
                                             draft.palettes = draft.palettes.filter(item => item.id !== palette.id);
@@ -1192,12 +1192,12 @@ export default function App() {
                     <MenuItem
                         label="Place on Canvas"
                         disabled={state.transactionActive}
-                        onClick={() => placePhoto(menuPhoto)}
+                        onAction={() => placePhoto(menuPhoto)}
                     />
                     <MenuItem
                         label="Select Uses on This Page"
                         disabled={!menuPhotoUses.some(shape => shape.pageId === state.selectedPageId)}
-                        onClick={() => {
+                        onAction={() => {
                             store.setSelection(
                                 menuPhotoUses
                                     .filter(shape => shape.pageId === state.selectedPageId)
@@ -1208,10 +1208,10 @@ export default function App() {
                     />
                     <MenuItem
                         label="Delete"
-                        data-variant="danger"
+                        variant="danger"
                         disabled={menuPhotoUses.length > 0 || state.transactionActive}
                         title={menuPhotoUses.length ? 'Remove the shapes that show this image first' : undefined}
-                        onClick={() => {
+                        onAction={() => {
                             store.deletePhoto(menuPhoto.id);
                             setPhotoMenu(null);
                         }}

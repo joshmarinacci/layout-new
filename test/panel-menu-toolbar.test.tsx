@@ -6,7 +6,6 @@ import PropSheet from '../src/common/PropSheet';
 import TreeView, {DOUBLE_CLICK_DELAY} from '../src/common/TreeView';
 import {EditorStore} from '../src/model/EditorStore';
 import {makeExampleDocument} from '../src/model/exampleDocument';
-import {keepInViewport} from '../src/ui/MenuPopover';
 import {Toolbar} from '../src/ui/Toolbar';
 
 afterEach(() => {
@@ -136,43 +135,6 @@ describe('renameable folders', () => {
         page().focus();
         await user.keyboard('{Enter}');
         expect(page().getAttribute('aria-expanded')).toBe('false');
-    });
-});
-
-describe('keepInViewport', () => {
-    function placed(rect: {left: number; top: number; width: number; height: number}) {
-        const element = document.createElement('div');
-        element.style.left = `${rect.left}px`;
-        element.style.top = `${rect.top}px`;
-        vi.spyOn(element, 'getBoundingClientRect').mockReturnValue({
-            ...rect,
-            x: rect.left,
-            y: rect.top,
-            right: rect.left + rect.width,
-            bottom: rect.top + rect.height,
-            toJSON: () => ({}),
-        } as DOMRect);
-        return element;
-    }
-
-    it('moves a menu that would run off the bottom or right edge back on screen', () => {
-        vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(1000);
-        vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(700);
-        const element = placed({left: 900, top: 600, width: 180, height: 300});
-        keepInViewport(element);
-        expect(element.style.top).toBe('392px');
-        expect(element.style.left).toBe('812px');
-    });
-
-    it('leaves a menu that already fits alone, and never moves one above the top edge', () => {
-        vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(1000);
-        vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(200);
-        const fits = placed({left: 10, top: 10, width: 100, height: 100});
-        keepInViewport(fits);
-        expect([fits.style.left, fits.style.top]).toEqual(['10px', '10px']);
-        const tall = placed({left: 10, top: 50, width: 100, height: 400});
-        keepInViewport(tall);
-        expect(tall.style.top).toBe('8px');
     });
 });
 
