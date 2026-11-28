@@ -698,6 +698,27 @@
     margin: 0;
 }
 
+.editor-dialog:has(.document-settings-form) {
+    width: min(460px, calc(100vw - 32px));
+}
+.document-settings-form {
+    display: grid;
+    gap: var(--s3);
+}
+.document-settings-form .number-input > label.title {
+    justify-self: end;
+    margin: 0;
+}
+.document-settings-form fieldset {
+    display: grid;
+    gap: var(--s2);
+    margin: 0;
+}
+.document-settings-form .hint {
+    margin: 0;
+    color: var(--text-muted);
+}
+
 .google-font-preview {
     padding: var(--s3);
     font-size: 24px;

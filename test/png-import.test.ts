@@ -252,6 +252,7 @@ describe('shared sprite sheets', () => {
             palettes: undefined,
             fonts: undefined,
             photos: undefined,
+            settings: undefined,
             images: current.images.map((image: Record<string, unknown>) => {
                 const {originalName, ...rest} = image;
                 void originalName;

@@ -203,6 +203,7 @@ describe('serialization', () => {
         store.setTitle('updated');
         expect(Object.keys(JSON.parse(store.toJSON()))).toEqual([
             'version',
+            'settings',
             'images',
             'photos',
             'palettes',
@@ -219,6 +220,7 @@ describe('serialization', () => {
         delete old.palettes;
         delete old.fonts;
         delete old.photos;
+        delete old.settings;
         expect(deserializeDocument(JSON.stringify(old)).palettes).toEqual([]);
     });
     it.each(['{', 'null', '{"version":1,"title":"x","shapes":[]}', '{"version":0,"title":"x","shapes":[{}]}'])(

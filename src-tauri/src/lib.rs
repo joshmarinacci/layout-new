@@ -128,9 +128,10 @@ pub fn run() {
             let save_document = item("save-local-document", "Save Document", Some("CmdOrCtrl+S"))?;
             let export_json = item("save-json-document", "Export JSON…", None)?;
             let save_png_document = item("save-png-document", "Save as JSON PNG…", None)?;
+            let document_settings = item("document-settings", "Document Settings…", None)?;
             let file_menu = Submenu::with_items(handle, "File", true, &[
                 &new_document, &open_saved, &load_json, &open_png_document, &import_svg, &import_image, &PredefinedMenuItem::separator(handle)?,
-                &save_document, &export_json, &save_png_document,
+                &save_document, &export_json, &save_png_document, &PredefinedMenuItem::separator(handle)?, &document_settings,
             ])?;
 
             let undo = item("undo", "Undo", Some("CmdOrCtrl+Z"))?;
@@ -153,6 +154,8 @@ pub fn run() {
                 &PredefinedMenuItem::separator(handle)?,
                 &item("ui-toggle-left-sidebar", "Toggle Left Sidebar", None)?,
                 &item("ui-toggle-right-sidebar", "Toggle Right Sidebar", None)?,
+                &PredefinedMenuItem::separator(handle)?,
+                &item("ui-toggle-grid", "Toggle Grid", Some("CmdOrCtrl+'"))?,
             ])?;
 
             let new_page = item("new-page", "New Page", None)?;

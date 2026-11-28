@@ -31,11 +31,12 @@ const photoShapes = (store: EditorStore) =>
     store.getSnapshot().document.shapes.filter((shape): shape is PhotoShape => shape.type === 'photo');
 
 describe('photo documents', () => {
-    it('migrates version 9 documents to version 10 with no photos', () => {
+    it('migrates version 9 documents to the current version with no photos', () => {
         const v9: Record<string, unknown> = {...emptyDocument(), version: 9};
         delete v9.photos;
+        delete v9.settings;
         const loaded = deserializeDocument(JSON.stringify(v9));
-        expect(loaded.version).toBe(10);
+        expect(loaded.version).toBe(11);
         expect(loaded.photos).toEqual([]);
     });
 

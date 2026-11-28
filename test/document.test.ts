@@ -13,7 +13,8 @@ import {
 function makeRectDocument(): DrawDocument {
     const rect = makeRect('rect1', {x: 200, y: 50, width: 100, height: 100});
     return {
-        version: 10,
+        version: 11,
+        settings: {grid: {size: 10, style: 'lines'}},
         images: [],
         photos: [],
         palettes: [],
@@ -28,7 +29,8 @@ function makeEmptyDoc(): DrawDocument {
     return {
         title: 'some doc',
         shapes: [],
-        version: 10,
+        version: 11,
+        settings: {grid: {size: 10, style: 'lines'}},
         images: [],
         photos: [],
         palettes: [],
@@ -40,7 +42,7 @@ function makeEmptyDoc(): DrawDocument {
 describe('make document', () => {
     it('can update a rectangle', () => {
         const doc = makeRectDocument();
-        expect(doc.version).toBe(10);
+        expect(doc.version).toBe(11);
         expect(doc.shapes.length).toBe(1);
         expect(doc.shapes[0].type).toBe('rectangle');
         let rect = doc.shapes[0] as RectangleShape;

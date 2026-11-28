@@ -63,7 +63,8 @@ export function makeExampleDocument(): DrawDocument {
         },
     };
     return {
-        version: 10,
+        version: 11,
+        settings: {grid: {size: 10, style: 'lines'}},
         images: [],
         photos: [],
         palettes: [],

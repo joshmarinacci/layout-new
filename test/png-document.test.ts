@@ -44,8 +44,9 @@ describe('document PNG metadata', () => {
         const version6 = {...emptyDocument(), version: 6} as unknown as Record<string, unknown>;
         delete version6.fonts;
         delete version6.photos;
+        delete version6.settings;
         const loaded = deserializeDocument(JSON.stringify(version6));
-        expect(loaded.version).toBe(10);
-        expect(JSON.parse(serializeDocument(loaded)).version).toBe(10);
+        expect(loaded.version).toBe(11);
+        expect(JSON.parse(serializeDocument(loaded)).version).toBe(11);
     });
 });
