@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
-import {act, cleanup, render, screen} from '@testing-library/react';
+import {cleanup, render, screen, within} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import PropSheet from '../src/common/PropSheet';
-import TreeView, {DOUBLE_CLICK_DELAY} from '../src/common/TreeView';
+import TreeView from '../src/common/TreeView';
 import {EditorStore} from '../src/model/EditorStore';
 import {makeExampleDocument} from '../src/model/exampleDocument';
 import {Toolbar} from '../src/ui/Toolbar';
@@ -12,8 +12,6 @@ afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
 });
-
-const waitPastDoubleClick = () => act(() => new Promise(resolve => setTimeout(resolve, DOUBLE_CLICK_DELAY + 30)));
 
 describe('document properties', () => {
     it('shows the title, contents and fonts when the document is selected', () => {
@@ -74,7 +72,7 @@ function treeProps() {
         selectedAsset: null,
         selectedPageId: document.pages[0].id,
         documentSelected: false,
-        onSelect: vi.fn(),
+        onSelectShapes: vi.fn(),
         onSelectAsset: vi.fn(),
         onSelectPalette: vi.fn(),
         onShapeContextMenu: vi.fn(),
@@ -90,9 +88,7 @@ function treeProps() {
         onSelectFont: vi.fn(),
         onSelectPhoto: vi.fn(),
         onPhotoContextMenu: vi.fn(),
-        onUngroup: vi.fn(),
         onRenameGroup: vi.fn(),
-        onSelectGroup: vi.fn(),
         onPageContextMenu: vi.fn(),
         onPagesContextMenu: vi.fn(),
         onAssetsContextMenu: vi.fn(),
@@ -103,7 +99,7 @@ function treeProps() {
 }
 
 describe('renameable folders', () => {
-    const page = () => screen.getByRole('button', {name: /Page 1/});
+    const page = () => screen.getByRole('row', {name: 'Page 1'});
 
     it('rename on double-click without opening and closing (no flicker)', async () => {
         const user = userEvent.setup();
@@ -112,29 +108,22 @@ describe('renameable folders', () => {
         const observer = new MutationObserver(() => expandedStates.push(page().getAttribute('aria-expanded')));
         observer.observe(page(), {attributes: true, attributeFilter: ['aria-expanded']});
         await user.dblClick(page());
-        await waitPastDoubleClick();
         observer.disconnect();
         expect(screen.getByRole('textbox', {name: 'Rename Page 1'})).toBeTruthy();
         expect(expandedStates).toEqual([]);
-        expect(screen.getByRole('button', {name: /^rect$/})).toBeTruthy();
+        expect(screen.getByRole('row', {name: 'rect'})).toBeTruthy();
     });
 
-    it('still toggle on a single click, once the double-click window has passed', async () => {
+    it('select on a single click without collapsing, and open and close from the chevron', async () => {
         const user = userEvent.setup();
-        render(<TreeView {...treeProps()} />);
+        const props = treeProps();
+        render(<TreeView {...props} selectedIds={['rect_1']} />);
         await user.click(page());
+        expect(props.onSelectPage).toHaveBeenCalledWith('page_1');
         expect(page().getAttribute('aria-expanded')).toBe('true');
-        await waitPastDoubleClick();
+        await user.click(within(page()).getAllByRole('button')[0]);
         expect(page().getAttribute('aria-expanded')).toBe('false');
-        expect(screen.queryByRole('button', {name: /^rect$/})).toBeNull();
-    });
-
-    it('toggle immediately from the keyboard', async () => {
-        const user = userEvent.setup();
-        render(<TreeView {...treeProps()} />);
-        page().focus();
-        await user.keyboard('{Enter}');
-        expect(page().getAttribute('aria-expanded')).toBe('false');
+        expect(screen.queryByRole('row', {name: 'rect'})).toBeNull();
     });
 });
 

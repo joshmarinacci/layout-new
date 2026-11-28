@@ -40,7 +40,7 @@ test.describe('canvas selection and editing', () => {
         await openEditor(page);
         await clickCanvas(page, 50, 50);
         await expect(inspector(page).getByRole('textbox', {name: 'Shape name'})).toHaveValue('rect');
-        await expect(treeItem(page, 'rect')).toHaveAttribute('aria-current', 'true');
+        await expect(treeItem(page, 'rect')).toHaveAttribute('aria-selected', 'true');
         await clickCanvas(page, 600, 600);
         await expect(inspector(page).getByText(/Select an\s+object/)).toBeVisible();
     });
@@ -236,6 +236,55 @@ test.describe('layers tree', () => {
         await expect
             .poll(async () => (await order()).filter(name => ['rect', 'circle'].includes(name)))
             .toEqual(['circle', 'rect']);
+    });
+
+    test('arrow keys move through the tree, selecting rows, and close and open folders', async ({page}) => {
+        await openEditor(page);
+        await treeItem(page, 'rect').click();
+        await page.keyboard.press('ArrowDown');
+        await expect(treeItem(page, 'circle')).toBeFocused();
+        await expect(treeItem(page, 'circle')).toHaveAttribute('aria-selected', 'true');
+        await expect(inspector(page).getByRole('textbox', {name: 'Shape name'})).toHaveValue('circle');
+        // Left goes to the parent, then closes it; Right opens it again.
+        await page.keyboard.press('ArrowLeft');
+        await expect(treeItem(page, 'Page 1')).toBeFocused();
+        await page.keyboard.press('ArrowLeft');
+        await expect(treeItem(page, 'Page 1')).toHaveAttribute('aria-expanded', 'false');
+        await expect(treeItem(page, 'rect')).toBeHidden();
+        await page.keyboard.press('ArrowRight');
+        await expect(treeItem(page, 'rect')).toBeVisible();
+    });
+
+    test('F2 or Enter renames the focused row', async ({page}) => {
+        await openEditor(page);
+        await treeItem(page, 'rect').click();
+        await page.keyboard.press('F2');
+        const field = layers(page).getByRole('textbox', {name: 'Rename rect'});
+        await field.fill('Box');
+        await field.press('Enter');
+        await expect(treeItem(page, 'Box')).toBeVisible();
+        await treeItem(page, 'circle').click();
+        await page.keyboard.press('Enter');
+        await layers(page).getByRole('textbox', {name: 'Rename circle'}).press('Escape');
+        await expect(treeItem(page, 'circle')).toBeVisible();
+    });
+
+    test('a shape row can be reordered from the keyboard', async ({page}) => {
+        await openEditor(page);
+        const order = async () =>
+            (await layers(page).locator('.tree-label').allTextContents()).filter(name =>
+                ['rect', 'circle'].includes(name),
+            );
+        await treeItem(page, 'circle').click();
+        // Right moves to the row's drag handle; Enter picks it up and Enter again drops it.
+        await page.keyboard.press('ArrowRight');
+        await expect(page.getByRole('button', {name: 'Move circle'})).toBeFocused();
+        await page.keyboard.press('Enter');
+        await expect(page.getByRole('button', {name: 'Insert before rect'})).toBeFocused();
+        await page.keyboard.press('Enter');
+        await expect.poll(order).toEqual(['circle', 'rect']);
+        await page.keyboard.press('ControlOrMeta+z');
+        await expect.poll(order).toEqual(['rect', 'circle']);
     });
 
     test('switching tabs keeps an unfinished rename from the inspector', async ({page}) => {
@@ -500,7 +549,7 @@ test.describe('infinite canvas', () => {
 
     test('switches pages from the tree right after creating one, with nothing selected', async ({page}) => {
         await openEditor(page);
-        const row = (name: RegExp) => treeItem(page, name).locator('xpath=ancestor::div[contains(@class, "tree-row")]');
+        const row = (name: RegExp) => treeItem(page, name);
         await page.getByRole('button', {name: 'Page', exact: true}).click();
         await page.getByRole('menuitem', {name: 'New Page'}).click();
         await expect(row(/Page 2/)).toHaveClass(/\b(selected|current)\b/);

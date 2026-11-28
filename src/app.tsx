@@ -743,10 +743,11 @@ export default function App() {
                         setPaletteMenu(null);
                         setPhotoMenu({x: event.clientX, y: event.clientY, photoId: photo.id});
                     }}
-                    onSelect={(shape, additive) => {
+                    onSelectShapes={(pageId, ids) => {
                         setSelectedAsset(null);
-                        if (additive) store.toggleSelection(shape.id);
-                        else store.select(shape.id);
+                        setDocumentSelected(false);
+                        if (pageId !== store.getSnapshot().selectedPageId) store.selectPage(pageId);
+                        store.setSelection(ids);
                     }}
                     onSelectFont={font => {
                         finishEditing();
@@ -786,9 +787,7 @@ export default function App() {
                         setDocumentSelected(false);
                         store.selectPage(id);
                     }}
-                    onUngroup={id => store.ungroup(id)}
                     onRenameGroup={(id, name) => store.renameGroup(id, name)}
-                    onSelectGroup={ids => store.setSelection(ids)}
                     onPageContextMenu={showPageContextMenu}
                     onPagesContextMenu={event => {
                         event.preventDefault();
