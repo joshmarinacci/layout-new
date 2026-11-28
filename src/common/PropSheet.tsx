@@ -1,123 +1,14 @@
-import {useRef} from 'react';
 import {PropertySection} from '../ui/controls';
 import type {Draft} from 'immer';
-import type {
-    Bounds,
-    ColorPalette,
-    DrawDocument,
-    FontAsset,
-    PhotoShape,
-    Shape,
-    ShapeComponent,
-    TextComponent,
-} from '../model/types';
+import type {Bounds, DrawDocument, FontAsset, PhotoShape, ShapeComponent, TextComponent} from '../model/types';
 import {actualSize, cropTo, resetCrop} from '../shapes/photos';
 import type {EditorStore} from '../model/EditorStore';
 import {useEditorStore} from '../model/useEditorStore';
 import {NameField} from './NameField';
-import {NumberInput} from '../ui/NumberInput';
-import {normalizeColor} from '../shapes/palettes';
-
-function Field({
-    store,
-    title,
-    value,
-    type = 'number',
-    nonnegative = false,
-    step,
-    shiftStep,
-    palettes = [],
-    update,
-}: {
-    store: EditorStore;
-    title: string;
-    value: number | string;
-    type?: 'number' | 'color';
-    nonnegative?: boolean;
-    step?: number;
-    shiftStep?: number;
-    palettes?: ColorPalette[];
-    update: (value: string) => void;
-}) {
-    // Join a transaction that is already open (such as crop mode) instead of starting
-    // one; only the field that started a transaction commits or cancels it.
-    const owns = useRef(false);
-    const onFocus = () => {
-        owns.current = !store.getSnapshot().transactionActive;
-        if (owns.current) store.beginTransaction(title);
-    };
-    const onBlur = () => {
-        if (owns.current && store.getSnapshot().transactionActive) store.commitTransaction();
-        owns.current = false;
-    };
-    const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-        if (event.key === 'Escape') {
-            if (owns.current && store.getSnapshot().transactionActive) store.cancelTransaction();
-            owns.current = false;
-            event.currentTarget.blur();
-        }
-        if (event.key === 'Enter') event.currentTarget.blur();
-    };
-    return (
-        <div className="number-input">
-            <span className="title">{title}</span>
-            {value === '' && <small>Mixed</small>}
-            {type === 'number' ? (
-                <NumberInput
-                    label={title}
-                    value={value}
-                    min={nonnegative ? 0 : undefined}
-                    step={step}
-                    shiftStep={shiftStep}
-                    onFocus={onFocus}
-                    onBlur={onBlur}
-                    onKeyDown={onKeyDown}
-                    onChange={next => update(String(next))}
-                />
-            ) : (
-                <>
-                    <input
-                        aria-label={title}
-                        type="color"
-                        value={value}
-                        onFocus={onFocus}
-                        onBlur={onBlur}
-                        onChange={event => update(event.target.value)}
-                    />
-                    {palettes.length > 0 && (
-                        <select
-                            aria-label={`${title} palette color`}
-                            value=""
-                            onChange={event => {
-                                if (event.target.value) update(event.target.value);
-                            }}
-                        >
-                            <option value="">Choose from palette…</option>
-                            {palettes.map(palette => (
-                                <optgroup key={palette.id} label={palette.name}>
-                                    {palette.colors.map((color, index) => (
-                                        <option key={color.id} value={normalizeColor(color.value)}>
-                                            {color.name || `Color ${index + 1}`} · {normalizeColor(color.value)}
-                                        </option>
-                                    ))}
-                                </optgroup>
-                            ))}
-                        </select>
-                    )}
-                </>
-            )}
-        </div>
-    );
-}
+import {commonComponents, Field, FillFields, RadiusField, shapeFieldAccess, StrokeFields} from './shapeFields';
 
 function isVerticalAlign(value: string): value is TextComponent['verticalAlign'] {
     return value === 'top' || value === 'middle' || value === 'bottom';
-}
-
-function componentFor(shape: Draft<Shape>, key: string): Draft<ShapeComponent> {
-    const entry = Object.entries(shape.components).find(([name]) => name === key);
-    if (!entry) throw new Error('Unknown component');
-    return entry[1];
 }
 
 /** Shown when the document row in the tree is the selection. */
@@ -189,18 +80,8 @@ export default function PropSheet({
     if (!shapes.length && documentSelected)
         return <DocumentProperties store={store} document={state.document} onAddGoogleFont={onAddGoogleFont} />;
     if (!shapes.length) return <div className="prop-sheet empty-state">Select an object to edit its properties.</div>;
-    const common = Object.entries(shapes[0].components).filter(([key, component]) =>
-        shapes.every(shape => {
-            const entry = Object.entries(shape.components).find(([name]) => name === key);
-            return entry?.[1].kind === component.kind;
-        }),
-    );
-    const update = (key: string, recipe: (component: Draft<ShapeComponent>) => void) =>
-        shapes.forEach(shape => store.updateShape(shape.id, draft => recipe(componentFor(draft, key))));
-    const fieldValue = (key: string, read: (component: ShapeComponent) => number | string) => {
-        const values = shapes.map(shape => read(shape.components[key as keyof Shape['components']] as ShapeComponent));
-        return values.every(value => value === values[0]) ? values[0] : '';
-    };
+    const common = commonComponents(shapes);
+    const {update, fieldValue} = shapeFieldAccess(store, shapes);
     const field = (
         key: string,
         title: string,
@@ -281,54 +162,25 @@ export default function PropSheet({
                             regions. Double-click the shape or choose Edit Vector to edit paths and fills.
                         </p>
                     )}
-                    {comp.kind === 'fill-component' &&
-                        field(
-                            key,
-                            'Fill color',
-                            c => (c.kind === 'fill-component' ? c.fill.color : ''),
-                            (c, value) => {
-                                if (c.kind === 'fill-component') c.fill.color = value;
-                            },
-                            'color',
-                        )}
-                    {comp.kind === 'stroke-component' && (
-                        <>
-                            {field(
-                                key,
-                                'Stroke color',
-                                c => (c.kind === 'stroke-component' ? c.color : ''),
-                                (c, value) => {
-                                    if (c.kind === 'stroke-component') c.color = value;
-                                },
-                                'color',
-                            )}
-                            {field(
-                                key,
-                                'Stroke width',
-                                c => (c.kind === 'stroke-component' ? c.width : ''),
-                                (c, value) => {
-                                    if (c.kind === 'stroke-component') c.width = Number(value);
-                                },
-                                'number',
-                                true,
-                            )}
-                        </>
+                    {comp.kind === 'fill-component' && (
+                        <FillFields
+                            store={store}
+                            shapes={shapes}
+                            componentKey={key}
+                            palettes={state.document.palettes}
+                        />
                     )}
-                    {(comp.kind === 'rounded-corner-component' || comp.kind === 'circle-like-component') &&
-                        field(
-                            key,
-                            'radius',
-                            c =>
-                                c.kind === 'rounded-corner-component' || c.kind === 'circle-like-component'
-                                    ? c.radius
-                                    : '',
-                            (c, value) => {
-                                if (c.kind === 'rounded-corner-component' || c.kind === 'circle-like-component')
-                                    c.radius = Number(value);
-                            },
-                            'number',
-                            true,
-                        )}
+                    {comp.kind === 'stroke-component' && (
+                        <StrokeFields
+                            store={store}
+                            shapes={shapes}
+                            componentKey={key}
+                            palettes={state.document.palettes}
+                        />
+                    )}
+                    {(comp.kind === 'rounded-corner-component' || comp.kind === 'circle-like-component') && (
+                        <RadiusField store={store} shapes={shapes} componentKey={key} />
+                    )}
                     {comp.kind === 'circle-like-component' &&
                         (['x', 'y'] as const).map(name =>
                             field(

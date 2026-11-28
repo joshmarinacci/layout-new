@@ -15,6 +15,7 @@ import {Toolbar} from './ui/Toolbar';
 import {usePanelWidths} from './ui/usePanelWidths';
 import {EditorDialog} from './common/EditorDialog';
 import {KeyboardShortcutsDialog} from './common/KeyboardShortcutsDialog';
+import {SelectionPanel} from './editor/SelectionPanel';
 import {DocumentSettingsDialog} from './common/DocumentSettingsDialog';
 import {effectiveGrid} from './model/grid';
 import {makeExampleDocument} from './model/exampleDocument';
@@ -120,6 +121,8 @@ export default function App() {
     const [vectorId, setVectorId] = useState<string | null>(null);
     /** The photo shape in crop mode. The crop session is one store transaction. */
     const [cropId, setCropId] = useState<string | null>(null);
+    /** A shape move or resize is in progress on the canvas (the selection panel fades out meanwhile). */
+    const [shapeGesture, setShapeGesture] = useState(false);
     const startCrop = (id: string) => {
         if (store.getSnapshot().transactionActive) return;
         setVectorId(null);
@@ -920,6 +923,7 @@ export default function App() {
                                     cropId={cropId}
                                     onStartCrop={startCrop}
                                     onFinishCrop={finishCrop}
+                                    onShapeGesture={setShapeGesture}
                                     onImportFiles={(files, at) =>
                                         void importImageFiles(
                                             ctx,
@@ -949,6 +953,15 @@ export default function App() {
                                         });
                                     }}
                                 />
+                                {!vectorId && !cropId && imageDialog?.kind !== 'edit' && (
+                                    <SelectionPanel
+                                        key={`${activeTab.id}-selection-panel`}
+                                        store={store}
+                                        camera={activeTab.camera}
+                                        ctx={ctx}
+                                        dragging={shapeGesture}
+                                    />
+                                )}
                                 {imageDialog?.kind === 'edit' && (
                                     <PixelImageEditor
                                         key={imageDialog.imageId}
