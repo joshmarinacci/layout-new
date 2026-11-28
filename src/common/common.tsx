@@ -18,7 +18,7 @@ export function CommandIconButton({commandId, ctx}: {commandId: CommandId; ctx: 
     const command = commandRegistry.require(commandId);
     return (
         <IconButton
-            label="Undo"
+            label={command.title}
             icon={command.icon ? command.icon : BugIcon}
             disabled={!command.enabled(ctx)}
             onClick={() => command.run(ctx)}
@@ -33,7 +33,7 @@ export function CommandMenuItem(props: {ctx: CommandContext; commandId: CommandI
         <MenuItem
             disabled={!command.enabled(ctx)}
             shortcut={shortcutLabel(command.id)}
-            onClick={() => {
+            onAction={() => {
                 command.run(ctx);
                 onRun?.();
             }}

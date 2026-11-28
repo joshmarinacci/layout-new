@@ -15,8 +15,9 @@ export async function openEditor(page: Page) {
 export const canvas = (page: Page) => page.locator('.canvas-viewport canvas');
 export const layers = (page: Page) => page.getByRole('complementary', {name: 'Layers & assets'});
 export const inspector = (page: Page) => page.getByRole('complementary', {name: 'Properties'});
+/** A row of the layers tree, by its label. */
 export const treeItem = (page: Page, name: string | RegExp) =>
-    layers(page).getByRole('button', {name: typeof name === 'string' ? new RegExp(`^${name}$`) : name});
+    layers(page).getByRole('row', {name: typeof name === 'string' ? new RegExp(`^${name}$`) : name});
 
 /** The canvas camera: the document point at the canvas's top-left corner, and the zoom. */
 export async function canvasCamera(page: Page) {

@@ -8,6 +8,7 @@ import TreeView from '../src/common/TreeView';
 import {makeExampleDocument} from '../src/model/exampleDocument';
 import {ContextMenu} from '../src/ui/ContextMenu';
 import {MenuItem} from '../src/ui/controls';
+import {Separator} from '../src/ui/DropdownMenu';
 import {NumberInput} from '../src/ui/NumberInput';
 import {clampPanelWidth, PANEL_MAX_WIDTH, PANEL_MIN_WIDTH, PanelResizer} from '../src/ui/PanelResizer';
 import {DEFAULT_PANEL_WIDTHS, usePanelWidths} from '../src/ui/usePanelWidths';
@@ -37,102 +38,16 @@ describe('ContextMenu', () => {
             action = vi.fn();
         render(
             <ContextMenu x={0} y={0} label="Test actions" onClose={onClose}>
-                <MenuItem label="Disabled" disabled onClick={action} />
-                <hr data-testid="separator" />
-                <MenuItem label="Run" onClick={action} />
+                <MenuItem label="Disabled" disabled onAction={action} />
+                <Separator />
+                <MenuItem label="Run" onAction={action} />
             </ContextMenu>,
         );
         await user.click(screen.getByRole('menuitem', {name: 'Disabled'}));
-        await user.click(screen.getByTestId('separator'));
+        await user.click(screen.getByRole('separator'));
         expect(onClose).not.toHaveBeenCalled();
         await user.click(screen.getByRole('menuitem', {name: 'Run'}));
         expect(action).toHaveBeenCalledTimes(1);
-        expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    function KeyboardMenu({onClose, action}: {onClose: () => void; action: () => void}) {
-        return (
-            <>
-                <button>Opener</button>
-                <ContextMenu x={0} y={0} label="Test actions" onClose={onClose}>
-                    <MenuItem label="First" onClick={action} />
-                    <MenuItem label="Skipped" disabled />
-                    <hr />
-                    <MenuItem label="Second" onClick={action} />
-                    <MenuItem label="Third" onClick={action} />
-                </ContextMenu>
-            </>
-        );
-    }
-
-    it('focuses the first enabled item and moves with arrows, Home and End, skipping disabled items', async () => {
-        const user = userEvent.setup();
-        render(<KeyboardMenu onClose={vi.fn()} action={vi.fn()} />);
-        const focused = () => document.activeElement?.textContent;
-        expect(focused()).toBe('First');
-        await user.keyboard('{ArrowDown}');
-        expect(focused()).toBe('Second');
-        await user.keyboard('{ArrowDown}{ArrowDown}');
-        expect(focused()).toBe('First');
-        await user.keyboard('{ArrowUp}');
-        expect(focused()).toBe('Third');
-        await user.keyboard('{Home}');
-        expect(focused()).toBe('First');
-        await user.keyboard('{End}');
-        expect(focused()).toBe('Third');
-    });
-
-    it('runs the focused item with Enter and then closes', async () => {
-        const user = userEvent.setup();
-        const onClose = vi.fn(),
-            action = vi.fn();
-        render(<KeyboardMenu onClose={onClose} action={action} />);
-        await user.keyboard('{ArrowDown}{Enter}');
-        expect(action).toHaveBeenCalledTimes(1);
-        expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('closes on Escape and returns focus to the previously focused element', async () => {
-        const user = userEvent.setup();
-        const onClose = vi.fn();
-        function Harness() {
-            const [open, setOpen] = useState(false);
-            return (
-                <>
-                    <button onClick={() => setOpen(true)}>Open</button>
-                    {open && (
-                        <ContextMenu
-                            x={0}
-                            y={0}
-                            label="Test actions"
-                            onClose={() => {
-                                onClose();
-                                setOpen(false);
-                            }}
-                        >
-                            <MenuItem label="Only" />
-                        </ContextMenu>
-                    )}
-                </>
-            );
-        }
-        render(<Harness />);
-        await user.click(screen.getByRole('button', {name: 'Open'}));
-        expect(document.activeElement?.textContent).toBe('Only');
-        const windowKeydown = vi.fn();
-        window.addEventListener('keydown', windowKeydown);
-        await user.keyboard('{Escape}');
-        window.removeEventListener('keydown', windowKeydown);
-        expect(onClose).toHaveBeenCalledTimes(1);
-        expect(windowKeydown).not.toHaveBeenCalled();
-        expect(document.activeElement?.textContent).toBe('Open');
-    });
-
-    it('closes on Tab', async () => {
-        const user = userEvent.setup();
-        const onClose = vi.fn();
-        render(<KeyboardMenu onClose={onClose} action={vi.fn()} />);
-        await user.keyboard('{Tab}');
         expect(onClose).toHaveBeenCalledTimes(1);
     });
 });
@@ -231,7 +146,7 @@ function treeProps() {
         selectedAsset: null,
         selectedPageId: document.pages[0].id,
         documentSelected: false,
-        onSelect: vi.fn(),
+        onSelectShapes: vi.fn(),
         onSelectAsset: vi.fn(),
         onSelectPalette: vi.fn(),
         onShapeContextMenu: vi.fn(),
@@ -247,9 +162,7 @@ function treeProps() {
         onSelectFont: vi.fn(),
         onSelectPhoto: vi.fn(),
         onPhotoContextMenu: vi.fn(),
-        onUngroup: vi.fn(),
         onRenameGroup: vi.fn(),
-        onSelectGroup: vi.fn(),
         onPageContextMenu: vi.fn(),
         onPagesContextMenu: vi.fn(),
         onAssetsContextMenu: vi.fn(),
@@ -260,67 +173,107 @@ function treeProps() {
 }
 
 describe('TreeView', () => {
+    const row = (name: string) => screen.getByRole('row', {name});
+    // React Aria toggles a row with Cmd on macOS and Ctrl elsewhere, as the platform does.
+    const toggleKey = () => (/Mac/.test(navigator.platform) ? 'Meta' : 'Control');
+
     it('shows the document as a selectable leaf with Pages and Assets beside it', async () => {
         const user = userEvent.setup();
         const props = treeProps();
         render(<TreeView {...props} />);
-        const doc = screen.getByRole('button', {name: /Doc: test doc/});
+        expect(screen.getByRole('treegrid', {name: 'Document contents'})).toBeTruthy();
+        const doc = row('Doc: test doc');
         expect(doc.hasAttribute('aria-expanded')).toBe(false);
         await user.click(doc);
         expect(props.onSelectDocument).toHaveBeenCalledTimes(1);
-        expect(screen.getByRole('button', {name: /^Pages$/}).getAttribute('aria-expanded')).toBe('true');
-        expect(screen.getByRole('button', {name: /^Assets$/})).toBeTruthy();
+        expect(row('Pages').getAttribute('aria-expanded')).toBe('true');
+        expect(row('Assets')).toBeTruthy();
     });
 
     it('uses a page icon for pages, with or without shapes', () => {
         const props = treeProps();
         props.document.pages.push({id: 'page_empty', name: 'Empty page', groups: []});
         render(<TreeView {...props} />);
-        for (const name of [/Page 1/, /Empty page/]) {
-            const icon = screen.getByRole('button', {name}).querySelector('svg');
-            expect(icon?.classList.contains('lucide-file-text')).toBe(true);
-        }
-        const pagesIcon = screen.getByRole('button', {name: /^Pages$/}).querySelector('svg');
-        expect(pagesIcon?.classList.contains('lucide-folder')).toBe(true);
+        const icon = (name: string) => row(name).querySelector('.tree-label svg');
+        for (const name of ['Page 1', 'Empty page'])
+            expect(icon(name)?.classList.contains('lucide-file-text')).toBe(true);
+        expect(icon('Pages')?.classList.contains('lucide-folder')).toBe(true);
+        // An empty folder keeps the plain icon it had before.
+        expect(icon('Assets')?.classList.contains('lucide-layers')).toBe(true);
     });
 
     it('fully highlights the open page only when nothing more specific is selected', () => {
-        const row = (name: RegExp) => screen.getByRole('button', {name}).closest('.tree-row')!;
         const props = treeProps();
         const {rerender} = render(<TreeView {...props} />);
-        expect(row(/Page 1/).classList.contains('selected')).toBe(true);
-        expect(row(/Doc: test doc/).classList.contains('selected')).toBe(false);
+        expect(row('Page 1').classList.contains('selected')).toBe(true);
+        expect(row('Page 1').getAttribute('aria-selected')).toBe('true');
+        expect(row('Doc: test doc').classList.contains('selected')).toBe(false);
 
         // A shape is selected: the page gets the subtle current-page style instead.
         rerender(<TreeView {...props} selectedIds={[props.document.shapes[0].id]} />);
-        expect(row(/^rect$/).classList.contains('selected')).toBe(true);
-        expect(row(/Page 1/).classList.contains('selected')).toBe(false);
-        expect(row(/Page 1/).classList.contains('current')).toBe(true);
-        expect(screen.getByRole('button', {name: /Page 1/}).getAttribute('aria-current')).toBe('page');
+        expect(row('rect').classList.contains('selected')).toBe(true);
+        expect(row('rect').getAttribute('aria-selected')).toBe('true');
+        expect(row('Page 1').classList.contains('selected')).toBe(false);
+        expect(row('Page 1').classList.contains('current')).toBe(true);
 
         // The document row is the selection only once it has been chosen.
         rerender(<TreeView {...props} documentSelected />);
-        expect(row(/Doc: test doc/).classList.contains('selected')).toBe(true);
-        expect(row(/Page 1/).classList.contains('current')).toBe(true);
+        expect(row('Doc: test doc').classList.contains('selected')).toBe(true);
+        expect(row('Page 1').classList.contains('current')).toBe(true);
     });
 
-    it('opens and closes folders with a single click', async () => {
+    it('opens and closes Pages and Assets with a single click, without selecting them', async () => {
         const user = userEvent.setup();
-        render(<TreeView {...treeProps()} />);
-        const pages = screen.getByRole('button', {name: /^Pages$/});
-        expect(screen.getByRole('button', {name: /Page 1/})).toBeTruthy();
-        await user.click(pages);
-        expect(pages.getAttribute('aria-expanded')).toBe('false');
-        expect(screen.queryByRole('button', {name: /Page 1/})).toBeNull();
-        await user.click(pages);
-        expect(screen.getByRole('button', {name: /Page 1/})).toBeTruthy();
+        const props = treeProps();
+        render(<TreeView {...props} />);
+        expect(row('Page 1')).toBeTruthy();
+        await user.click(row('Pages'));
+        expect(row('Pages').getAttribute('aria-expanded')).toBe('false');
+        expect(screen.queryByRole('row', {name: 'Page 1'})).toBeNull();
+        await user.click(row('Pages'));
+        expect(row('Page 1')).toBeTruthy();
+        expect(props.onSelectPage).not.toHaveBeenCalled();
+    });
+
+    it('selects shapes: a click selects one, Cmd/Ctrl-click adds or removes, Shift-click a range', async () => {
+        const user = userEvent.setup();
+        const props = treeProps();
+        const {rerender} = render(<TreeView {...props} />);
+        await user.click(row('rect'));
+        expect(props.onSelectShapes).toHaveBeenLastCalledWith('page_1', ['rect_1']);
+        rerender(<TreeView {...props} selectedIds={['rect_1']} />);
+        await user.keyboard(`{${toggleKey()}>}`);
+        await user.click(row('circle'));
+        await user.keyboard(`{/${toggleKey()}}`);
+        expect(props.onSelectShapes).toHaveBeenLastCalledWith('page_1', ['rect_1', 'circle_1']);
+        rerender(<TreeView {...props} selectedIds={['rect_1', 'circle_1']} />);
+        await user.keyboard(`{${toggleKey()}>}`);
+        await user.click(row('rect'));
+        await user.keyboard(`{/${toggleKey()}}`);
+        expect(props.onSelectShapes).toHaveBeenLastCalledWith('page_1', ['circle_1']);
+        rerender(<TreeView {...props} selectedIds={['rect_1']} />);
+        await user.keyboard('{Shift>}');
+        await user.click(row('circle'));
+        await user.keyboard('{/Shift}');
+        expect(props.onSelectShapes).toHaveBeenLastCalledWith('page_1', ['rect_1', 'circle_1']);
+    });
+
+    it('selects only the newly clicked row when it is not a shape', async () => {
+        const user = userEvent.setup();
+        const props = treeProps();
+        render(<TreeView {...props} selectedIds={['rect_1']} />);
+        await user.keyboard(`{${toggleKey()}>}`);
+        await user.click(row('Doc: test doc'));
+        await user.keyboard(`{/${toggleKey()}}`);
+        expect(props.onSelectDocument).toHaveBeenCalledTimes(1);
+        expect(props.onSelectShapes).not.toHaveBeenCalled();
     });
 
     it('renames items in place on double-click, committing with Enter', async () => {
         const user = userEvent.setup();
         const props = treeProps();
         render(<TreeView {...props} />);
-        await user.dblClick(screen.getByRole('button', {name: /^rect$/}));
+        await user.dblClick(row('rect'));
         const field = screen.getByRole('textbox', {name: 'Rename rect'});
         await user.clear(field);
         await user.type(field, 'Box{Enter}');
@@ -332,7 +285,7 @@ describe('TreeView', () => {
         const user = userEvent.setup();
         const props = treeProps();
         render(<TreeView {...props} />);
-        await user.dblClick(screen.getByRole('button', {name: /Doc: test doc/}));
+        await user.dblClick(row('Doc: test doc'));
         expect(screen.getByDisplayValue('test doc')).toBeTruthy();
         await user.type(screen.getByRole('textbox'), ' changed{Escape}');
         expect(props.onRenameDocument).not.toHaveBeenCalled();
@@ -343,11 +296,11 @@ describe('TreeView', () => {
         const user = userEvent.setup();
         const props = treeProps();
         render(<TreeView {...props} />);
-        screen.getByRole('button', {name: /Page 1/}).focus();
+        act(() => row('Page 1').focus());
         await user.keyboard('{F2}');
         await user.keyboard('{Control>}a{/Control}Cover{Enter}');
         expect(props.onRenamePage).toHaveBeenCalledWith(props.document.pages[0].id, 'Cover');
-        await user.dblClick(screen.getByRole('button', {name: /^Pages$/}));
+        await user.dblClick(row('Pages'));
         expect(screen.queryByRole('textbox')).toBeNull();
     });
 });

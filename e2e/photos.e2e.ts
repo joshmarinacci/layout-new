@@ -69,7 +69,7 @@ test.describe('photos', () => {
         await openEditor(page);
         await importImage(page, 'quadrants.jpg');
         await layers(page)
-            .getByRole('button', {name: /^quadrants \(400 × 300/})
+            .getByRole('row', {name: /^quadrants \(400 × 300/})
             .click();
         const name = inspector(page).getByRole('textbox', {name: 'Asset name'});
         await expect(name).toHaveValue('quadrants');

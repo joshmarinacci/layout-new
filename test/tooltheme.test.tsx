@@ -7,7 +7,7 @@ import {CommandMenuItem} from '../src/common/common';
 import type {CommandContext} from '../src/commands';
 import {MenuItem} from '../src/ui/controls';
 import {DropdownMenu, Separator} from '../src/ui/DropdownMenu';
-import {MenuPopover} from '../src/ui/MenuPopover';
+import {ContextMenu} from '../src/ui/ContextMenu';
 import {loadThemeSettings, THEME_STORAGE_KEY, themeMode, useThemeSettings} from '../src/ui/theme';
 
 afterEach(() => {
@@ -60,17 +60,18 @@ describe('theme settings', () => {
 describe('menus use tooltheme semantics', () => {
     it('render a popover holding a labelled menu of menu items', () => {
         render(
-            <MenuPopover label="Shape actions" style={{left: 10, top: 20}}>
+            <ContextMenu x={10} y={20} label="Shape actions" onClose={vi.fn()}>
                 <MenuItem label="Duplicate" shortcut="⌘D" />
                 <Separator />
-                <MenuItem label="Delete" />
-            </MenuPopover>,
+                <MenuItem label="Delete" variant="danger" />
+            </ContextMenu>,
         );
         const menu = screen.getByRole('menu', {name: 'Shape actions'});
-        expect(menu.tagName).toBe('MENU');
-        expect(menu.parentElement?.getAttribute('popover')).toBe('manual');
+        expect(menu.closest('.menu-popover')).not.toBeNull();
         expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Duplicate⌘D', 'Delete']);
-        expect(menu.querySelector('hr')).not.toBeNull();
+        expect(menu.querySelector('kbd')?.textContent).toBe('⌘D');
+        expect(screen.getByRole('separator')).toBeTruthy();
+        expect(screen.getByRole('menuitem', {name: 'Delete'}).getAttribute('data-variant')).toBe('danger');
     });
 
     it('opens a dropdown from its button and closes it after an item runs', async () => {
@@ -78,11 +79,11 @@ describe('menus use tooltheme semantics', () => {
         const run = vi.fn();
         render(
             <DropdownMenu title="File">
-                <MenuItem label="New" onClick={run} />
+                <MenuItem label="New" onAction={run} />
             </DropdownMenu>,
         );
         const button = screen.getByRole('button', {name: 'File'});
-        expect(button.getAttribute('aria-haspopup')).toBe('menu');
+        expect(button.getAttribute('aria-haspopup')).toBe('true');
         await user.click(button);
         expect(button.getAttribute('aria-expanded')).toBe('true');
         await user.click(screen.getByRole('menuitem', {name: 'New'}));
@@ -94,9 +95,9 @@ describe('menus use tooltheme semantics', () => {
     it('renders command menu items as menu items', () => {
         const ctx = {} as CommandContext;
         render(
-            <menu role="menu">
+            <ContextMenu x={0} y={0} label="Test" onClose={vi.fn()}>
                 <CommandMenuItem ctx={ctx} commandId="theme-settings" />
-            </menu>,
+            </ContextMenu>,
         );
         expect(screen.getByRole('menuitem', {name: 'Theme Settings…'})).toBeDefined();
     });

@@ -1,6 +1,7 @@
-// Thin wrappers over plain elements; tooltheme styles them from their semantics.
+// Thin wrappers over plain elements (and React Aria for menus); tooltheme styles them from their semantics.
 import {type LucideIcon} from 'lucide-react';
 import type {ButtonHTMLAttributes, ReactNode, SelectHTMLAttributes} from 'react';
+import {Keyboard, MenuItem as AriaMenuItem} from 'react-aria-components';
 
 /** A square icon-only button: tooltheme sizes `button[aria-label]` holding just an svg. */
 export function IconButton({
@@ -26,19 +27,28 @@ export function ToolbarGroup({label, children}: {label: string; children: ReactN
     );
 }
 
+/** A menu item for a MenuPopover: its label, and the keyboard shortcut when it has one. */
 export function MenuItem({
     label,
     shortcut,
-    ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
+    disabled,
+    onAction,
+    variant,
+    title,
+}: {
     label: string;
     shortcut?: string;
+    disabled?: boolean;
+    onAction?: () => void;
+    variant?: 'danger';
+    /** A tooltip, e.g. why the item is disabled. */
+    title?: string;
 }) {
     return (
-        <button type="button" role="menuitem" {...props}>
-            <span>{label}</span>
-            {shortcut && <kbd>{shortcut}</kbd>}
-        </button>
+        <AriaMenuItem textValue={label} isDisabled={disabled} onAction={onAction} data-variant={variant}>
+            <span title={title}>{label}</span>
+            {shortcut && <Keyboard>{shortcut}</Keyboard>}
+        </AriaMenuItem>
     );
 }
 
