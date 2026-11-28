@@ -193,6 +193,7 @@ test.describe('photos', () => {
         expect(await page.evaluate(() => localStorage.getItem('layout-new:saved-documents:v1'))).toBeNull();
 
         await page.reload();
+        await expect(canvas(page)).toBeVisible();
         await runCommand(page, 'open from browser');
         await page.getByRole('button', {name: 'Open', exact: true}).click();
         await expect(layers(page)).toContainText('noise (4096 × 819, 1 use)');
